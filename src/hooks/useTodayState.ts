@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { normalizeDailyRecord, type DailyRecord } from '../domain/day'
-import { oppositeState, resolveEffectiveState, type DayState } from '../domain/tracker'
+import { resolveEffectiveState, type DayState } from '../domain/tracker'
 import { saveDailyRecord, subscribeDay } from '../data/day'
 import { useLocalDateKey } from './useLocalDateKey'
 
@@ -10,7 +10,7 @@ export interface TodayState {
   record: DailyRecord
   pending: boolean
   error: string | null
-  toggle: () => void
+  setState: (desired: DayState) => void
 }
 
 const EMPTY_RECORD: DailyRecord = {}
@@ -58,12 +58,14 @@ export function useTodayState(
       ? resolveEffectiveState(defaultState, record.state ?? null)
       : null
 
-  function toggle() {
+  function setState(desired: DayState) {
     if (!uid || !dateKey || !defaultState || effectiveState === null || record === undefined) {
       return
     }
+    if (desired === effectiveState) {
+      return
+    }
 
-    const desired = oppositeState(effectiveState)
     setError(null)
 
     const normalized = normalizeDailyRecord({
@@ -84,6 +86,6 @@ export function useTodayState(
     record: record ?? EMPTY_RECORD,
     pending,
     error,
-    toggle,
+    setState,
   }
 }

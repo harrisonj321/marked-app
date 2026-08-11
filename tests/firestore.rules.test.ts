@@ -197,9 +197,31 @@ describe('tracker config', () => {
     )
   })
 
-  it('rejects changing defaultState on update', async () => {
+  it('owner can change defaultState on update', async () => {
     await seedTracker(OWNER_UID)
     const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        defaultState: 'didnt',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects an invalid defaultState value on update', async () => {
+    await seedTracker(OWNER_UID)
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      updateDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        defaultState: 'sometimes',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('another authenticated user cannot change defaultState', async () => {
+    await seedTracker(OWNER_UID)
+    const db = dbAs(OTHER_UID)
     await assertFails(
       updateDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
         defaultState: 'didnt',
@@ -464,6 +486,30 @@ describe('daily entries -- counts', () => {
     await assertFails(
       setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
         count: 2,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('allows pinning the implicit did state onto a count-only day before a default change', async () => {
+    await seedTracker(OWNER_UID) // defaultState: did
+    await seedDayDoc(OWNER_UID, '2026-08-10', { count: 3 })
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        state: 'did',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('allows pinning a state onto a note-only day', async () => {
+    await seedTracker(OWNER_UID)
+    await seedDayDoc(OWNER_UID, '2026-08-10', { note: 'Sick' })
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        state: 'did',
         updatedAt: serverTimestamp(),
       }),
     )

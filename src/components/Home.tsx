@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { updateTrackerName } from '../data/tracker'
+import { updateTrackerDefaultState, updateTrackerName } from '../data/tracker'
 import { signOutUser } from '../lib/auth'
 import { formatDisplayDate } from '../domain/date'
 import { useLocalDateKey } from '../hooks/useLocalDateKey'
-import type { TrackerConfig } from '../domain/tracker'
+import type { DayState, TrackerConfig } from '../domain/tracker'
 import { CalendarSheet } from './CalendarSheet'
+import { SettingsSheet } from './SettingsSheet'
 import { TodaySection } from './TodaySection'
 import { TrackerNameEditor } from './TrackerNameEditor'
 import { CalendarIcon } from './icons'
@@ -17,9 +18,14 @@ interface HomeProps {
 export function Home({ uid, tracker }: HomeProps) {
   const todayKey = useLocalDateKey(tracker.timezone)
   const [calendarOpen, setCalendarOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   async function handleNameSave(name: string) {
     await updateTrackerName(uid, name)
+  }
+
+  async function handleDefaultStateSave(defaultState: DayState) {
+    await updateTrackerDefaultState(uid, tracker.defaultState, defaultState)
   }
 
   return (
@@ -43,9 +49,14 @@ export function Home({ uid, tracker }: HomeProps) {
       </div>
 
       <footer className="home-footer">
-        <button type="button" onClick={() => void signOutUser()} className="sign-out">
-          Sign out
-        </button>
+        <div className="home-footer-links">
+          <button type="button" className="footer-link" onClick={() => setSettingsOpen(true)}>
+            Settings
+          </button>
+          <button type="button" className="footer-link" onClick={() => void signOutUser()}>
+            Sign out
+          </button>
+        </div>
         <p className="maker-mark">{`Made with ❤️ by Maker 428 · v${__APP_VERSION__}`}</p>
       </footer>
 
@@ -55,6 +66,14 @@ export function Home({ uid, tracker }: HomeProps) {
           tracker={tracker}
           todayKey={todayKey}
           onDismiss={() => setCalendarOpen(false)}
+        />
+      )}
+
+      {settingsOpen && (
+        <SettingsSheet
+          defaultState={tracker.defaultState}
+          onSaveDefaultState={handleDefaultStateSave}
+          onDismiss={() => setSettingsOpen(false)}
         />
       )}
     </main>

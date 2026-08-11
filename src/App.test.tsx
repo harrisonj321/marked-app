@@ -15,7 +15,7 @@ vi.mock('./hooks/useTodayState', () => ({
     record: {},
     pending: false,
     error: null,
-    toggle: vi.fn(),
+    setState: vi.fn(),
   }),
 }))
 vi.mock('./hooks/useMonthRecords', () => ({
@@ -24,6 +24,7 @@ vi.mock('./hooks/useMonthRecords', () => ({
 vi.mock('./data/tracker', () => ({
   createTracker: vi.fn(),
   updateTrackerName: vi.fn(),
+  updateTrackerDefaultState: vi.fn(),
 }))
 vi.mock('./data/day', () => ({
   saveDailyRecord: vi.fn(),

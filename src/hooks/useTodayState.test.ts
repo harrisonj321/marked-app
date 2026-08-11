@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { DayState } from '../domain/tracker'
 
 const subscribeDayMock = vi.fn()
 const saveDailyRecordMock = vi.fn()
@@ -57,12 +58,23 @@ describe('useTodayState', () => {
     expect(result.current.effectiveState).toBe('did')
   })
 
-  it('a toggle preserves the existing note and count', () => {
+  it('selecting the state that is already current writes nothing', () => {
+    const { result } = renderHook(() => useTodayState(UID, 'did', LA))
+    act(() => emitLatestSnapshot({}))
+
+    act(() => {
+      result.current.setState('did')
+    })
+
+    expect(saveDailyRecordMock).not.toHaveBeenCalled()
+  })
+
+  it('a state change preserves the existing note and count', () => {
     const { result } = renderHook(() => useTodayState(UID, 'did', LA))
     act(() => emitLatestSnapshot({ note: 'Hotel gym', count: 3 }))
 
     act(() => {
-      result.current.toggle()
+      result.current.setState('didnt')
     })
 
     expect(saveDailyRecordMock).toHaveBeenCalledWith(UID, '2026-08-10', {
@@ -72,19 +84,30 @@ describe('useTodayState', () => {
     })
   })
 
-  it('toggling away from did drops any stored count', () => {
+  it('changing away from did drops any stored count', () => {
     const { result } = renderHook(() => useTodayState(UID, 'did', LA))
     act(() => emitLatestSnapshot({ count: 5 }))
 
     act(() => {
-      result.current.toggle()
+      result.current.setState('didnt')
     })
 
     const call = saveDailyRecordMock.mock.calls.at(-1)
     expect(call?.[2]).not.toHaveProperty('count')
   })
 
-  it('a toggle after rollover writes the new day, never the previous one', () => {
+  it('returning an override to the default deletes the day document', () => {
+    const { result } = renderHook(() => useTodayState(UID, 'did', LA))
+    act(() => emitLatestSnapshot({ state: 'didnt' }))
+
+    act(() => {
+      result.current.setState('did')
+    })
+
+    expect(saveDailyRecordMock).toHaveBeenCalledWith(UID, '2026-08-10', { kind: 'delete' })
+  })
+
+  it('a state change after rollover writes the new day, never the previous one', () => {
     const { result } = renderHook(() => useTodayState(UID, 'did', LA))
     act(() => emitLatestSnapshot({}))
 
@@ -95,7 +118,7 @@ describe('useTodayState', () => {
     act(() => emitLatestSnapshot({}))
 
     act(() => {
-      result.current.toggle()
+      result.current.setState('didnt')
     })
 
     expect(saveDailyRecordMock).toHaveBeenCalledWith(
@@ -108,6 +131,57 @@ describe('useTodayState', () => {
       '2026-08-10',
       expect.anything(),
     )
+  })
+
+  it('re-resolves an untouched day when the tracker default changes, without writing', () => {
+    const { result, rerender } = renderHook(
+      ({ defaultState }: { defaultState: DayState }) =>
+        useTodayState(UID, defaultState, LA),
+      { initialProps: { defaultState: 'did' } as { defaultState: DayState } },
+    )
+    act(() => emitLatestSnapshot({}))
+    expect(result.current.effectiveState).toBe('did')
+
+    rerender({ defaultState: 'didnt' })
+
+    expect(result.current.effectiveState).toBe('didnt')
+    expect(subscribeDayMock).toHaveBeenCalledTimes(1)
+    expect(saveDailyRecordMock).not.toHaveBeenCalled()
+  })
+
+  it('leaves an explicit override untouched when the tracker default changes', () => {
+    const { result, rerender } = renderHook(
+      ({ defaultState }: { defaultState: DayState }) =>
+        useTodayState(UID, defaultState, LA),
+      { initialProps: { defaultState: 'did' } as { defaultState: DayState } },
+    )
+    act(() => emitLatestSnapshot({ state: 'didnt', note: 'Sick' }))
+
+    rerender({ defaultState: 'didnt' })
+
+    expect(result.current.effectiveState).toBe('didnt')
+    expect(result.current.record).toEqual({ state: 'didnt', note: 'Sick' })
+    expect(saveDailyRecordMock).not.toHaveBeenCalled()
+  })
+
+  it('a state change after the default changes is normalized against the new default', () => {
+    const { result, rerender } = renderHook(
+      ({ defaultState }: { defaultState: DayState }) =>
+        useTodayState(UID, defaultState, LA),
+      { initialProps: { defaultState: 'did' } as { defaultState: DayState } },
+    )
+    act(() => emitLatestSnapshot({}))
+
+    rerender({ defaultState: 'didnt' })
+
+    act(() => {
+      result.current.setState('did')
+    })
+
+    expect(saveDailyRecordMock).toHaveBeenCalledWith(UID, '2026-08-10', {
+      kind: 'set',
+      state: 'did',
+    })
   })
 
   it('exposes the raw record for the detail surface to consume', () => {

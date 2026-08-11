@@ -3,16 +3,19 @@ import {
   deleteDoc,
   doc,
   documentId,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
   setDoc,
   where,
+  writeBatch,
   type FirestoreError,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import type { DailyRecord, NormalizedDailyRecord } from '../domain/day'
+import type { DayState } from '../domain/tracker'
 
 function dayRef(uid: string, dateKey: string) {
   return doc(db, 'users', uid, 'days', dateKey)
@@ -90,6 +93,37 @@ export function subscribeMonth(
     },
     onError,
   )
+}
+
+/** Firestore caps a single batch at 500 writes; stay clear of the edge. */
+const PIN_BATCH_SIZE = 400
+
+/**
+ * Writes the state a day already resolves to onto every existing day
+ * document that has none of its own.
+ *
+ * A day document is stored sparsely: it holds a state only when that
+ * state differs from the tracker default, so a note-only or count-only
+ * day carries its state implicitly. Making those implicit states
+ * explicit *before* the default changes is what keeps a recorded day
+ * saying the same thing afterwards. Days with no document at all are
+ * untouched days and are deliberately left to follow the new default.
+ *
+ * Writing a state a document already resolves to changes nothing about
+ * what that day means, so a partially applied run is harmless and safe
+ * to repeat.
+ */
+export async function pinImplicitDayStates(uid: string, state: DayState): Promise<void> {
+  const snapshot = await getDocs(daysCollection(uid))
+  const implicit = snapshot.docs.filter((docSnapshot) => !toDailyRecord(docSnapshot.data()).state)
+
+  for (let index = 0; index < implicit.length; index += PIN_BATCH_SIZE) {
+    const batch = writeBatch(db)
+    for (const docSnapshot of implicit.slice(index, index + PIN_BATCH_SIZE)) {
+      batch.update(docSnapshot.ref, { state, updatedAt: serverTimestamp() })
+    }
+    await batch.commit()
+  }
 }
 
 /** Writes or deletes a day document from its already-normalized form. */

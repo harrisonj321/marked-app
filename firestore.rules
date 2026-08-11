@@ -94,13 +94,17 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && request.resource.data.updatedAt == request.time;
 
-        // Only name and updatedAt may ever change after creation.
+        // Only name, defaultState, and updatedAt may change after
+        // creation. defaultState is user-correctable from Settings; the
+        // client pins each day's current state onto its own document
+        // before this write, so no already-recorded day's meaning
+        // changes -- only days with no document re-resolve.
         allow update: if isOwner(uid)
           && request.resource.data.keys().hasOnly(
                ['name', 'defaultState', 'timezone', 'startDate', 'createdAt', 'updatedAt']
              )
           && isTrackerName(request.resource.data.name)
-          && request.resource.data.defaultState == resource.data.defaultState
+          && isDayState(request.resource.data.defaultState)
           && request.resource.data.timezone == resource.data.timezone
           && request.resource.data.startDate == resource.data.startDate
           && request.resource.data.createdAt == resource.data.createdAt

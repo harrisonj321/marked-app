@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
-const toggle = vi.fn()
+const setState = vi.fn()
 let mockRecord: { state?: 'did' | 'didnt'; note?: string; count?: number } = {}
 
 vi.mock('../hooks/useTodayState', () => ({
@@ -11,7 +11,7 @@ vi.mock('../hooks/useTodayState', () => ({
     record: mockRecord,
     pending: false,
     error: null,
-    toggle,
+    setState,
   }),
 }))
 
@@ -29,21 +29,23 @@ beforeEach(() => {
     this.dispatchEvent(new Event('close'))
   })
   mockRecord = {}
+  setState.mockClear()
   saveDailyRecordMock.mockClear()
 })
 
 const { TodaySection } = await import('./TodaySection')
 
 describe('TodaySection', () => {
-  it("the primary control shows today's effective state", () => {
+  it("presents both states with today's state selected", () => {
     render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
-    expect(screen.getByText('Did')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Did' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: "Didn't" })).not.toBeChecked()
   })
 
-  it('the primary control names the flip action it will take and calls toggle', () => {
+  it('selecting the other state flips today', () => {
     render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
-    fireEvent.click(screen.getByRole('button', { name: /mark today as "didn't"/i }))
-    expect(toggle).toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('radio', { name: "Didn't" }))
+    expect(setState).toHaveBeenCalledWith('didnt')
   })
 
   it('shows "Add note" when there is no existing note or count', () => {
@@ -74,7 +76,8 @@ describe('TodaySection', () => {
   it("today's note sheet does not duplicate the Did/Didn't controls", () => {
     render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
     fireEvent.click(screen.getByRole('button', { name: 'Add note' }))
-    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+    // The only radios on screen remain the two in the primary toggle.
+    expect(screen.getAllByRole('radio')).toHaveLength(2)
   })
 
   it('saving from the detail surface persists via saveDailyRecord for today', async () => {

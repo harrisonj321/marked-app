@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   TRACKER_NAME_MAX_LENGTH,
   isOverrideNeeded,
-  oppositeState,
   resolveEffectiveState,
   validateTrackerName,
 } from './tracker'
@@ -31,13 +30,6 @@ describe('isOverrideNeeded', () => {
   it('is true when the desired state differs from the default', () => {
     expect(isOverrideNeeded('did', 'didnt')).toBe(true)
     expect(isOverrideNeeded('didnt', 'did')).toBe(true)
-  })
-})
-
-describe('oppositeState', () => {
-  it('flips did to didnt and back', () => {
-    expect(oppositeState('did')).toBe('didnt')
-    expect(oppositeState('didnt')).toBe('did')
   })
 })
 

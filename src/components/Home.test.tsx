@@ -1,5 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+
+const { reportSaveError, updateTrackerDefaultStateMock, updateTrackerNameMock } = vi.hoisted(
+  () => ({
+    reportSaveError: vi.fn(),
+    updateTrackerDefaultStateMock: vi.fn(),
+    updateTrackerNameMock: vi.fn(),
+  }),
+)
 
 vi.mock('./TodaySection', () => ({
   TodaySection: ({ defaultState, timezone }: { defaultState: string; timezone: string }) => (
@@ -18,11 +26,41 @@ vi.mock('./CalendarSheet', () => ({
     </div>
   ),
 }))
+vi.mock('./SettingsSheet', () => ({
+  SettingsSheet: ({
+    defaultState,
+    onSaveDefaultState,
+    onDismiss,
+  }: {
+    defaultState: string
+    onSaveDefaultState: (next: 'did' | 'didnt') => Promise<void>
+    onDismiss: () => void
+  }) => (
+    <div data-testid="settings-sheet">
+      settings-sheet:{defaultState}
+      <button type="button" onClick={() => void onSaveDefaultState('didnt').catch(reportSaveError)}>
+        Save didnt
+      </button>
+      <button type="button" onClick={onDismiss}>
+        Close settings
+      </button>
+    </div>
+  ),
+}))
 vi.mock('../hooks/useLocalDateKey', () => ({
   useLocalDateKey: () => '2026-08-10',
 }))
-vi.mock('../data/tracker', () => ({ updateTrackerName: vi.fn() }))
+vi.mock('../data/tracker', () => ({
+  updateTrackerName: updateTrackerNameMock,
+  updateTrackerDefaultState: updateTrackerDefaultStateMock,
+}))
 vi.mock('../lib/auth', () => ({ signOutUser: vi.fn() }))
+
+beforeEach(() => {
+  reportSaveError.mockReset()
+  updateTrackerNameMock.mockReset().mockResolvedValue(undefined)
+  updateTrackerDefaultStateMock.mockReset().mockResolvedValue(undefined)
+})
 
 const { Home } = await import('./Home')
 
@@ -52,6 +90,40 @@ describe('Home', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close calendar' }))
     expect(screen.queryByTestId('calendar-sheet')).not.toBeInTheDocument()
+  })
+
+  it('opens and closes settings from the footer link', () => {
+    render(<Home uid="u1" tracker={tracker} />)
+    expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:did')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
+    expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
+  })
+
+  it('saves a new default state with the current one, so existing days can be pinned first', async () => {
+    render(<Home uid="u1" tracker={tracker} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save didnt' }))
+
+    await vi.waitFor(() => {
+      expect(updateTrackerDefaultStateMock).toHaveBeenCalledWith('u1', 'did', 'didnt')
+    })
+  })
+
+  it('propagates a failed default-state save so the sheet can report it', async () => {
+    updateTrackerDefaultStateMock.mockRejectedValue(new Error('offline'))
+    render(<Home uid="u1" tracker={tracker} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save didnt' }))
+
+    await vi.waitFor(() => {
+      expect(reportSaveError).toHaveBeenCalled()
+    })
   })
 
   it('provides a sign-out control', () => {

@@ -102,9 +102,9 @@ A tracker contains:
 - a local tracker start date
 - creation/update timestamps as needed
 
-The default daily state is fixed after initial setup in V1.
+The tracker name and the default daily state both remain editable.
 
-The tracker name remains editable.
+Changing the default daily state must not rewrite what an already-recorded day says. Days that have a stored document keep the state they currently show; days with no document follow the new default.
 
 Days before the tracker start date do not have a state and must not be interpreted retroactively.
 

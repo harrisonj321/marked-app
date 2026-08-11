@@ -40,7 +40,3 @@ export function resolveEffectiveState(
 export function isOverrideNeeded(defaultState: DayState, desiredState: DayState): boolean {
   return desiredState !== defaultState
 }
-
-export function oppositeState(state: DayState): DayState {
-  return state === 'did' ? 'didnt' : 'did'
-}
