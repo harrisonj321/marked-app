@@ -2,13 +2,11 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const subscribeDayMock = vi.fn()
-const setDayOverrideMock = vi.fn()
-const clearDayOverrideMock = vi.fn()
+const saveDailyRecordMock = vi.fn()
 
 vi.mock('../data/day', () => ({
   subscribeDay: (...args: unknown[]) => subscribeDayMock(...args),
-  setDayOverride: (...args: unknown[]) => setDayOverrideMock(...args),
-  clearDayOverride: (...args: unknown[]) => clearDayOverrideMock(...args),
+  saveDailyRecord: (...args: unknown[]) => saveDailyRecordMock(...args),
 }))
 
 const { useTodayState } = await import('./useTodayState')
@@ -16,11 +14,14 @@ const { useTodayState } = await import('./useTodayState')
 const LA = 'America/Los_Angeles'
 const UID = 'user-1'
 
-function emitLatestSnapshot(state: 'did' | 'didnt' | null, hasPendingWrites = false) {
+function emitLatestSnapshot(
+  record: { state?: 'did' | 'didnt'; note?: string; count?: number },
+  hasPendingWrites = false,
+) {
   const call = subscribeDayMock.mock.calls.at(-1) as
-    | [string, string, (snapshot: { state: typeof state; hasPendingWrites: boolean }) => void]
+    | [string, string, (snapshot: { record: typeof record; hasPendingWrites: boolean }) => void]
     | undefined
-  call?.[2]({ state, hasPendingWrites })
+  call?.[2]({ record, hasPendingWrites })
 }
 
 describe('useTodayState', () => {
@@ -28,8 +29,7 @@ describe('useTodayState', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-10T23:00:00-07:00'))
     subscribeDayMock.mockReset().mockReturnValue(() => {})
-    setDayOverrideMock.mockReset().mockResolvedValue(undefined)
-    clearDayOverrideMock.mockReset().mockResolvedValue(undefined)
+    saveDailyRecordMock.mockReset().mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -44,80 +44,75 @@ describe('useTodayState', () => {
 
   it('re-subscribes to the new day when local midnight passes', () => {
     renderHook(() => useTodayState(UID, 'did', LA))
-    expect(subscribeDayMock.mock.calls[0][1]).toBe('2026-08-10')
-
     act(() => {
       vi.setSystemTime(new Date('2026-08-11T00:00:02-07:00'))
       vi.runOnlyPendingTimers()
     })
-
-    const lastCall = subscribeDayMock.mock.calls.at(-1)
-    expect(lastCall?.[1]).toBe('2026-08-11')
+    expect(subscribeDayMock.mock.calls.at(-1)?.[1]).toBe('2026-08-11')
   })
 
-  it('returns to a loading/derived state while the new subscription resolves after rollover', () => {
+  it('resolves the effective state from the default when nothing is stored', () => {
     const { result } = renderHook(() => useTodayState(UID, 'did', LA))
-    act(() => emitLatestSnapshot('didnt'))
-    expect(result.current.effectiveState).toBe('didnt')
+    act(() => emitLatestSnapshot({}))
+    expect(result.current.effectiveState).toBe('did')
+  })
+
+  it('a toggle preserves the existing note and count', () => {
+    const { result } = renderHook(() => useTodayState(UID, 'did', LA))
+    act(() => emitLatestSnapshot({ note: 'Hotel gym', count: 3 }))
 
     act(() => {
-      vi.setSystemTime(new Date('2026-08-11T00:00:02-07:00'))
-      vi.runOnlyPendingTimers()
+      result.current.toggle()
     })
 
-    // Yesterday's override must not leak into the new day before the new
-    // subscription reports back.
-    expect(result.current.effectiveState).toBeNull()
+    expect(saveDailyRecordMock).toHaveBeenCalledWith(UID, '2026-08-10', {
+      kind: 'set',
+      state: 'didnt',
+      note: 'Hotel gym',
+    })
+  })
 
-    act(() => emitLatestSnapshot(null))
-    expect(result.current.effectiveState).toBe('did')
+  it('toggling away from did drops any stored count', () => {
+    const { result } = renderHook(() => useTodayState(UID, 'did', LA))
+    act(() => emitLatestSnapshot({ count: 5 }))
+
+    act(() => {
+      result.current.toggle()
+    })
+
+    const call = saveDailyRecordMock.mock.calls.at(-1)
+    expect(call?.[2]).not.toHaveProperty('count')
   })
 
   it('a toggle after rollover writes the new day, never the previous one', () => {
     const { result } = renderHook(() => useTodayState(UID, 'did', LA))
-    act(() => emitLatestSnapshot(null))
+    act(() => emitLatestSnapshot({}))
 
     act(() => {
       vi.setSystemTime(new Date('2026-08-11T00:00:02-07:00'))
       vi.runOnlyPendingTimers()
     })
-    act(() => emitLatestSnapshot(null))
+    act(() => emitLatestSnapshot({}))
 
     act(() => {
       result.current.toggle()
     })
 
-    expect(setDayOverrideMock).toHaveBeenCalledWith(UID, '2026-08-11', 'didnt')
-    expect(setDayOverrideMock).not.toHaveBeenCalledWith(
+    expect(saveDailyRecordMock).toHaveBeenCalledWith(
+      UID,
+      '2026-08-11',
+      expect.objectContaining({ state: 'didnt' }),
+    )
+    expect(saveDailyRecordMock).not.toHaveBeenCalledWith(
       UID,
       '2026-08-10',
       expect.anything(),
     )
-    expect(clearDayOverrideMock).not.toHaveBeenCalledWith(UID, '2026-08-10')
   })
 
-  it('a toggle back to default after rollover clears the new day, not the previous one', () => {
+  it('exposes the raw record for the detail surface to consume', () => {
     const { result } = renderHook(() => useTodayState(UID, 'did', LA))
-    act(() => emitLatestSnapshot(null))
-
-    act(() => {
-      vi.setSystemTime(new Date('2026-08-11T00:00:02-07:00'))
-      vi.runOnlyPendingTimers()
-    })
-    act(() => emitLatestSnapshot('didnt'))
-
-    act(() => {
-      result.current.toggle()
-    })
-
-    expect(clearDayOverrideMock).toHaveBeenCalledWith(UID, '2026-08-11')
-    expect(clearDayOverrideMock).not.toHaveBeenCalledWith(UID, '2026-08-10')
-  })
-
-  it('remains timezone-aware: UTC already past midnight does not retarget a still-current LA day', () => {
-    // UTC has already crossed into Aug 11, but it is still 10 PM Aug 10 in LA.
-    vi.setSystemTime(new Date('2026-08-11T05:00:00Z'))
-    renderHook(() => useTodayState(UID, 'did', LA))
-    expect(subscribeDayMock.mock.calls[0][1]).toBe('2026-08-10')
+    act(() => emitLatestSnapshot({ note: 'Sick', count: 2, state: 'didnt' }))
+    expect(result.current.record).toEqual({ note: 'Sick', count: 2, state: 'didnt' })
   })
 })

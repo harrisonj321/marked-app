@@ -54,10 +54,10 @@ async function seedTracker(uid: string, data: Record<string, unknown> = validTra
   })
 }
 
-async function seedDay(uid: string, dateKey: string, state = 'did') {
+async function seedDayDoc(uid: string, dateKey: string, data: Record<string, unknown>) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), `users/${uid}/days/${dateKey}`), {
-      state,
+      ...data,
       updatedAt: new Date(),
     })
   })
@@ -275,7 +275,7 @@ describe('tracker config', () => {
   })
 })
 
-describe('daily entries', () => {
+describe('daily entries -- ownership and shape', () => {
   it('owner can create, read, and delete their own daily override', async () => {
     const db = dbAs(OWNER_UID)
     const ref = doc(db, `users/${OWNER_UID}/days/2026-08-10`)
@@ -285,7 +285,7 @@ describe('daily entries', () => {
   })
 
   it('another user cannot read or delete a daily override', async () => {
-    await seedDay(OWNER_UID, '2026-08-10')
+    await seedDayDoc(OWNER_UID, '2026-08-10', { state: 'did' })
     const db = dbAs(OTHER_UID)
     const ref = doc(db, `users/${OWNER_UID}/days/2026-08-10`)
     await assertFails(getDoc(ref))
@@ -303,7 +303,7 @@ describe('daily entries', () => {
   })
 
   it('unauthenticated user cannot read or write a daily override', async () => {
-    await seedDay(OWNER_UID, '2026-08-10')
+    await seedDayDoc(OWNER_UID, '2026-08-10', { state: 'did' })
     const db = dbAs(null)
     const ref = doc(db, `users/${OWNER_UID}/days/2026-08-10`)
     await assertFails(getDoc(ref))
@@ -320,13 +320,22 @@ describe('daily entries', () => {
     )
   })
 
-  it('rejects arbitrary extra daily fields', async () => {
+  it('rejects an unrecognized field', async () => {
     const db = dbAs(OWNER_UID)
     await assertFails(
       setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
         state: 'did',
         updatedAt: serverTimestamp(),
-        note: 'not implemented yet',
+        tag: 'not supported',
+      }),
+    )
+  })
+
+  it('rejects a document with only updatedAt and no explicit field', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        updatedAt: serverTimestamp(),
       }),
     )
   })
@@ -336,6 +345,158 @@ describe('daily entries', () => {
     await assertFails(
       setDoc(doc(db, `users/${OWNER_UID}/days/not-a-date`), {
         state: 'did',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+})
+
+describe('daily entries -- notes', () => {
+  it('allows a note-only document on an otherwise default-state day', async () => {
+    await seedTracker(OWNER_UID)
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        note: 'Hotel gym',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('allows a valid note alongside a state override', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        state: 'didnt',
+        note: 'Sick',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a note over the length limit', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        note: 'a'.repeat(121),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a whitespace-only note', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        note: '   ',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('removes the state override while preserving the note', async () => {
+    await seedTracker(OWNER_UID) // defaultState: did
+    await seedDayDoc(OWNER_UID, '2026-08-10', { state: 'didnt', note: 'Sick' })
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        note: 'Sick',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('removes the note while preserving the state override', async () => {
+    await seedDayDoc(OWNER_UID, '2026-08-10', { state: 'didnt', note: 'Sick' })
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        state: 'didnt',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('allows deleting the entire day document', async () => {
+    await seedDayDoc(OWNER_UID, '2026-08-10', { note: 'Sick' })
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(deleteDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`)))
+  })
+})
+
+describe('daily entries -- counts', () => {
+  it('allows a valid count greater than one on an explicit did day', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        state: 'did',
+        count: 3,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('allows a valid count when the day is did via the tracker default alone', async () => {
+    await seedTracker(OWNER_UID) // defaultState: did
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        count: 4,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a count on an explicit didnt day', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        state: 'didnt',
+        count: 2,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a count when the tracker default makes the day effectively didnt', async () => {
+    await seedTracker(OWNER_UID, { ...validTracker, defaultState: 'didnt' })
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        count: 2,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a non-integer count', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        state: 'did',
+        count: 2.5,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a count of one -- it must be implicit, not stored', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        state: 'did',
+        count: 1,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a count above the maximum', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
+        state: 'did',
+        count: 100,
         updatedAt: serverTimestamp(),
       }),
     )

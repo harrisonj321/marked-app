@@ -12,14 +12,21 @@ vi.mock('./hooks/useTodayState', () => ({
   useTodayState: () => ({
     dateKey: '2026-08-10',
     effectiveState: 'did' as const,
+    record: {},
     pending: false,
     error: null,
     toggle: vi.fn(),
   }),
 }))
+vi.mock('./hooks/useMonthRecords', () => ({
+  useMonthRecords: () => ({ records: new Map(), loading: false, error: null }),
+}))
 vi.mock('./data/tracker', () => ({
   createTracker: vi.fn(),
   updateTrackerName: vi.fn(),
+}))
+vi.mock('./data/day', () => ({
+  saveDailyRecord: vi.fn(),
 }))
 vi.mock('./lib/auth', () => ({
   signInWithGoogle: vi.fn(),

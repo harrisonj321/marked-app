@@ -1,0 +1,87 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+
+const toggle = vi.fn()
+let mockRecord: { state?: 'did' | 'didnt'; note?: string; count?: number } = {}
+
+vi.mock('../hooks/useTodayState', () => ({
+  useTodayState: () => ({
+    dateKey: '2026-08-10',
+    effectiveState: 'did' as const,
+    record: mockRecord,
+    pending: false,
+    error: null,
+    toggle,
+  }),
+}))
+
+const saveDailyRecordMock = vi.fn().mockResolvedValue(undefined)
+vi.mock('../data/day', () => ({
+  saveDailyRecord: (...args: unknown[]) => saveDailyRecordMock(...args),
+}))
+
+beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = true
+  })
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+    this.open = false
+    this.dispatchEvent(new Event('close'))
+  })
+  mockRecord = {}
+  saveDailyRecordMock.mockClear()
+})
+
+const { TodaySection } = await import('./TodaySection')
+
+describe('TodaySection', () => {
+  it("shows today's effective state", () => {
+    render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
+    expect(screen.getByText('Did')).toBeInTheDocument()
+  })
+
+  it('the primary control names the action it will take and calls toggle', () => {
+    render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
+    fireEvent.click(screen.getByRole('button', { name: /mark today as "didn't"/i }))
+    expect(toggle).toHaveBeenCalled()
+  })
+
+  it('shows "Add note" when there is no existing note or count', () => {
+    render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
+    expect(screen.getByRole('button', { name: 'Add note' })).toBeInTheDocument()
+  })
+
+  it('shows "Edit note" when a note already exists', () => {
+    mockRecord = { note: 'Hotel gym' }
+    render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
+    expect(screen.getByRole('button', { name: 'Edit note' })).toBeInTheDocument()
+  })
+
+  it('shows "Add note" when only a count exists without a note', () => {
+    mockRecord = { count: 3 }
+    render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
+    expect(screen.getByRole('button', { name: 'Add note' })).toBeInTheDocument()
+  })
+
+  it('opens the detail surface pre-filled with the current record', () => {
+    mockRecord = { note: 'Hotel gym', count: 3 }
+    render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit note' }))
+    expect(screen.getByLabelText('Add note')).toHaveValue('Hotel gym')
+    expect(screen.getByLabelText('Count')).toHaveValue(3)
+  })
+
+  it('saving from the detail surface persists via saveDailyRecord for today', async () => {
+    render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add note' }))
+    fireEvent.change(screen.getByLabelText('Add note'), { target: { value: 'Sick' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => {
+      expect(saveDailyRecordMock).toHaveBeenCalledWith('u1', '2026-08-10', {
+        kind: 'set',
+        note: 'Sick',
+      })
+    })
+  })
+})

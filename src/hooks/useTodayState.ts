@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react'
-import {
-  isOverrideNeeded,
-  oppositeState,
-  resolveEffectiveState,
-  type DayState,
-} from '../domain/tracker'
-import { clearDayOverride, setDayOverride, subscribeDay } from '../data/day'
+import { normalizeDailyRecord, type DailyRecord } from '../domain/day'
+import { oppositeState, resolveEffectiveState, type DayState } from '../domain/tracker'
+import { saveDailyRecord, subscribeDay } from '../data/day'
 import { useLocalDateKey } from './useLocalDateKey'
 
 export interface TodayState {
   dateKey: string
   effectiveState: DayState | null
+  record: DailyRecord
   pending: boolean
   error: string | null
   toggle: () => void
 }
+
+const EMPTY_RECORD: DailyRecord = {}
 
 export function useTodayState(
   uid: string | null,
@@ -22,7 +21,7 @@ export function useTodayState(
   timezone: string | null,
 ): TodayState {
   const dateKey = useLocalDateKey(timezone)
-  const [override, setOverride] = useState<DayState | null | undefined>(undefined)
+  const [record, setRecord] = useState<DailyRecord | undefined>(undefined)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,7 +32,7 @@ export function useTodayState(
   const [trackedKey, setTrackedKey] = useState(subscriptionKey)
   if (subscriptionKey !== trackedKey) {
     setTrackedKey(subscriptionKey)
-    setOverride(undefined)
+    setRecord(undefined)
     setPending(false)
     setError(null)
   }
@@ -47,7 +46,7 @@ export function useTodayState(
       uid,
       dateKey,
       (snapshot) => {
-        setOverride(snapshot.state)
+        setRecord(snapshot.record)
         setPending(snapshot.hasPendingWrites)
       },
       () => setError('Could not load today. Try again.'),
@@ -55,22 +54,36 @@ export function useTodayState(
   }, [uid, dateKey])
 
   const effectiveState =
-    defaultState && override !== undefined ? resolveEffectiveState(defaultState, override) : null
+    defaultState && record !== undefined
+      ? resolveEffectiveState(defaultState, record.state ?? null)
+      : null
 
   function toggle() {
-    if (!uid || !dateKey || !defaultState || effectiveState === null) {
+    if (!uid || !dateKey || !defaultState || effectiveState === null || record === undefined) {
       return
     }
 
     const desired = oppositeState(effectiveState)
     setError(null)
 
-    const action = isOverrideNeeded(defaultState, desired)
-      ? setDayOverride(uid, dateKey, desired)
-      : clearDayOverride(uid, dateKey)
+    const normalized = normalizeDailyRecord({
+      defaultState,
+      effectiveState: desired,
+      note: record.note,
+      count: record.count,
+    })
 
-    action.catch(() => setError('Could not save. Try again.'))
+    saveDailyRecord(uid, dateKey, normalized).catch(() =>
+      setError('Could not save. Try again.'),
+    )
   }
 
-  return { dateKey, effectiveState, pending, error, toggle }
+  return {
+    dateKey,
+    effectiveState,
+    record: record ?? EMPTY_RECORD,
+    pending,
+    error,
+    toggle,
+  }
 }

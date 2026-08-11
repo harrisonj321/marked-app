@@ -26,6 +26,52 @@ service cloud.firestore {
       return state in ['did', 'didnt'];
     }
 
+    // -- Daily entry helpers -------------------------------------------
+    // A daily document is an exception/context record: every field on it
+    // is optional except updatedAt, and at least one of state/note/count
+    // must be present (otherwise the document should not exist at all).
+
+    function hasKey(data, key) {
+      return key in data.keys();
+    }
+
+    function hasAtLeastOneExplicitDailyField(data) {
+      return hasKey(data, 'state') || hasKey(data, 'note') || hasKey(data, 'count');
+    }
+
+    function isValidOptionalState(data) {
+      return !hasKey(data, 'state') || isDayState(data.state);
+    }
+
+    function isValidNote(note) {
+      return note is string
+        && note.size() > 0
+        && note.size() <= 120
+        && note.matches('.*\\S.*');
+    }
+
+    function isValidOptionalNote(data) {
+      return !hasKey(data, 'note') || isValidNote(data.note);
+    }
+
+    function isValidCount(count) {
+      return count is int && count >= 2 && count <= 99;
+    }
+
+    // A count's validity depends on the day's *effective* state, which
+    // requires the tracker's configured default when no explicit state is
+    // present on this write.
+    function effectiveDailyState(uid, data) {
+      return hasKey(data, 'state')
+        ? data.state
+        : get(/databases/$(database)/documents/users/$(uid)/tracker/config).data.defaultState;
+    }
+
+    function isValidOptionalCount(uid, data) {
+      return !hasKey(data, 'count')
+        || (isValidCount(data.count) && effectiveDailyState(uid, data) == 'did');
+    }
+
     match /users/{uid} {
 
       // Single tracker config per user, at a fixed document id so no
@@ -68,17 +114,21 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
-      // A daily document represents only a non-default override for that
-      // day; it is fully replaced or removed, never partially patched.
+      // A daily document represents only the explicit, non-default facts
+      // for that day (state override, note, occurrence count); it is
+      // fully replaced or removed, never partially patched.
       match /days/{dayId} {
         allow read: if isOwner(uid);
 
         allow create, update: if isOwner(uid)
           && isDateKey(dayId)
-          && request.resource.data.keys().hasOnly(['state', 'updatedAt'])
-          && request.resource.data.keys().hasAll(['state', 'updatedAt'])
-          && isDayState(request.resource.data.state)
-          && request.resource.data.updatedAt == request.time;
+          && request.resource.data.keys().hasAll(['updatedAt'])
+          && request.resource.data.keys().hasOnly(['state', 'note', 'count', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && hasAtLeastOneExplicitDailyField(request.resource.data)
+          && isValidOptionalState(request.resource.data)
+          && isValidOptionalNote(request.resource.data)
+          && isValidOptionalCount(uid, request.resource.data);
 
         allow delete: if isOwner(uid);
       }

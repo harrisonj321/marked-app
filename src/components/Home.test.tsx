@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
-const toggle = vi.fn()
-
-vi.mock('../hooks/useTodayState', () => ({
-  useTodayState: () => ({
-    dateKey: '2026-08-10',
-    effectiveState: 'did' as const,
-    pending: false,
-    error: null,
-    toggle,
-  }),
+vi.mock('./TodaySection', () => ({
+  TodaySection: ({ defaultState, timezone }: { defaultState: string; timezone: string }) => (
+    <div data-testid="today-section">
+      today-section:{defaultState}:{timezone}
+    </div>
+  ),
+}))
+vi.mock('./Calendar', () => ({
+  Calendar: ({ todayKey }: { todayKey: string }) => (
+    <div data-testid="calendar">calendar:{todayKey}</div>
+  ),
 }))
 vi.mock('../data/tracker', () => ({ updateTrackerName: vi.fn() }))
 vi.mock('../lib/auth', () => ({ signOutUser: vi.fn() }))
@@ -21,23 +22,21 @@ const tracker = {
   name: 'Worked out',
   defaultState: 'did' as const,
   timezone: 'UTC',
-  startDate: '2026-08-10',
+  startDate: '2026-08-01',
 }
 
 describe('Home', () => {
-  it("shows the tracker name and today's effective state", () => {
+  it('renders the brand, tracker name, today section, and calendar', () => {
     render(<Home uid="u1" tracker={tracker} />)
 
+    expect(screen.getByText('Noted.')).toBeInTheDocument()
     expect(screen.getByText('Worked out')).toBeInTheDocument()
-    expect(screen.getByText('Did')).toBeInTheDocument()
+    expect(screen.getByTestId('today-section')).toHaveTextContent('today-section:did:UTC')
+    expect(screen.getByTestId('calendar')).toBeInTheDocument()
   })
 
-  it('the primary control names the action it will take and calls toggle', () => {
+  it('provides a sign-out control', () => {
     render(<Home uid="u1" tracker={tracker} />)
-
-    const button = screen.getByRole('button', { name: /mark today as "didn't"/i })
-    fireEvent.click(button)
-
-    expect(toggle).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 })
