@@ -34,9 +34,11 @@ export function TodayToggle({ state, onSelect }: TodayToggleProps) {
           <span className="today-toggle-word">{STATE_LABEL[position]}</span>
         </label>
       ))}
-      <div className="today-toggle-ink" aria-hidden="true">
-        <span>{STATE_LABEL.did}</span>
-        <span>{STATE_LABEL.didnt}</span>
+      <div className="today-toggle-ink-shadow" aria-hidden="true">
+        <div className="today-toggle-ink">
+          <span>{STATE_LABEL.did}</span>
+          <span>{STATE_LABEL.didnt}</span>
+        </div>
       </div>
     </div>
   )

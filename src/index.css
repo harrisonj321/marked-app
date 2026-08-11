@@ -1,14 +1,23 @@
 :root {
   color-scheme: light dark;
-  --color-bg: #faf6ee;
-  --color-text: #2b2620;
-  --color-text-muted: #6f6a5f;
-  --color-border: #e6dfd0;
-  --color-border-strong: #cfc6b2;
-  --color-surface: #fdfaf3;
-  --color-accent: #2b2620;
-  --color-accent-text: #faf6ee;
-  --grain-opacity: 0.04;
+  --color-bg: #f6f0e4;
+  --color-text: #332920;
+  --color-text-muted: #6d6152;
+  --color-border: #e7ddce;
+  --color-border-strong: #c9b99e;
+  --color-surface: #fbf7ee;
+  --color-accent: #4a3524;
+  --color-accent-text: #f8f2e6;
+  /* Shared warm-umber shadow tone (space-separated for rgb(var(...) / a)).
+     Shadows read as "dark" in both themes, so this is not overridden
+     under prefers-color-scheme: dark. */
+  --color-shadow-rgb: 34 24 15;
+  /* A whisper of warm light in one corner of the page -- not a visible
+     gradient, just enough to keep large empty fields from reading flat.
+     Composited under the grain at --grain-opacity, so its effective
+     strength is a fraction of the alpha below. */
+  --color-vignette: rgb(253 249 240 / 55%);
+  --grain-opacity: 0.05;
   --space-1: 0.5rem;
   --space-2: 1rem;
   --space-3: 1.5rem;
@@ -17,15 +26,16 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #191713;
-    --color-text: #ece7db;
-    --color-text-muted: #a49d8e;
-    --color-border: #322e26;
-    --color-border-strong: #4a4437;
-    --color-surface: #211e18;
-    --color-accent: #ece7db;
-    --color-accent-text: #191713;
-    --grain-opacity: 0.055;
+    --color-bg: #1b1611;
+    --color-text: #efe8da;
+    --color-text-muted: #ab9f8a;
+    --color-border: #332a1f;
+    --color-border-strong: #5a4c38;
+    --color-surface: #221c15;
+    --color-accent: #f0e6d3;
+    --color-accent-text: #241c14;
+    --color-vignette: rgb(50 40 28 / 45%);
+    --grain-opacity: 0.065;
   }
 }
 
@@ -51,9 +61,19 @@ body {
   line-height: 1.5;
 }
 
-/* Paper grain: a tiled grayscale-noise SVG behind the content (z-index -1),
-   so text and controls stay crisp while the background reads as uncoated
-   paper. Purely decorative. */
+/* Material surface: a soft tonal wash plus a fine woven-paper grain behind
+   the content (z-index -1), so text and controls stay crisp while the
+   background reads as a quiet physical surface rather than a flat white
+   page. Both layers sit at z-index -1, purely decorative.
+
+   The grain is fractal noise run through feComponentTransfer to compress
+   its tonal range toward mid-gray before it is drawn: raw turbulence
+   swings from black to white, which reads as digital static even at low
+   opacity; compressing that range first is what makes it feel like soft
+   fiber variation you sense rather than speckle you see. The vignette is
+   listed first (top) so it modulates the grain beneath it rather than
+   being hidden by it -- the grain layer is fully opaque on its own and
+   would otherwise occlude anything under it. */
 body::before {
   content: '';
   position: fixed;
@@ -61,7 +81,11 @@ body::before {
   z-index: -1;
   pointer-events: none;
   opacity: var(--grain-opacity);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image:
+    radial-gradient(150% 120% at 20% -10%, var(--color-vignette) 0%, transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.35' intercept='0.33'/%3E%3CfeFuncG type='linear' slope='0.35' intercept='0.33'/%3E%3CfeFuncB type='linear' slope='0.35' intercept='0.33'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, repeat;
+  background-size: cover, 160px 160px;
 }
 
 #root {
@@ -292,7 +316,12 @@ fieldset label {
   border: 1px solid var(--color-border-strong);
   border-radius: 1.25rem;
   background: var(--color-surface);
-  box-shadow: inset 0 1px 3px rgb(24 20 12 / 0.08);
+  /* A recessed woven track (inset) resting on the page with a soft
+     ambient lift (the two outer layers) -- cushioned, not glossy. */
+  box-shadow:
+    inset 0 1px 3px rgb(var(--color-shadow-rgb) / 0.1),
+    0 1px 2px rgb(var(--color-shadow-rgb) / 0.05),
+    0 10px 20px rgb(var(--color-shadow-rgb) / 0.05);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
@@ -325,7 +354,21 @@ fieldset label {
 /* The ink card is a full-size overlay (accent surface plus both words in
    the exact geometry of the track) clipped to one half. Moving the clip
    window slides the card while the words themselves stay perfectly
-   registered with the track underneath. */
+   registered with the track underneath.
+
+   Its cushioned shadow lives on the wrapper, not on the card itself:
+   filter and clip-path on the same element clip the shadow away along
+   with everything else outside the window, so drop-shadow has to sit on
+   an unclipped ancestor and read the card's already-clipped silhouette. */
+.today-toggle-ink-shadow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  filter:
+    drop-shadow(0 1px 1px rgb(var(--color-shadow-rgb) / 0.14))
+    drop-shadow(0 4px 10px rgb(var(--color-shadow-rgb) / 0.12));
+}
+
 .today-toggle-ink {
   position: absolute;
   inset: 0;
@@ -338,7 +381,6 @@ fieldset label {
   font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.01em;
-  pointer-events: none;
   clip-path: inset(0.3125rem calc(50% + 0.15625rem) 0.3125rem 0.3125rem round 0.9375rem);
 }
 
@@ -356,7 +398,7 @@ fieldset label {
    unclipped overlay would hide both words. Drop it and mark the current
    side directly instead. */
 @supports not (clip-path: inset(0 round 1px)) {
-  .today-toggle-ink {
+  .today-toggle-ink-shadow {
     display: none;
   }
 
@@ -554,10 +596,11 @@ fieldset label {
   padding: var(--space-1) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
   background: var(--color-surface);
   color: var(--color-text);
+  box-shadow: 0 -0.5rem 2rem rgb(var(--color-shadow-rgb) / 0.08);
 }
 
 .calendar-sheet::backdrop {
-  background: rgb(24 20 12 / 0.4);
+  background: rgb(var(--color-shadow-rgb) / 0.4);
 }
 
 .calendar-sheet-header {
@@ -596,12 +639,16 @@ fieldset label {
   width: min(24rem, calc(100vw - 2rem));
   background: var(--color-surface);
   color: var(--color-text);
-  box-shadow: 0 1rem 3rem rgb(24 20 12 / 0.15);
+  /* A close, tight shadow for grounding plus a wide, soft one for lift --
+     reads as a card resting gently above the page, not a hard drop. */
+  box-shadow:
+    0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
+    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12);
 }
 
 .day-detail::backdrop,
 .settings-sheet::backdrop {
-  background: rgb(24 20 12 / 0.4);
+  background: rgb(var(--color-shadow-rgb) / 0.4);
 }
 
 .day-detail-header,
@@ -677,7 +724,7 @@ fieldset label {
   border-radius: 0.75rem;
   padding: 0.5rem 0.5rem 0.5rem 0.875rem;
   max-width: calc(100vw - 2rem);
-  box-shadow: 0 0.25rem 1rem rgb(24 20 12 / 0.1);
+  box-shadow: 0 0.25rem 1rem rgb(var(--color-shadow-rgb) / 0.1);
 }
 
 .update-banner-message {
