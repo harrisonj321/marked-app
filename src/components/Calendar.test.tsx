@@ -109,13 +109,13 @@ describe('Calendar', () => {
     render(<Calendar uid="u1" tracker={tracker} todayKey="2026-08-15" />)
     fireEvent.click(screen.getByRole('button', { name: /08\/10\/2026/ }))
     expect(screen.getByRole('radio', { name: "Didn't" })).toBeChecked()
-    expect(screen.getByLabelText('Add note')).toHaveValue('Sick')
+    expect(screen.getByLabelText('Note')).toHaveValue('Sick')
   })
 
   it('saving from the detail surface persists via saveDailyRecord for the selected day', async () => {
     render(<Calendar uid="u1" tracker={tracker} todayKey="2026-08-15" />)
     fireEvent.click(screen.getByRole('button', { name: /08\/10\/2026/ }))
-    fireEvent.change(screen.getByLabelText('Add note'), { target: { value: 'Wedding' } })
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'Wedding' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => {

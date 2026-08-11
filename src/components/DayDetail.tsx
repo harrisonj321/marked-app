@@ -1,35 +1,49 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react'
 import { formatDisplayDate } from '../domain/date'
 import {
-  COUNT_MAX,
-  COUNT_MIN,
   NOTE_MAX_LENGTH,
+  modeForCount,
   normalizeDailyRecord,
-  validateCount,
   validateNote,
+  validateOtherCount,
+  type CountMode,
+  type CountValidation,
   type DailyRecord,
   type NormalizedDailyRecord,
 } from '../domain/day'
 import type { DayState } from '../domain/tracker'
+import { CountSelector } from './CountSelector'
+import { CloseIcon } from './icons'
 
 interface DayDetailProps {
   dateKey: string
   defaultState: DayState
   initialRecord: DailyRecord
+  /** False for today's note sheet: the home screen already owns today's state. */
+  editableState?: boolean
   onSave: (normalized: NormalizedDailyRecord) => Promise<void>
   onDismiss: () => void
 }
 
 const STATE_LABEL = { did: 'Did', didnt: "Didn't" } as const
 
-export function DayDetail({ dateKey, defaultState, initialRecord, onSave, onDismiss }: DayDetailProps) {
+export function DayDetail({
+  dateKey,
+  defaultState,
+  initialRecord,
+  editableState = true,
+  onSave,
+  onDismiss,
+}: DayDetailProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [effectiveState, setEffectiveState] = useState<DayState>(
     initialRecord.state ?? defaultState,
   )
   const [noteDraft, setNoteDraft] = useState(initialRecord.note ?? '')
-  const [countDraft, setCountDraft] = useState(
-    initialRecord.count ? String(initialRecord.count) : '',
+  const initialCountMode = modeForCount(initialRecord.count)
+  const [countMode, setCountMode] = useState<CountMode>(initialCountMode)
+  const [otherCountDraft, setOtherCountDraft] = useState(
+    initialCountMode === 'other' && initialRecord.count ? String(initialRecord.count) : '',
   )
   const [noteError, setNoteError] = useState<string | null>(null)
   const [countError, setCountError] = useState<string | null>(null)
@@ -38,7 +52,7 @@ export function DayDetail({ dateKey, defaultState, initialRecord, onSave, onDism
 
   const titleId = useId()
   const noteId = useId()
-  const countId = useId()
+  const otherCountId = useId()
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -50,11 +64,27 @@ export function DayDetail({ dateKey, defaultState, initialRecord, onSave, onDism
     }
   }
 
+  function handleCountSelect(nextMode: CountMode) {
+    setCountMode(nextMode)
+    setCountError(null)
+    if (nextMode !== 'other') {
+      setOtherCountDraft('')
+    }
+  }
+
+  function resolveCount(): CountValidation {
+    if (countMode === 'two') return { valid: true, count: 2 }
+    if (countMode === 'three') return { valid: true, count: 3 }
+    if (countMode === 'other') return validateOtherCount(otherCountDraft)
+    return { valid: true, count: undefined }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
 
     const noteResult = validateNote(noteDraft)
-    const countResult = effectiveState === 'did' ? validateCount(countDraft) : { valid: true as const, count: undefined }
+    const countResult: CountValidation =
+      effectiveState === 'did' ? resolveCount() : { valid: true, count: undefined }
 
     setNoteError(noteResult.valid ? null : noteResult.error)
     setCountError(countResult.valid ? null : countResult.error)
@@ -88,60 +118,62 @@ export function DayDetail({ dateKey, defaultState, initialRecord, onSave, onDism
       onClose={onDismiss}
       onClick={handleBackdropClick}
     >
-      <h2 id={titleId}>{formatDisplayDate(dateKey)}</h2>
+      <div className="day-detail-header">
+        <h2 id={titleId}>{formatDisplayDate(dateKey)}</h2>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Close"
+          onClick={() => dialogRef.current?.close()}
+        >
+          <CloseIcon />
+        </button>
+      </div>
 
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <fieldset>
-          <legend className="visually-hidden">State</legend>
-          <label>
-            <input
-              type="radio"
-              name={`${titleId}-state`}
-              checked={effectiveState === 'did'}
-              onChange={() => setEffectiveState('did')}
-            />
-            {STATE_LABEL.did}
-          </label>
-          <label>
-            <input
-              type="radio"
-              name={`${titleId}-state`}
-              checked={effectiveState === 'didnt'}
-              onChange={() => setEffectiveState('didnt')}
-            />
-            {STATE_LABEL.didnt}
-          </label>
-        </fieldset>
+        {editableState && (
+          <fieldset>
+            <legend className="visually-hidden">State</legend>
+            <label>
+              <input
+                type="radio"
+                name={`${titleId}-state`}
+                checked={effectiveState === 'did'}
+                onChange={() => setEffectiveState('did')}
+              />
+              {STATE_LABEL.did}
+            </label>
+            <label>
+              <input
+                type="radio"
+                name={`${titleId}-state`}
+                checked={effectiveState === 'didnt'}
+                onChange={() => setEffectiveState('didnt')}
+              />
+              {STATE_LABEL.didnt}
+            </label>
+          </fieldset>
+        )}
 
         {effectiveState === 'did' && (
-          <div className="field">
-            <label htmlFor={countId}>Count</label>
-            <input
-              id={countId}
-              type="number"
-              inputMode="numeric"
-              min={COUNT_MIN}
-              max={COUNT_MAX}
-              placeholder="1"
-              value={countDraft}
-              onChange={(event) => setCountDraft(event.target.value)}
-            />
-            {countError && (
-              <p role="alert" className="message">
-                {countError}
-              </p>
-            )}
-          </div>
+          <CountSelector
+            mode={countMode}
+            otherDraft={otherCountDraft}
+            otherError={countError}
+            onSelect={handleCountSelect}
+            onOtherDraftChange={setOtherCountDraft}
+            otherInputId={otherCountId}
+          />
         )}
 
         <div className="field">
-          <label htmlFor={noteId}>Add note</label>
-          <input
+          <label htmlFor={noteId}>Note</label>
+          <textarea
             id={noteId}
-            type="text"
             value={noteDraft}
             onChange={(event) => setNoteDraft(event.target.value)}
             maxLength={NOTE_MAX_LENGTH}
+            rows={2}
           />
           {noteError && (
             <p role="alert" className="message">
@@ -159,9 +191,6 @@ export function DayDetail({ dateKey, defaultState, initialRecord, onSave, onDism
         <div className="day-detail-actions">
           <button type="submit" disabled={saving}>
             Save
-          </button>
-          <button type="button" onClick={() => dialogRef.current?.close()} disabled={saving}>
-            Cancel
           </button>
         </div>
       </form>

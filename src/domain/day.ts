@@ -9,6 +9,7 @@ export interface DailyRecord {
 export const NOTE_MAX_LENGTH = 120
 export const COUNT_MIN = 1
 export const COUNT_MAX = 99
+export const COUNT_OTHER_MIN = 4
 
 export interface DailyRecordInput {
   defaultState: DayState
@@ -93,4 +94,34 @@ export function validateCount(input: string): CountValidation {
 
 export function formatCount(count: number): string {
   return `${count}×`
+}
+
+/** Which quick-count option a stored count value corresponds to. */
+export type CountMode = 'none' | 'two' | 'three' | 'other'
+
+export function modeForCount(count: number | undefined): CountMode {
+  if (count === 2) return 'two'
+  if (count === 3) return 'three'
+  if (count === undefined) return 'none'
+  return 'other'
+}
+
+/**
+ * Validates the free-entry "Other" count field. The 2x/3x quick options
+ * cover the common cases, so this path only ever needs to accept whole
+ * numbers strictly above that dedicated range.
+ */
+export function validateOtherCount(input: string): CountValidation {
+  const trimmed = input.trim()
+  if (trimmed.length === 0) {
+    return { valid: false, error: 'Enter a number.' }
+  }
+  const parsed = Number(trimmed)
+  if (!Number.isInteger(parsed)) {
+    return { valid: false, error: 'Enter a whole number.' }
+  }
+  if (parsed < COUNT_OTHER_MIN || parsed > COUNT_MAX) {
+    return { valid: false, error: `Enter a number ${COUNT_OTHER_MIN} or greater.` }
+  }
+  return { valid: true, count: parsed }
 }

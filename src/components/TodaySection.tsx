@@ -27,15 +27,16 @@ export function TodaySection({ uid, defaultState, timezone }: TodaySectionProps)
     <section className="today">
       {today.effectiveState && next && (
         <>
+          <p className="today-state" aria-live="polite">
+            {STATE_LABEL[today.effectiveState]}
+          </p>
           <button
             type="button"
             onClick={today.toggle}
-            className={`mark ${today.effectiveState === defaultState ? 'mark-default' : 'mark-set'}`}
-            aria-label={`Today: ${STATE_LABEL[today.effectiveState]}. Mark today as "${STATE_LABEL[next]}".`}
+            className="today-action"
+            aria-label={`Mark today as "${STATE_LABEL[next]}"`}
           >
-            <span className="mark-label" aria-live="polite">
-              {STATE_LABEL[today.effectiveState]}
-            </span>
+            {STATE_LABEL[next]}
           </button>
           {today.pending && (
             <p className="message" aria-live="polite">
@@ -62,6 +63,7 @@ export function TodaySection({ uid, defaultState, timezone }: TodaySectionProps)
           dateKey={today.dateKey}
           defaultState={defaultState}
           initialRecord={today.record}
+          editableState={false}
           onSave={handleDetailSave}
           onDismiss={() => setDetailOpen(false)}
         />

@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   COUNT_MAX,
+  COUNT_OTHER_MIN,
   NOTE_MAX_LENGTH,
   formatCount,
+  modeForCount,
   normalizeDailyRecord,
   validateCount,
   validateNote,
+  validateOtherCount,
 } from './day'
 
 describe('normalizeDailyRecord', () => {
@@ -134,6 +137,53 @@ describe('validateCount', () => {
 
   it('rejects a negative count', () => {
     expect(validateCount('-1').valid).toBe(false)
+  })
+})
+
+describe('validateOtherCount', () => {
+  it('rejects blank input -- the Other field requires an explicit value', () => {
+    expect(validateOtherCount('').valid).toBe(false)
+  })
+
+  it('rejects a non-integer value', () => {
+    expect(validateOtherCount('4.5').valid).toBe(false)
+    expect(validateOtherCount('abc').valid).toBe(false)
+  })
+
+  it('rejects a value at or below the dedicated 2x/3x range', () => {
+    expect(validateOtherCount('1').valid).toBe(false)
+    expect(validateOtherCount('2').valid).toBe(false)
+    expect(validateOtherCount('3').valid).toBe(false)
+  })
+
+  it('accepts a value at exactly the minimum', () => {
+    expect(validateOtherCount(String(COUNT_OTHER_MIN))).toEqual({
+      valid: true,
+      count: COUNT_OTHER_MIN,
+    })
+  })
+
+  it('accepts a value at exactly the maximum', () => {
+    expect(validateOtherCount(String(COUNT_MAX))).toEqual({ valid: true, count: COUNT_MAX })
+  })
+
+  it('rejects a value above the maximum', () => {
+    expect(validateOtherCount(String(COUNT_MAX + 1)).valid).toBe(false)
+  })
+})
+
+describe('modeForCount', () => {
+  it('maps an unset count to the normal single occurrence', () => {
+    expect(modeForCount(undefined)).toBe('none')
+  })
+
+  it('maps 2 and 3 to their dedicated quick options', () => {
+    expect(modeForCount(2)).toBe('two')
+    expect(modeForCount(3)).toBe('three')
+  })
+
+  it('maps any other value to Other', () => {
+    expect(modeForCount(9)).toBe('other')
   })
 })
 

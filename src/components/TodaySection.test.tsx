@@ -67,14 +67,20 @@ describe('TodaySection', () => {
     mockRecord = { note: 'Hotel gym', count: 3 }
     render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
     fireEvent.click(screen.getByRole('button', { name: 'Edit note' }))
-    expect(screen.getByLabelText('Add note')).toHaveValue('Hotel gym')
-    expect(screen.getByLabelText('Count')).toHaveValue(3)
+    expect(screen.getByLabelText('Note')).toHaveValue('Hotel gym')
+    expect(screen.getByRole('button', { name: '3×' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it("today's note sheet does not duplicate the Did/Didn't controls", () => {
+    render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add note' }))
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
   })
 
   it('saving from the detail surface persists via saveDailyRecord for today', async () => {
     render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
     fireEvent.click(screen.getByRole('button', { name: 'Add note' }))
-    fireEvent.change(screen.getByLabelText('Add note'), { target: { value: 'Sick' } })
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'Sick' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => {
