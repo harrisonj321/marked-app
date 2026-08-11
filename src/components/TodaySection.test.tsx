@@ -35,12 +35,12 @@ beforeEach(() => {
 const { TodaySection } = await import('./TodaySection')
 
 describe('TodaySection', () => {
-  it("shows today's effective state", () => {
+  it("the primary control shows today's effective state", () => {
     render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
     expect(screen.getByText('Did')).toBeInTheDocument()
   })
 
-  it('the primary control names the action it will take and calls toggle', () => {
+  it('the primary control names the flip action it will take and calls toggle', () => {
     render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
     fireEvent.click(screen.getByRole('button', { name: /mark today as "didn't"/i }))
     expect(toggle).toHaveBeenCalled()

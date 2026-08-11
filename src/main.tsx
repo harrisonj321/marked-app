@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { UpdatePrompt } from './components/UpdatePrompt'
 import './index.css'
 
 const rootElement = document.getElementById('root')
@@ -11,5 +12,6 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <App />
+    <UpdatePrompt />
   </StrictMode>,
 )

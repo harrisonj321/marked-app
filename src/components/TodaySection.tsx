@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { formatDisplayDate } from '../domain/date'
 import type { NormalizedDailyRecord } from '../domain/day'
 import { oppositeState, type DayState } from '../domain/tracker'
 import { saveDailyRecord } from '../data/day'
@@ -26,20 +25,17 @@ export function TodaySection({ uid, defaultState, timezone }: TodaySectionProps)
 
   return (
     <section className="today">
-      <p className="today-date">Today &middot; {formatDisplayDate(today.dateKey)}</p>
-
       {today.effectiveState && next && (
         <>
-          <p className="today-state" aria-live="polite">
-            {STATE_LABEL[today.effectiveState]}
-          </p>
           <button
             type="button"
             onClick={today.toggle}
-            className="toggle"
-            aria-label={`Mark today as "${STATE_LABEL[next]}"`}
+            className={`mark ${today.effectiveState === defaultState ? 'mark-default' : 'mark-set'}`}
+            aria-label={`Today: ${STATE_LABEL[today.effectiveState]}. Mark today as "${STATE_LABEL[next]}".`}
           >
-            {STATE_LABEL[next]}
+            <span className="mark-label" aria-live="polite">
+              {STATE_LABEL[today.effectiveState]}
+            </span>
           </button>
           {today.pending && (
             <p className="message" aria-live="polite">

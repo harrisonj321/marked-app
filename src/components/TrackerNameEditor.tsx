@@ -52,9 +52,14 @@ export function TrackerNameEditor({ name, onSave }: TrackerNameEditorProps) {
 
   if (!editing) {
     return (
-      <div className="tracker-name">
-        <span>{name}</span>
-        <button type="button" onClick={startEditing} aria-label="Edit tracker name">
+      <div className="tracker-title">
+        <h1 className="tracker-title-name">{name}</h1>
+        <button
+          type="button"
+          onClick={startEditing}
+          aria-label="Edit tracker name"
+          className="tracker-title-edit"
+        >
           Edit
         </button>
       </div>
@@ -83,12 +88,14 @@ export function TrackerNameEditor({ name, onSave }: TrackerNameEditorProps) {
           {error}
         </p>
       )}
-      <button type="submit" disabled={saving}>
-        Save
-      </button>
-      <button type="button" onClick={cancel} disabled={saving}>
-        Cancel
-      </button>
+      <div className="tracker-name-actions">
+        <button type="submit" disabled={saving}>
+          Save
+        </button>
+        <button type="button" onClick={cancel} disabled={saving}>
+          Cancel
+        </button>
+      </div>
     </form>
   )
 }

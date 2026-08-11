@@ -1,12 +1,16 @@
 import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import packageJson from './package.json' with { type: 'json' }
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+  },
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifest: {
         name: 'Noted.',
         short_name: 'Noted.',
@@ -14,8 +18,8 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
-        background_color: '#ffffff',
-        theme_color: '#171717',
+        background_color: '#faf6ee',
+        theme_color: '#faf6ee',
         icons: [
           {
             src: 'icon-192.png',

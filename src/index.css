@@ -1,12 +1,14 @@
 :root {
   color-scheme: light dark;
-  --color-bg: #fafaf9;
-  --color-text: #171717;
-  --color-text-muted: #737370;
-  --color-border: #e4e4e1;
-  --color-surface: #ffffff;
-  --color-accent: #171717;
-  --color-accent-text: #fafaf9;
+  --color-bg: #faf6ee;
+  --color-text: #2b2620;
+  --color-text-muted: #6f6a5f;
+  --color-border: #e6dfd0;
+  --color-border-strong: #cfc6b2;
+  --color-surface: #fdfaf3;
+  --color-accent: #2b2620;
+  --color-accent-text: #faf6ee;
+  --grain-opacity: 0.04;
   --space-1: 0.5rem;
   --space-2: 1rem;
   --space-3: 1.5rem;
@@ -15,13 +17,15 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #141413;
-    --color-text: #f2f2f0;
-    --color-text-muted: #a3a19d;
-    --color-border: #2e2e2b;
-    --color-surface: #1c1c1a;
-    --color-accent: #f2f2f0;
-    --color-accent-text: #141413;
+    --color-bg: #191713;
+    --color-text: #ece7db;
+    --color-text-muted: #a49d8e;
+    --color-border: #322e26;
+    --color-border-strong: #4a4437;
+    --color-surface: #211e18;
+    --color-accent: #ece7db;
+    --color-accent-text: #191713;
+    --grain-opacity: 0.055;
   }
 }
 
@@ -39,6 +43,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   background: var(--color-bg);
@@ -46,8 +51,22 @@ body {
   line-height: 1.5;
 }
 
+/* Paper grain: a tiled grayscale-noise SVG behind the content (z-index -1),
+   so text and controls stay crisp while the background reads as uncoated
+   paper. Purely decorative. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 h1 {
@@ -59,10 +78,14 @@ h1 {
 .screen {
   box-sizing: border-box;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   max-width: 26rem;
   margin: 0 auto;
-  padding: var(--space-4) var(--space-3);
+  padding-top: max(var(--space-4), calc(var(--space-2) + env(safe-area-inset-top, 0px)));
+  padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+  padding-bottom: max(var(--space-2), calc(var(--space-1) + env(safe-area-inset-bottom, 0px)));
+  padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -151,52 +174,45 @@ fieldset label {
   margin: 0;
 }
 
-.home-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: var(--space-3);
-}
-
-.tracker-name {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--color-text-muted);
-  font-size: 0.9375rem;
-}
-
-.tracker-name button {
+.icon-button {
   border: none;
   background: none;
-  padding: 0.25rem 0.375rem;
-  min-height: auto;
-  text-decoration: underline;
+  padding: 0;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  border-radius: 0.625rem;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.tracker-name-edit {
-  flex-direction: row;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: var(--space-1);
+.icon-button:hover {
+  color: var(--color-text);
 }
 
-.tracker-name-edit input {
-  flex: 1 1 auto;
-  min-width: 8rem;
+/* Home */
+
+.home {
+  gap: 0;
 }
 
-.today {
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home-main {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: center;
   text-align: center;
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
 }
 
 .today-date {
@@ -205,19 +221,116 @@ fieldset label {
   font-size: 0.9375rem;
 }
 
-.today-state {
-  font-size: 1.375rem;
-  font-weight: 600;
-  margin: 0;
+.tracker-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
 }
 
-.toggle {
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-  border-color: var(--color-accent);
-  font-size: 1.0625rem;
+.tracker-title-name {
+  font-size: 1.75rem;
   font-weight: 600;
-  padding: 1rem 2.25rem;
+  letter-spacing: -0.01em;
+}
+
+.tracker-title-edit {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0.25rem 0.5rem;
+  min-height: auto;
+}
+
+.tracker-name-edit {
+  align-items: center;
+  width: 100%;
+  max-width: 18rem;
+  gap: var(--space-1);
+}
+
+.tracker-name-edit input {
+  text-align: center;
+}
+
+.tracker-name-actions {
+  display: flex;
+  gap: var(--space-1);
+  justify-content: center;
+}
+
+.today {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+
+/* The daily mark: shows today's current state; tapping flips it. The
+   non-default state is filled like an ink mark on a pocket calendar, the
+   default state is an open outline. Fill (not color hue) plus the label
+   carries the distinction, and neither reads as success or failure. */
+.mark {
+  width: min(56vw, 13rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mark:focus-visible {
+  outline-offset: 4px;
+}
+
+.mark-default {
+  background: transparent;
+  border: 1.5px solid var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.mark-set {
+  background: var(--color-accent);
+  border: 1.5px solid var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark {
+    transition: none;
+  }
+}
+
+.today-detail-link {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  min-height: auto;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.home-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
 }
 
 .sign-out {
@@ -226,9 +339,16 @@ fieldset label {
   background: none;
   color: var(--color-text-muted);
   text-decoration: underline;
+  text-underline-offset: 2px;
   min-height: auto;
   padding: 0.5rem;
   font-size: 0.875rem;
+}
+
+.maker-mark {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
 }
 
 .visually-hidden {
@@ -241,16 +361,6 @@ fieldset label {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.today-detail-link {
-  border: none;
-  background: none;
-  color: var(--color-text-muted);
-  text-decoration: underline;
-  min-height: auto;
-  padding: 0.25rem;
-  font-size: 0.875rem;
 }
 
 /* Calendar */
@@ -360,6 +470,50 @@ fieldset label {
   outline-offset: 2px;
 }
 
+/* Calendar sheet */
+
+.calendar-sheet {
+  border: none;
+  width: min(100%, 26rem);
+  margin: auto auto 0;
+  max-height: calc(100dvh - 3rem);
+  overflow-y: auto;
+  border-radius: 1rem 1rem 0 0;
+  padding: var(--space-1) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.calendar-sheet::backdrop {
+  background: rgb(24 20 12 / 0.4);
+}
+
+.calendar-sheet-header {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (min-width: 640px) {
+  .calendar-sheet {
+    margin: auto;
+    border-radius: 1rem;
+    padding-bottom: var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .calendar-sheet[open] {
+    animation: sheet-in 160ms ease-out;
+  }
+
+  @keyframes sheet-in {
+    from {
+      transform: translateY(0.75rem);
+      opacity: 0.6;
+    }
+  }
+}
+
 /* Day detail dialog */
 
 .day-detail {
@@ -369,11 +523,11 @@ fieldset label {
   width: min(24rem, calc(100vw - 2rem));
   background: var(--color-surface);
   color: var(--color-text);
-  box-shadow: 0 1rem 3rem rgb(0 0 0 / 0.15);
+  box-shadow: 0 1rem 3rem rgb(24 20 12 / 0.15);
 }
 
 .day-detail::backdrop {
-  background: rgb(0 0 0 / 0.4);
+  background: rgb(24 20 12 / 0.4);
 }
 
 .day-detail h2 {
@@ -391,4 +545,47 @@ fieldset label {
   display: flex;
   gap: var(--space-1);
   justify-content: flex-end;
+}
+
+/* Update banner */
+
+.update-banner {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.875rem;
+  max-width: calc(100vw - 2rem);
+  box-shadow: 0 0.25rem 1rem rgb(24 20 12 / 0.1);
+}
+
+.update-banner-message {
+  margin: 0;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.update-banner-reload {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  border-color: var(--color-accent);
+  padding: 0.4rem 0.875rem;
+  min-height: 36px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.update-banner-dismiss {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  padding: 0.4rem 0.5rem;
+  min-height: 36px;
+  font-size: 0.875rem;
 }
