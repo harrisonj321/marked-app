@@ -121,66 +121,70 @@ export function SettingsSheet({
 
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>
         <fieldset>
-          <legend>An untouched day counts as:</legend>
-          <label>
+          <legend>The two states</legend>
+
+          <div className="state-row">
             <input
               type="radio"
               name={`${titleId}-default`}
               value="did"
               checked={draft === 'did'}
               onChange={() => setDraft('did')}
+              aria-label="First option is the untouched-day default"
             />
-            {syncedLabels.did}
-          </label>
-          <label>
+            <div className="field">
+              <label htmlFor={didLabelId} className="visually-hidden">
+                First option
+              </label>
+              <input
+                id={didLabelId}
+                type="text"
+                value={didLabelDraft}
+                onChange={(event) => setDidLabelDraft(event.target.value)}
+                maxLength={STATE_LABEL_MAX_LENGTH}
+              />
+            </div>
+          </div>
+          {didLabelError && (
+            <p role="alert" className="message">
+              {didLabelError}
+            </p>
+          )}
+
+          <div className="state-row">
             <input
               type="radio"
               name={`${titleId}-default`}
               value="didnt"
               checked={draft === 'didnt'}
               onChange={() => setDraft('didnt')}
+              aria-label="Second option is the untouched-day default"
             />
-            {syncedLabels.didnt}
-          </label>
+            <div className="field">
+              <label htmlFor={didntLabelId} className="visually-hidden">
+                Second option
+              </label>
+              <input
+                id={didntLabelId}
+                type="text"
+                value={didntLabelDraft}
+                onChange={(event) => setDidntLabelDraft(event.target.value)}
+                maxLength={STATE_LABEL_MAX_LENGTH}
+              />
+            </div>
+          </div>
+          {didntLabelError && (
+            <p role="alert" className="message">
+              {didntLabelError}
+            </p>
+          )}
         </fieldset>
 
         <p className="message">
-          Days you have marked keep what they say. Days you have not follow this setting.
+          The selected option is what an untouched day means, on the left of today&#39;s
+          toggle. The other is what you actively Note, on the right. Days already marked
+          keep what they say.
         </p>
-
-        <fieldset>
-          <legend>Labels</legend>
-          <div className="field">
-            <label htmlFor={didLabelId}>First option</label>
-            <input
-              id={didLabelId}
-              type="text"
-              value={didLabelDraft}
-              onChange={(event) => setDidLabelDraft(event.target.value)}
-              maxLength={STATE_LABEL_MAX_LENGTH}
-            />
-            {didLabelError && (
-              <p role="alert" className="message">
-                {didLabelError}
-              </p>
-            )}
-          </div>
-          <div className="field">
-            <label htmlFor={didntLabelId}>Second option</label>
-            <input
-              id={didntLabelId}
-              type="text"
-              value={didntLabelDraft}
-              onChange={(event) => setDidntLabelDraft(event.target.value)}
-              maxLength={STATE_LABEL_MAX_LENGTH}
-            />
-            {didntLabelError && (
-              <p role="alert" className="message">
-                {didntLabelError}
-              </p>
-            )}
-          </div>
-        </fieldset>
 
         {error && (
           <p role="alert" className="message">

@@ -304,9 +304,17 @@ fieldset label {
 /* The primary control: a two-position slide switch. Both state words are
    printed on a recessed track; an ink card covers today's state and
    knocks its word out to paper. The same ink is used at either position,
-   so neither "Did" nor "Didn't" reads as the preferred outcome. Tapping
-   the other word moves the ink there. */
+   so neither word reads as the preferred outcome. Tapping the other word,
+   or dragging the ink there and releasing, moves it.
+
+   The untouched-day default always renders on the left (--x: 0) and the
+   actively-Noted state on the right (--x: 1); TodayToggle sets
+   data-position from which underlying DayState is current relative to the
+   tracker's default, not from a fixed did/didnt order. touch-action is
+   none rather than manipulation because the control fully owns horizontal
+   drag gestures itself. */
 .today-toggle {
+  --x: 0;
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -322,8 +330,12 @@ fieldset label {
     inset 0 1px 3px rgb(var(--color-shadow-rgb) / 0.1),
     0 1px 2px rgb(var(--color-shadow-rgb) / 0.05),
     0 10px 20px rgb(var(--color-shadow-rgb) / 0.05);
-  touch-action: manipulation;
+  touch-action: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.today-toggle[data-position='right'] {
+  --x: 1;
 }
 
 .today-toggle-option {
@@ -369,6 +381,11 @@ fieldset label {
     drop-shadow(0 4px 10px rgb(var(--color-shadow-rgb) / 0.12));
 }
 
+/* The clip window is a fixed width sliding between the two halves; its
+   left/right insets are both expressed as linear functions of --x so a
+   live drag (JS writes a fractional --x directly) and a settled tap or
+   drag-release (--x snaps to the 0/1 driven by [data-position]) animate
+   through the exact same formula. */
 .today-toggle-ink {
   position: absolute;
   inset: 0;
@@ -381,16 +398,27 @@ fieldset label {
   font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.01em;
-  clip-path: inset(0.3125rem calc(50% + 0.15625rem) 0.3125rem 0.3125rem round 0.9375rem);
-}
-
-.today-toggle[data-state='didnt'] .today-toggle-ink {
-  clip-path: inset(0.3125rem 0.3125rem 0.3125rem calc(50% + 0.15625rem) round 0.9375rem);
+  clip-path: inset(
+    0.3125rem
+    calc(50% + 0.15625rem - var(--x) * (50% - 0.15625rem))
+    0.3125rem
+    calc(0.3125rem + var(--x) * (50% - 0.15625rem))
+    round 0.9375rem
+  );
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .today-toggle-ink {
-    transition: clip-path 200ms cubic-bezier(0.3, 0, 0, 1);
+    /* A back-out curve (overshoots past 1 before settling) is what reads
+       as a small physical bounce rather than a plain ease -- restrained
+       to one gentle overshoot, not a repeating wobble. */
+    transition: clip-path 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* Live-dragging tracks the pointer 1:1; the spring only plays once the
+     finger lets go and --x snaps back to its resolved 0/1. */
+  .today-toggle-dragging .today-toggle-ink {
+    transition: none;
   }
 }
 
@@ -586,57 +614,20 @@ fieldset label {
 
 /* Calendar sheet */
 
-.calendar-sheet {
-  border: none;
-  width: min(100%, 26rem);
-  margin: auto auto 0;
-  max-height: calc(100dvh - 3rem);
-  overflow-y: auto;
-  border-radius: 1rem 1rem 0 0;
-  padding: var(--space-1) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
-  background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: 0 -0.5rem 2rem rgb(var(--color-shadow-rgb) / 0.08);
-}
-
-.calendar-sheet::backdrop {
-  background: rgb(var(--color-shadow-rgb) / 0.4);
-}
-
 .calendar-sheet-header {
   display: flex;
   justify-content: flex-end;
 }
 
-@media (min-width: 640px) {
-  .calendar-sheet {
-    margin: auto;
-    border-radius: 1rem;
-    padding-bottom: var(--space-3);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .calendar-sheet[open] {
-    animation: sheet-in 160ms ease-out;
-  }
-
-  @keyframes sheet-in {
-    from {
-      transform: translateY(0.75rem);
-      opacity: 0.6;
-    }
-  }
-}
-
-/* Day detail and settings dialogs share one small card treatment. */
-
+/* Day detail, settings, and calendar dialogs share one small card
+   treatment: centered in the viewport (native <dialog> centering) rather
+   than pinned to any edge, so all three read as the same kind of overlay
+   -- balanced, with even breathing room around them, not a bottom sheet. */
 .day-detail,
-.settings-sheet {
+.settings-sheet,
+.calendar-sheet {
   border: none;
   border-radius: 0.75rem;
-  padding: var(--space-3);
-  width: min(24rem, calc(100vw - 2rem));
   background: var(--color-surface);
   color: var(--color-text);
   /* A close, tight shadow for grounding plus a wide, soft one for lift --
@@ -646,8 +637,31 @@ fieldset label {
     0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12);
 }
 
+.day-detail,
+.settings-sheet {
+  padding: var(--space-3);
+  width: min(24rem, calc(100vw - 2rem));
+}
+
+/* The calendar grid runs taller than a settings/day form and needs more
+   width for its seven columns, so it keeps its own sizing -- but stays
+   centered like the other two, with a height cap plus internal scrolling
+   so it never clips on short phone screens. */
+.calendar-sheet {
+  width: min(100%, 26rem);
+  margin: auto;
+  max-height: calc(
+    100dvh - 2 * var(--space-3) - env(safe-area-inset-top, 0px) -
+      env(safe-area-inset-bottom, 0px)
+  );
+  overflow-y: auto;
+  padding: var(--space-3);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+}
+
 .day-detail::backdrop,
-.settings-sheet::backdrop {
+.settings-sheet::backdrop,
+.calendar-sheet::backdrop {
   background: rgb(var(--color-shadow-rgb) / 0.4);
 }
 
@@ -671,6 +685,22 @@ fieldset label {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
+}
+
+/* One row per state: a radio marking it as the untouched-day default,
+   plus the editable text for what it's called. Combining both into a
+   single control is what replaces the old separate default-state and
+   label fieldsets. */
+.settings-sheet .state-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 44px;
+}
+
+.settings-sheet .state-row .field {
+  flex: 1;
+  gap: 0;
 }
 
 .day-detail-actions,

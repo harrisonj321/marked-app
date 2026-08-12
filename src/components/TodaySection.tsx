@@ -31,7 +31,12 @@ export function TodaySection({
     <section className="today">
       {today.effectiveState && (
         <>
-          <TodayToggle state={today.effectiveState} onSelect={today.setState} labels={labels} />
+          <TodayToggle
+            state={today.effectiveState}
+            defaultState={defaultState}
+            onSelect={today.setState}
+            labels={labels}
+          />
           {today.pending && (
             <p className="message" aria-live="polite">
               Saving&hellip;
