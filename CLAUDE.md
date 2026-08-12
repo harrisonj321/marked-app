@@ -334,10 +334,13 @@ Use:
 - TypeScript
 - Firebase Authentication
 - Cloud Firestore
-- Firebase Hosting
+- Vercel (primary production frontend hosting)
+- Firebase Hosting (secondary mirror; not the normal deploy target -- see Deployment Safety)
 - Progressive Web App support
 
 The application is mobile-first but must remain responsive on desktop.
+
+Firebase is the backend platform (Authentication, Firestore, Firestore Rules). Vercel is the primary public production frontend and deploys automatically from `main` via its existing GitHub integration -- see Deployment Safety for the full release workflow.
 
 Do not introduce another backend, database, state-management framework, UI framework, or cloud provider without a demonstrated requirement.
 
@@ -612,7 +615,24 @@ Never claim success if validation failed.
 
 ## Deployment Safety
 
-Do not deploy to Firebase Hosting unless the user explicitly instructs you to deploy.
+### Production Deployment Architecture
+
+- The primary public production frontend is **Vercel**, project `noted-app`, served at `https://the-noted-app.vercel.app`.
+- Production deploys happen automatically when commits are pushed to `main`, through the existing Vercel GitHub integration. Pushing `main` *is* the deploy -- do not run a manual Vercel deploy as part of a routine release.
+- Firebase remains the backend platform: Authentication, Cloud Firestore, and Firestore Rules.
+- Firebase Hosting currently holds a working mirror of the frontend but is **not** the normal production deployment target. Do not run `firebase deploy --only hosting` (or a full `firebase deploy`) as part of a routine release unless the user explicitly requests it.
+
+### Normal Frontend Release Workflow
+
+1. Complete and verify the approved code changes.
+2. Bump the version and commit as appropriate.
+3. Push `main`.
+4. Let the existing Vercel GitHub integration auto-deploy -- do not trigger a manual deploy.
+5. Verify `https://the-noted-app.vercel.app` is serving the expected commit/version/build (compare the deployed commit SHA and/or built asset hash, not just that the site loads).
+6. Do not deploy to Firebase Hosting as part of this workflow.
+7. If `firestore.rules` changed, deploy the rules separately through Firebase and verify that deployment too.
+
+### General Rules
 
 Do not publish Firestore Rules unless the user explicitly instructs you to do so as part of a deployment/setup task.
 
@@ -621,6 +641,8 @@ Never weaken security rules merely to get a feature working.
 Never enable billing or switch Firebase plans.
 
 Never create Cloud Functions, Cloud Run services, Storage buckets, paid APIs, or other potentially billable infrastructure without explicit approval.
+
+Never disconnect, delete, or reconfigure the Vercel project or Firebase Hosting without explicit approval.
 
 ---
 
