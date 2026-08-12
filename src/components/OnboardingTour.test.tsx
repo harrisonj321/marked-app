@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 const { useInstallPromptMock, isIOSDeviceMock, isStandaloneDisplayMock } = vi.hoisted(() => ({
@@ -30,6 +30,7 @@ function mockPlatform({
 function renderTour(onFinish = vi.fn()) {
   render(
     <>
+      <div data-tour-id="open-settings" />
       <div data-tour-id="today-toggle" />
       <div data-tour-id="open-calendar" />
       <OnboardingTour onFinish={onFinish} />
@@ -42,12 +43,39 @@ function clickNext() {
   fireEvent.click(screen.getByRole('button', { name: /^(Next|Done)$/ }))
 }
 
+/**
+ * jsdom's real getBoundingClientRect is always a zero-rect, which cannot
+ * distinguish which data-tour-id element a coach mark actually measured --
+ * a step accidentally wired to the wrong tourId would look identical. This
+ * gives each stub target a distinct, identifiable rect so a test can assert
+ * the rendered spotlight reflects the *specific* real control it claims to.
+ */
+function mockDistinctTourRects() {
+  const rectsByTourId: Record<string, DOMRect> = {
+    'open-settings': { top: 700, left: 10, width: 20, height: 20, bottom: 720, right: 30 } as DOMRect,
+    'today-toggle': { top: 300, left: 10, width: 20, height: 20, bottom: 320, right: 30 } as DOMRect,
+    'open-calendar': { top: 40, left: 10, width: 20, height: 20, bottom: 60, right: 30 } as DOMRect,
+  }
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: Element,
+  ) {
+    const tourId = this.getAttribute('data-tour-id')
+    const rect = (tourId && rectsByTourId[tourId]) || ({ top: 0, left: 0, width: 0, height: 0, bottom: 0, right: 0 } as DOMRect)
+    return { ...rect, x: rect.left, y: rect.top, toJSON: () => {} }
+  })
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 describe('OnboardingTour', () => {
-  it('opens on the welcome step with Skip visible and no Back control', () => {
+  it('opens on the single welcome screen with Skip visible and no Back control anywhere in the tour', () => {
     mockPlatform()
     renderTour()
 
-    expect(screen.getByText(/simple ledger for anything you want to notice/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Noted.' })).toBeInTheDocument()
+    expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
   })
@@ -66,33 +94,66 @@ describe('OnboardingTour', () => {
     mockPlatform()
     const { onFinish } = renderTour()
 
-    clickNext() // welcome -> concept
+    clickNext() // welcome -> coach-customize
     fireEvent.keyDown(window, { key: 'Escape' })
 
     expect(onFinish).toHaveBeenCalledWith('skipped')
   })
 
-  it('moves forward through the intro and back again', () => {
+  it('the primary action on the opening screen leads directly into contextual guidance, not another intro slide', () => {
     mockPlatform()
     renderTour()
 
-    clickNext() // welcome -> concept
-    expect(screen.getByRole('heading', { name: 'Just Noted.' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-    expect(screen.getByText(/simple ledger for anything you want to notice/i)).toBeInTheDocument()
+    clickNext() // welcome -> coach-customize
+    expect(screen.getByText(/name the two states/i)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Noted.' })).not.toBeInTheDocument()
   })
 
-  it('walks through both coach marks anchored to the real controls, in order', () => {
+  it('walks through all three coach marks anchored to the real controls, in order', () => {
     mockPlatform()
     renderTour()
 
-    clickNext() // welcome -> concept
-    clickNext() // concept -> coach-today
+    clickNext() // welcome -> coach-customize
+    expect(screen.getByText(/name the two states/i)).toBeInTheDocument()
+
+    clickNext() // coach-customize -> coach-today
     expect(screen.getByText(/tap or slide to change today's mark/i)).toBeInTheDocument()
 
     clickNext() // coach-today -> coach-calendar
     expect(screen.getByText(/open the calendar to review or change/i)).toBeInTheDocument()
+  })
+
+  it('anchors the customization coach mark to the real Settings control', () => {
+    mockPlatform()
+    renderTour()
+
+    clickNext() // welcome -> coach-customize
+    expect(screen.getByText('Make it yours')).toBeInTheDocument()
+  })
+
+  it('measures the real open-settings element specifically, not merely any coach-mark target', () => {
+    mockDistinctTourRects()
+    mockPlatform()
+    renderTour()
+
+    clickNext() // welcome -> coach-customize
+    // A tourId mix-up (e.g. wired to 'today-toggle' or 'open-calendar' by
+    // mistake) would measure a different stub and produce a different top --
+    // this pins the spotlight to the one open-settings owns.
+    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '690px' })
+  })
+
+  it('shows exactly one progress dot per step, adapting when the install step is present or omitted', () => {
+    mockPlatform({ ios: false, standalone: false, canPromptInstall: false })
+    renderTour()
+    // welcome, coach-customize, coach-today, coach-calendar -- no install step.
+    expect(document.querySelectorAll('.onboarding-dot')).toHaveLength(4)
+  })
+
+  it('adds a fifth progress dot when the install step applies', () => {
+    mockPlatform({ ios: true, standalone: false, canPromptInstall: false })
+    renderTour()
+    expect(document.querySelectorAll('.onboarding-dot')).toHaveLength(5)
   })
 
   it('keeps the top bar in one unchanging layout across every step, so Skip never changes position', () => {
@@ -102,9 +163,9 @@ describe('OnboardingTour', () => {
     const topbarClassName = () => document.querySelector('.onboarding-topbar')?.className
 
     expect(topbarClassName()).toBe('onboarding-topbar')
-    clickNext() // welcome -> concept
+    clickNext() // welcome -> coach-customize
     expect(topbarClassName()).toBe('onboarding-topbar')
-    clickNext() // concept -> coach-today
+    clickNext() // coach-customize -> coach-today
     expect(topbarClassName()).toBe('onboarding-topbar')
     clickNext() // coach-today -> coach-calendar
     expect(topbarClassName()).toBe('onboarding-topbar')
@@ -114,9 +175,9 @@ describe('OnboardingTour', () => {
     mockPlatform()
     renderTour()
 
-    clickNext() // welcome -> concept
-    clickNext() // concept -> coach-today
-    // Both stub targets report a zero rect in jsdom, so the difference in
+    clickNext() // welcome -> coach-customize
+    clickNext() // coach-customize -> coach-today
+    // All stub targets report a zero rect in jsdom, so the difference in
     // computed inline style isolates the padding math itself.
     expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '-10px' })
 
@@ -128,8 +189,8 @@ describe('OnboardingTour', () => {
     mockPlatform()
     render(<OnboardingTour onFinish={vi.fn()} />) // no stub data-tour-id elements this time
 
-    clickNext() // welcome -> concept
-    clickNext() // concept -> coach-today
+    clickNext() // welcome -> coach-customize
+    clickNext() // coach-customize -> coach-today
 
     expect(screen.getByText(/tap or slide to change today's mark/i)).toBeInTheDocument()
     expect(document.querySelector('.tour-spotlight')).not.toBeInTheDocument()
@@ -139,8 +200,8 @@ describe('OnboardingTour', () => {
     mockPlatform({ ios: false, standalone: false, canPromptInstall: false })
     const { onFinish } = renderTour()
 
-    clickNext() // welcome -> concept
-    clickNext() // concept -> coach-today
+    clickNext() // welcome -> coach-customize
+    clickNext() // coach-customize -> coach-today
     clickNext() // coach-today -> coach-calendar
 
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
@@ -153,8 +214,8 @@ describe('OnboardingTour', () => {
     mockPlatform({ ios: true, standalone: true, canPromptInstall: false })
     renderTour()
 
-    clickNext() // welcome -> concept
-    clickNext() // concept -> coach-today
+    clickNext() // welcome -> coach-customize
+    clickNext() // coach-customize -> coach-today
     clickNext() // coach-today -> coach-calendar
 
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
@@ -164,8 +225,8 @@ describe('OnboardingTour', () => {
     mockPlatform({ ios: true, standalone: false, canPromptInstall: false })
     renderTour()
 
-    clickNext() // welcome -> concept
-    clickNext() // concept -> coach-today
+    clickNext() // welcome -> coach-customize
+    clickNext() // coach-customize -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> install
 
@@ -181,8 +242,8 @@ describe('OnboardingTour', () => {
     const { promptInstall } = mockPlatform({ ios: false, standalone: false, canPromptInstall: true })
     const { onFinish } = renderTour()
 
-    clickNext() // welcome -> concept
-    clickNext() // concept -> coach-today
+    clickNext() // welcome -> coach-customize
+    clickNext() // coach-customize -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> install
 
@@ -198,8 +259,8 @@ describe('OnboardingTour', () => {
     mockPlatform({ ios: false, standalone: false, canPromptInstall: true })
     const { onFinish } = renderTour()
 
-    clickNext() // welcome -> concept
-    clickNext() // concept -> coach-today
+    clickNext() // welcome -> coach-customize
+    clickNext() // coach-customize -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> install
 
@@ -212,8 +273,8 @@ describe('OnboardingTour', () => {
     mockPlatform({ ios: true, standalone: false })
     renderTour()
 
-    clickNext() // welcome -> concept
-    clickNext() // concept -> coach-today
+    clickNext() // welcome -> coach-customize
+    clickNext() // coach-customize -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> install
 

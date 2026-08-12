@@ -85,7 +85,12 @@ export function Home({ uid, tracker }: HomeProps) {
 
         <footer className="home-footer">
           <div className="home-footer-links">
-            <button type="button" className="footer-link" onClick={() => setSettingsOpen(true)}>
+            <button
+              type="button"
+              className="footer-link"
+              data-tour-id="open-settings"
+              onClick={() => setSettingsOpen(true)}
+            >
               Settings
             </button>
             <button type="button" className="footer-link" onClick={() => void signOutUser()}>

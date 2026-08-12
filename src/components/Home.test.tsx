@@ -62,7 +62,7 @@ vi.mock('../data/tracker', () => ({
 }))
 vi.mock('../lib/auth', () => ({ signOutUser: vi.fn() }))
 
-const WELCOME_TEXT = /simple ledger for anything you want to notice/i
+const WELCOME_TEXT = /not a habit tracker/i
 
 beforeEach(() => {
   reportSaveError.mockReset()
@@ -122,6 +122,14 @@ describe('Home', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
     expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
+  })
+
+  it('marks the real Settings control as the customization coach mark\'s anchor', () => {
+    renderSettledHome()
+    expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute(
+      'data-tour-id',
+      'open-settings',
+    )
   })
 
   it('saves a new default state with the current one, so existing days can be pinned first', async () => {

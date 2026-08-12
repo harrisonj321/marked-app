@@ -5,16 +5,21 @@ import { useTourTargetRect } from '../hooks/useTourTargetRect'
 import { isIOSDevice, isStandaloneDisplay } from '../lib/platform'
 import { ShareIcon } from './icons'
 
-type StepId = 'welcome' | 'concept' | 'coach-today' | 'coach-calendar' | 'install'
+type StepId = 'welcome' | 'coach-customize' | 'coach-today' | 'coach-calendar' | 'install'
 
-const INTRO_AND_COACH_STEPS: readonly StepId[] = ['welcome', 'concept', 'coach-today', 'coach-calendar']
+const INTRO_AND_COACH_STEPS: readonly StepId[] = [
+  'welcome',
+  'coach-customize',
+  'coach-today',
+  'coach-calendar',
+]
 
 interface OnboardingTourProps {
   onFinish: (status: OnboardingStatus) => void
 }
 
 /**
- * Drives the first-run/replayable tour: two full-screen intro slides, two
+ * Drives the first-run/replayable tour: one full-screen intro slide, three
  * coach marks anchored to the real Home controls, then an optional PWA
  * install step. Home stays mounted (and inert) underneath the whole time --
  * see Home's use of the `inert` attribute -- so this component only ever
@@ -65,10 +70,6 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
     setIndex((current) => current + 1)
   }
 
-  function goBack() {
-    setIndex((current) => Math.max(0, current - 1))
-  }
-
   function skip() {
     onFinish('skipped')
   }
@@ -89,25 +90,21 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
         <IntroStep
           title="Noted."
           paragraphs={[
-            'A simple ledger for anything you want to notice over time.',
-            "It doesn't score, judge, or tell you what your days should mean — it just keeps the record.",
+            "It's not a habit tracker.\nIt's not about streaks, judgment, or value statements.",
+            "It's just a ledger of whatever.\nIt's just visibility.\nIt's just Noted.",
           ]}
           primaryLabel="Next"
           onPrimary={goNext}
         />
       )}
 
-      {step === 'concept' && (
-        <IntroStep
-          title="Just Noted."
-          paragraphs={[
-            "It's not a habit tracker.",
-            'No streaks. No judgment. No value statements.',
-            'Just a ledger of whatever.\nJust visibility.\nJust Noted.',
-          ]}
+      {step === 'coach-customize' && (
+        <CoachStep
+          tourId="open-settings"
+          label="Make it yours"
+          body="Name the two states whatever makes sense for what you're noting, and choose what an untouched day means."
           primaryLabel="Next"
           onPrimary={goNext}
-          onBack={goBack}
         />
       )}
 
@@ -186,10 +183,9 @@ interface IntroStepProps {
   paragraphs: string[]
   primaryLabel: string
   onPrimary: () => void
-  onBack?: () => void
 }
 
-function IntroStep({ title, paragraphs, primaryLabel, onPrimary, onBack }: IntroStepProps) {
+function IntroStep({ title, paragraphs, primaryLabel, onPrimary }: IntroStepProps) {
   const headingId = useId()
   const primaryRef = useRef<HTMLButtonElement>(null)
 
@@ -206,11 +202,6 @@ function IntroStep({ title, paragraphs, primaryLabel, onPrimary, onBack }: Intro
         ))}
       </div>
       <div className="onboarding-footer">
-        {onBack && (
-          <button type="button" className="onboarding-back" onClick={onBack}>
-            Back
-          </button>
-        )}
         <button type="button" className="onboarding-primary" ref={primaryRef} onClick={onPrimary}>
           {primaryLabel}
         </button>

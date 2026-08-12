@@ -875,10 +875,6 @@ fieldset label {
   flex: 1;
 }
 
-.onboarding-back {
-  background: none;
-}
-
 /* The one accent-filled treatment already established elsewhere in Noted.
    (the update banner's Reload, the active count chip) -- reused here so the
    forward/progression action in the tour reads as clearly primary without
