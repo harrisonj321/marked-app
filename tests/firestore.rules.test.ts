@@ -297,6 +297,101 @@ describe('tracker config', () => {
   })
 })
 
+describe('tracker config -- stateLabels', () => {
+  it('allows creating a tracker with valid stateLabels', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        ...validTracker,
+        stateLabels: { did: 'Took it', didnt: "Didn't take it" },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('allows creating a tracker with no stateLabels at all', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        ...validTracker,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('owner can rename both labels on update', async () => {
+    await seedTracker(OWNER_UID)
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        stateLabels: { did: 'Took it', didnt: "Didn't take it" },
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects stateLabels missing the didnt key', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        ...validTracker,
+        stateLabels: { did: 'Took it' },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects an unrecognized key inside stateLabels', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        ...validTracker,
+        stateLabels: { did: 'Took it', didnt: "Didn't take it", extra: 'nope' },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a whitespace-only label', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        ...validTracker,
+        stateLabels: { did: '   ', didnt: "Didn't take it" },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a label over the maximum length', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        ...validTracker,
+        stateLabels: { did: 'a'.repeat(25), didnt: "Didn't take it" },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('another authenticated user cannot rename labels', async () => {
+    await seedTracker(OWNER_UID)
+    const db = dbAs(OTHER_UID)
+    await assertFails(
+      updateDoc(doc(db, `users/${OWNER_UID}/tracker/config`), {
+        stateLabels: { did: 'Hijacked', didnt: "Didn't take it" },
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+})
+
 describe('daily entries -- ownership and shape', () => {
   it('owner can create, read, and delete their own daily override', async () => {
     const db = dbAs(OWNER_UID)

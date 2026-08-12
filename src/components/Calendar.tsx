@@ -11,7 +11,7 @@ import {
 } from '../domain/calendar'
 import { formatDisplayDate } from '../domain/date'
 import { formatCount, type NormalizedDailyRecord } from '../domain/day'
-import type { TrackerConfig } from '../domain/tracker'
+import { resolveStateLabels, type StateLabels, type TrackerConfig } from '../domain/tracker'
 import { saveDailyRecord } from '../data/day'
 import { useMonthRecords } from '../hooks/useMonthRecords'
 import { DayDetail } from './DayDetail'
@@ -24,11 +24,9 @@ interface CalendarProps {
 
 const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
-const STATE_LABEL = { did: 'Did', didnt: "Didn't" } as const
-
-function buildDayAriaLabel(view: CalendarDayView): string {
+function buildDayAriaLabel(view: CalendarDayView, labels: StateLabels): string {
   const parts = [formatDisplayDate(view.dateKey)]
-  if (view.effectiveState) parts.push(STATE_LABEL[view.effectiveState])
+  if (view.effectiveState) parts.push(labels[view.effectiveState])
   if (view.isToday) parts.push('Today')
   if (view.hasNote) parts.push('has a note')
   if (view.count) parts.push(formatCount(view.count))
@@ -43,6 +41,7 @@ export function Calendar({ uid, tracker, todayKey }: CalendarProps) {
   const { records, error } = useMonthRecords(uid, visibleMonth)
   const calendarMonth = getCalendarMonth(visibleMonth.year, visibleMonth.month)
   const canGoNext = compareYearMonth(visibleMonth, todayYearMonth) < 0
+  const labels = resolveStateLabels(tracker.stateLabels)
 
   function goToPreviousMonth() {
     setVisibleMonth((current) => addMonths(current, -1))
@@ -105,7 +104,12 @@ export function Calendar({ uid, tracker, todayKey }: CalendarProps) {
               record: records.get(cell.dateKey),
             })
             return (
-              <CalendarDayCell key={cell.dateKey} view={view} onSelect={setSelectedDateKey} />
+              <CalendarDayCell
+                key={cell.dateKey}
+                view={view}
+                labels={labels}
+                onSelect={setSelectedDateKey}
+              />
             )
           })}
         </div>
@@ -116,6 +120,7 @@ export function Calendar({ uid, tracker, todayKey }: CalendarProps) {
           dateKey={selectedDateKey}
           defaultState={tracker.defaultState}
           initialRecord={records.get(selectedDateKey) ?? {}}
+          labels={labels}
           onSave={(normalized) => handleDetailSave(selectedDateKey, normalized)}
           onDismiss={() => setSelectedDateKey(null)}
         />
@@ -126,10 +131,11 @@ export function Calendar({ uid, tracker, todayKey }: CalendarProps) {
 
 interface CalendarDayCellProps {
   view: CalendarDayView
+  labels: StateLabels
   onSelect: (dateKey: string) => void
 }
 
-function CalendarDayCell({ view, onSelect }: CalendarDayCellProps) {
+function CalendarDayCell({ view, labels, onSelect }: CalendarDayCellProps) {
   if (view.status !== 'active') {
     return (
       <div className="calendar-cell calendar-cell-inactive" aria-hidden="true">
@@ -151,7 +157,7 @@ function CalendarDayCell({ view, onSelect }: CalendarDayCellProps) {
       type="button"
       className={className}
       onClick={() => onSelect(view.dateKey)}
-      aria-label={buildDayAriaLabel(view)}
+      aria-label={buildDayAriaLabel(view, labels)}
       aria-current={view.isToday ? 'date' : undefined}
     >
       <span className="calendar-cell-day">{view.dayOfMonth}</span>

@@ -271,6 +271,21 @@ describe('DayDetail', () => {
     })
   })
 
+  it('renders custom labels in place of the default Did/Didn\'t wording', () => {
+    render(
+      <DayDetail
+        dateKey="2026-08-10"
+        defaultState="did"
+        initialRecord={{}}
+        labels={{ did: 'Took it', didnt: "Didn't take it" }}
+        onSave={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('radio', { name: 'Took it' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: "Didn't take it" })).not.toBeChecked()
+  })
+
   it('calls onDismiss when the dialog is closed via the close control', () => {
     const onDismiss = vi.fn()
     render(

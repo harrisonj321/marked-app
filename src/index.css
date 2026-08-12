@@ -666,7 +666,8 @@ fieldset label {
   font-size: 1.125rem;
 }
 
-.day-detail .field {
+.day-detail .field,
+.settings-sheet .field {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;

@@ -11,7 +11,7 @@ import {
   type DailyRecord,
   type NormalizedDailyRecord,
 } from '../domain/day'
-import type { DayState } from '../domain/tracker'
+import { DEFAULT_STATE_LABELS, type DayState, type StateLabels } from '../domain/tracker'
 import { CountSelector } from './CountSelector'
 import { CloseIcon } from './icons'
 
@@ -21,17 +21,17 @@ interface DayDetailProps {
   initialRecord: DailyRecord
   /** False for today's note sheet: the home screen already owns today's state. */
   editableState?: boolean
+  labels?: StateLabels
   onSave: (normalized: NormalizedDailyRecord) => Promise<void>
   onDismiss: () => void
 }
-
-const STATE_LABEL = { did: 'Did', didnt: "Didn't" } as const
 
 export function DayDetail({
   dateKey,
   defaultState,
   initialRecord,
   editableState = true,
+  labels = DEFAULT_STATE_LABELS,
   onSave,
   onDismiss,
 }: DayDetailProps) {
@@ -141,7 +141,7 @@ export function DayDetail({
                 checked={effectiveState === 'did'}
                 onChange={() => setEffectiveState('did')}
               />
-              {STATE_LABEL.did}
+              {labels.did}
             </label>
             <label>
               <input
@@ -150,7 +150,7 @@ export function DayDetail({
                 checked={effectiveState === 'didnt'}
                 onChange={() => setEffectiveState('didnt')}
               />
-              {STATE_LABEL.didnt}
+              {labels.didnt}
             </label>
           </fieldset>
         )}

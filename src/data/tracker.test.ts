@@ -15,7 +15,7 @@ vi.mock('./day', () => ({
   pinImplicitDayStates: (...args: unknown[]) => pinImplicitDayStatesMock(...args),
 }))
 
-const { updateTrackerDefaultState } = await import('./tracker')
+const { updateTrackerDefaultState, updateTrackerStateLabels } = await import('./tracker')
 
 const UID = 'user-1'
 
@@ -68,5 +68,17 @@ describe('updateTrackerDefaultState', () => {
 
     await expect(updateTrackerDefaultState(UID, 'did', 'didnt')).rejects.toThrow()
     expect(updateDocMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateTrackerStateLabels', () => {
+  it('writes both labels on the tracker config, without touching defaultState', async () => {
+    await updateTrackerStateLabels(UID, { did: 'Took it', didnt: "Didn't take it" })
+
+    expect(pinImplicitDayStatesMock).not.toHaveBeenCalled()
+    expect(updateDocMock).toHaveBeenCalledWith(expect.anything(), {
+      stateLabels: { did: 'Took it', didnt: "Didn't take it" },
+      updatedAt: 'server-time',
+    })
   })
 })

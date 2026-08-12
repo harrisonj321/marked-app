@@ -64,4 +64,21 @@ describe('TodayToggle', () => {
     expect(did.name).not.toBe('')
     expect(didnt.name).toBe(did.name)
   })
+
+  it('renders custom labels in place of the default Did/Didn\'t wording', () => {
+    const onSelect = vi.fn()
+    render(
+      <TodayToggle
+        state="did"
+        onSelect={onSelect}
+        labels={{ did: 'Took it', didnt: "Didn't take it" }}
+      />,
+    )
+
+    expect(screen.getByRole('radio', { name: 'Took it' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: "Didn't take it" })).not.toBeChecked()
+
+    fireEvent.click(screen.getByRole('radio', { name: "Didn't take it" }))
+    expect(onSelect).toHaveBeenCalledWith('didnt')
+  })
 })

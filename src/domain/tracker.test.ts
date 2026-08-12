@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DEFAULT_STATE_LABELS,
+  STATE_LABEL_MAX_LENGTH,
   TRACKER_NAME_MAX_LENGTH,
   isOverrideNeeded,
   resolveEffectiveState,
+  resolveStateLabels,
+  validateStateLabel,
   validateTrackerName,
 } from './tracker'
 
@@ -59,5 +63,52 @@ describe('validateTrackerName', () => {
   it('accepts a name at exactly the max length', () => {
     const maxLength = 'a'.repeat(TRACKER_NAME_MAX_LENGTH)
     expect(validateTrackerName(maxLength).valid).toBe(true)
+  })
+})
+
+describe('validateStateLabel', () => {
+  it('trims surrounding whitespace', () => {
+    expect(validateStateLabel('  Took it  ')).toEqual({
+      valid: true,
+      label: 'Took it',
+    })
+  })
+
+  it('rejects an empty label', () => {
+    expect(validateStateLabel('').valid).toBe(false)
+  })
+
+  it('rejects a whitespace-only label', () => {
+    expect(validateStateLabel('   ').valid).toBe(false)
+  })
+
+  it('rejects a label over the max length', () => {
+    const tooLong = 'a'.repeat(STATE_LABEL_MAX_LENGTH + 1)
+    expect(validateStateLabel(tooLong).valid).toBe(false)
+  })
+
+  it('accepts a label at exactly the max length', () => {
+    const maxLength = 'a'.repeat(STATE_LABEL_MAX_LENGTH)
+    expect(validateStateLabel(maxLength).valid).toBe(true)
+  })
+})
+
+describe('resolveStateLabels', () => {
+  it('falls back to the default wording when no labels are stored', () => {
+    expect(resolveStateLabels(undefined)).toEqual(DEFAULT_STATE_LABELS)
+  })
+
+  it('uses the stored labels when both are set', () => {
+    expect(resolveStateLabels({ did: 'Took it', didnt: "Didn't take it" })).toEqual({
+      did: 'Took it',
+      didnt: "Didn't take it",
+    })
+  })
+
+  it('falls back per-key when only one label is customized', () => {
+    expect(resolveStateLabels({ did: 'Took it' })).toEqual({
+      did: 'Took it',
+      didnt: DEFAULT_STATE_LABELS.didnt,
+    })
   })
 })

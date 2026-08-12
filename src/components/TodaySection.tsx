@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { NormalizedDailyRecord } from '../domain/day'
-import type { DayState } from '../domain/tracker'
+import { DEFAULT_STATE_LABELS, type DayState, type StateLabels } from '../domain/tracker'
 import { saveDailyRecord } from '../data/day'
 import { useTodayState } from '../hooks/useTodayState'
 import { DayDetail } from './DayDetail'
@@ -10,9 +10,15 @@ interface TodaySectionProps {
   uid: string
   defaultState: DayState
   timezone: string
+  labels?: StateLabels
 }
 
-export function TodaySection({ uid, defaultState, timezone }: TodaySectionProps) {
+export function TodaySection({
+  uid,
+  defaultState,
+  timezone,
+  labels = DEFAULT_STATE_LABELS,
+}: TodaySectionProps) {
   const today = useTodayState(uid, defaultState, timezone)
   const [detailOpen, setDetailOpen] = useState(false)
   const hasNote = Boolean(today.record.note)
@@ -25,7 +31,7 @@ export function TodaySection({ uid, defaultState, timezone }: TodaySectionProps)
     <section className="today">
       {today.effectiveState && (
         <>
-          <TodayToggle state={today.effectiveState} onSelect={today.setState} />
+          <TodayToggle state={today.effectiveState} onSelect={today.setState} labels={labels} />
           {today.pending && (
             <p className="message" aria-live="polite">
               Saving&hellip;
@@ -52,6 +58,7 @@ export function TodaySection({ uid, defaultState, timezone }: TodaySectionProps)
           defaultState={defaultState}
           initialRecord={today.record}
           editableState={false}
+          labels={labels}
           onSave={handleDetailSave}
           onDismiss={() => setDetailOpen(false)}
         />

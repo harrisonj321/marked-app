@@ -8,7 +8,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import type { DayState, TrackerConfig } from '../domain/tracker'
+import type { DayState, StateLabels, TrackerConfig } from '../domain/tracker'
 import { pinImplicitDayStates } from './day'
 
 function trackerRef(uid: string) {
@@ -36,6 +36,18 @@ export async function createTracker(uid: string, input: NewTracker): Promise<voi
 export async function updateTrackerName(uid: string, name: string): Promise<void> {
   await updateDoc(trackerRef(uid), {
     name,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/**
+ * Renames the display wording for the two DayState values. This is
+ * presentation data only -- it never touches `defaultState` or any stored
+ * daily record, so existing log history is unaffected.
+ */
+export async function updateTrackerStateLabels(uid: string, stateLabels: StateLabels): Promise<void> {
+  await updateDoc(trackerRef(uid), {
+    stateLabels,
     updatedAt: serverTimestamp(),
   })
 }
@@ -90,5 +102,6 @@ function toTrackerConfig(data: Record<string, unknown>): TrackerConfig {
     defaultState: data.defaultState as DayState,
     timezone: data.timezone as string,
     startDate: data.startDate as string,
+    stateLabels: data.stateLabels as StateLabels | undefined,
   }
 }

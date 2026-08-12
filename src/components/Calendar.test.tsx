@@ -83,6 +83,17 @@ describe('Calendar', () => {
     expect(cell.className).toContain('calendar-cell-marked')
   })
 
+  it('uses the tracker\'s configured labels in day aria-labels', () => {
+    render(
+      <Calendar
+        uid="u1"
+        tracker={{ ...tracker, stateLabels: { did: 'Took it', didnt: "Didn't take it" } }}
+        todayKey="2026-08-15"
+      />,
+    )
+    expect(screen.getByRole('button', { name: /08\/10\/2026, Took it/ })).toBeInTheDocument()
+  })
+
   it("today's cell is identifiable independent of its state", () => {
     render(<Calendar uid="u1" tracker={tracker} todayKey="2026-08-15" />)
     expect(screen.getByRole('button', { name: /Today/ })).toHaveAttribute(
@@ -110,6 +121,19 @@ describe('Calendar', () => {
     fireEvent.click(screen.getByRole('button', { name: /08\/10\/2026/ }))
     expect(screen.getByRole('radio', { name: "Didn't" })).toBeChecked()
     expect(screen.getByLabelText('Note')).toHaveValue('Sick')
+  })
+
+  it('the detail surface uses the configured labels when a day is selected', () => {
+    mockRecords = new Map([['2026-08-10', { state: 'didnt' }]])
+    render(
+      <Calendar
+        uid="u1"
+        tracker={{ ...tracker, stateLabels: { did: 'Took it', didnt: "Didn't take it" } }}
+        todayKey="2026-08-15"
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /08\/10\/2026/ }))
+    expect(screen.getByRole('radio', { name: "Didn't take it" })).toBeChecked()
   })
 
   it('saving from the detail surface persists via saveDailyRecord for the selected day', async () => {

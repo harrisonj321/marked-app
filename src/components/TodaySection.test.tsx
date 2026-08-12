@@ -80,6 +80,19 @@ describe('TodaySection', () => {
     expect(screen.getAllByRole('radio')).toHaveLength(2)
   })
 
+  it('renders custom labels when provided', () => {
+    render(
+      <TodaySection
+        uid="u1"
+        defaultState="did"
+        timezone="UTC"
+        labels={{ did: 'Took it', didnt: "Didn't take it" }}
+      />,
+    )
+    expect(screen.getByRole('radio', { name: 'Took it' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: "Didn't take it" })).not.toBeChecked()
+  })
+
   it('saving from the detail surface persists via saveDailyRecord for today', async () => {
     render(<TodaySection uid="u1" defaultState="did" timezone="UTC" />)
     fireEvent.click(screen.getByRole('button', { name: 'Add note' }))

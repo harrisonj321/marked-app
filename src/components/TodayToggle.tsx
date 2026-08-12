@@ -1,12 +1,12 @@
 import { useId } from 'react'
-import type { DayState } from '../domain/tracker'
+import { DEFAULT_STATE_LABELS, type DayState, type StateLabels } from '../domain/tracker'
 
-const STATE_LABEL = { did: 'Did', didnt: "Didn't" } as const
 const POSITIONS = ['did', 'didnt'] as const
 
 interface TodayToggleProps {
   state: DayState
   onSelect: (state: DayState) => void
+  labels?: StateLabels
 }
 
 /**
@@ -16,7 +16,7 @@ interface TodayToggleProps {
  * is a no-op, so an accidental flip is undone by tapping back, never by
  * re-tapping the same spot.
  */
-export function TodayToggle({ state, onSelect }: TodayToggleProps) {
+export function TodayToggle({ state, onSelect, labels = DEFAULT_STATE_LABELS }: TodayToggleProps) {
   const groupName = useId()
 
   return (
@@ -31,13 +31,13 @@ export function TodayToggle({ state, onSelect }: TodayToggleProps) {
             checked={state === position}
             onChange={() => onSelect(position)}
           />
-          <span className="today-toggle-word">{STATE_LABEL[position]}</span>
+          <span className="today-toggle-word">{labels[position]}</span>
         </label>
       ))}
       <div className="today-toggle-ink-shadow" aria-hidden="true">
         <div className="today-toggle-ink">
-          <span>{STATE_LABEL.did}</span>
-          <span>{STATE_LABEL.didnt}</span>
+          <span>{labels.did}</span>
+          <span>{labels.didnt}</span>
         </div>
       </div>
     </div>

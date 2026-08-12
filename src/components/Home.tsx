@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { updateTrackerDefaultState, updateTrackerName } from '../data/tracker'
+import {
+  updateTrackerDefaultState,
+  updateTrackerName,
+  updateTrackerStateLabels,
+} from '../data/tracker'
 import { signOutUser } from '../lib/auth'
 import { formatDisplayDate } from '../domain/date'
 import { useLocalDateKey } from '../hooks/useLocalDateKey'
-import type { DayState, TrackerConfig } from '../domain/tracker'
+import { resolveStateLabels, type DayState, type StateLabels, type TrackerConfig } from '../domain/tracker'
 import { CalendarSheet } from './CalendarSheet'
 import { SettingsSheet } from './SettingsSheet'
 import { TodaySection } from './TodaySection'
@@ -19,6 +23,7 @@ export function Home({ uid, tracker }: HomeProps) {
   const todayKey = useLocalDateKey(tracker.timezone)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const labels = resolveStateLabels(tracker.stateLabels)
 
   async function handleNameSave(name: string) {
     await updateTrackerName(uid, name)
@@ -26,6 +31,10 @@ export function Home({ uid, tracker }: HomeProps) {
 
   async function handleDefaultStateSave(defaultState: DayState) {
     await updateTrackerDefaultState(uid, tracker.defaultState, defaultState)
+  }
+
+  async function handleStateLabelsSave(stateLabels: StateLabels) {
+    await updateTrackerStateLabels(uid, stateLabels)
   }
 
   return (
@@ -45,7 +54,12 @@ export function Home({ uid, tracker }: HomeProps) {
       <div className="home-main">
         {todayKey && <p className="today-date">{`Today · ${formatDisplayDate(todayKey)}`}</p>}
         <TrackerNameEditor name={tracker.name} onSave={handleNameSave} />
-        <TodaySection uid={uid} defaultState={tracker.defaultState} timezone={tracker.timezone} />
+        <TodaySection
+          uid={uid}
+          defaultState={tracker.defaultState}
+          timezone={tracker.timezone}
+          labels={labels}
+        />
       </div>
 
       <footer className="home-footer">
@@ -72,7 +86,9 @@ export function Home({ uid, tracker }: HomeProps) {
       {settingsOpen && (
         <SettingsSheet
           defaultState={tracker.defaultState}
+          stateLabels={labels}
           onSaveDefaultState={handleDefaultStateSave}
+          onSaveStateLabels={handleStateLabelsSave}
           onDismiss={() => setSettingsOpen(false)}
         />
       )}

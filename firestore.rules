@@ -26,6 +26,26 @@ service cloud.firestore {
       return state in ['did', 'didnt'];
     }
 
+    function isStateLabel(label) {
+      return label is string
+        && label.size() > 0
+        && label.size() <= 24
+        && label.matches('.*\\S.*');
+    }
+
+    // stateLabels is presentation-only wording for the two DayState values;
+    // it is optional (unset trackers fall back to default wording) but
+    // when present must carry both keys with a valid label each.
+    function isValidOptionalStateLabels(data) {
+      return !hasKey(data, 'stateLabels')
+        || (
+          data.stateLabels.keys().hasOnly(['did', 'didnt'])
+          && data.stateLabels.keys().hasAll(['did', 'didnt'])
+          && isStateLabel(data.stateLabels.did)
+          && isStateLabel(data.stateLabels.didnt)
+        );
+    }
+
     // -- Daily entry helpers -------------------------------------------
     // A daily document is an exception/context record: every field on it
     // is optional except updatedAt, and at least one of state/note/count
@@ -81,7 +101,7 @@ service cloud.firestore {
 
         allow create: if isOwner(uid)
           && request.resource.data.keys().hasOnly(
-               ['name', 'defaultState', 'timezone', 'startDate', 'createdAt', 'updatedAt']
+               ['name', 'defaultState', 'timezone', 'startDate', 'stateLabels', 'createdAt', 'updatedAt']
              )
           && request.resource.data.keys().hasAll(
                ['name', 'defaultState', 'timezone', 'startDate', 'createdAt', 'updatedAt']
@@ -91,23 +111,26 @@ service cloud.firestore {
           && request.resource.data.timezone is string
           && request.resource.data.timezone.size() > 0
           && isDateKey(request.resource.data.startDate)
+          && isValidOptionalStateLabels(request.resource.data)
           && request.resource.data.createdAt == request.time
           && request.resource.data.updatedAt == request.time;
 
-        // Only name, defaultState, and updatedAt may change after
-        // creation. defaultState is user-correctable from Settings; the
-        // client pins each day's current state onto its own document
+        // Only name, defaultState, stateLabels, and updatedAt may change
+        // after creation. defaultState is user-correctable from Settings;
+        // the client pins each day's current state onto its own document
         // before this write, so no already-recorded day's meaning
-        // changes -- only days with no document re-resolve.
+        // changes -- only days with no document re-resolve. stateLabels is
+        // presentation-only wording and never affects that resolution.
         allow update: if isOwner(uid)
           && request.resource.data.keys().hasOnly(
-               ['name', 'defaultState', 'timezone', 'startDate', 'createdAt', 'updatedAt']
+               ['name', 'defaultState', 'timezone', 'startDate', 'stateLabels', 'createdAt', 'updatedAt']
              )
           && isTrackerName(request.resource.data.name)
           && isDayState(request.resource.data.defaultState)
           && request.resource.data.timezone == resource.data.timezone
           && request.resource.data.startDate == resource.data.startDate
           && request.resource.data.createdAt == resource.data.createdAt
+          && isValidOptionalStateLabels(request.resource.data)
           && request.resource.data.updatedAt == request.time;
 
         allow delete: if false;
