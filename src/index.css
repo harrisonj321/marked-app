@@ -311,8 +311,11 @@ fieldset label {
    actively-Noted state on the right (--x: 1); TodayToggle sets
    data-position from which underlying DayState is current relative to the
    tracker's default, not from a fixed did/didnt order. touch-action is
-   none rather than manipulation because the control fully owns horizontal
-   drag gestures itself. */
+   pan-y, not none or manipulation: this is a horizontal-only control, so
+   the browser is left free to handle a vertical touch as page scroll
+   natively, while horizontal movement is never interpreted as a native
+   gesture at all and is left entirely to TodayToggle's own pointer
+   handling. */
 .today-toggle {
   --x: 0;
   position: relative;
@@ -330,7 +333,7 @@ fieldset label {
     inset 0 1px 3px rgb(var(--color-shadow-rgb) / 0.1),
     0 1px 2px rgb(var(--color-shadow-rgb) / 0.05),
     0 10px 20px rgb(var(--color-shadow-rgb) / 0.05);
-  touch-action: none;
+  touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
   /* Without these, pressing and holding on the word text (exactly what a
      drag gesture starts with) can trigger iOS Safari's text-selection
