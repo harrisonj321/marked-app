@@ -77,7 +77,7 @@ describe('OnboardingTour', () => {
     renderTour()
 
     clickNext() // welcome -> concept
-    expect(screen.getByText(/how it works/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Just Noted.' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByText(/simple ledger for anything you want to notice/i)).toBeInTheDocument()
@@ -92,21 +92,36 @@ describe('OnboardingTour', () => {
     expect(screen.getByText(/tap or slide to change today's mark/i)).toBeInTheDocument()
 
     clickNext() // coach-today -> coach-calendar
-    expect(screen.getByText(/open the calendar to see, or correct/i)).toBeInTheDocument()
+    expect(screen.getByText(/open the calendar to review or change/i)).toBeInTheDocument()
   })
 
-  it('clusters Skip next to the dots only during the calendar coach mark, clear of the spotlighted calendar button in that same corner', () => {
+  it('keeps the top bar in one unchanging layout across every step, so Skip never changes position', () => {
+    mockPlatform()
+    renderTour()
+
+    const topbarClassName = () => document.querySelector('.onboarding-topbar')?.className
+
+    expect(topbarClassName()).toBe('onboarding-topbar')
+    clickNext() // welcome -> concept
+    expect(topbarClassName()).toBe('onboarding-topbar')
+    clickNext() // concept -> coach-today
+    expect(topbarClassName()).toBe('onboarding-topbar')
+    clickNext() // coach-today -> coach-calendar
+    expect(topbarClassName()).toBe('onboarding-topbar')
+  })
+
+  it('insets the calendar spotlight from the top by more than the default coach-mark padding, to clear Skip in its one fixed position', () => {
     mockPlatform()
     renderTour()
 
     clickNext() // welcome -> concept
     clickNext() // concept -> coach-today
-    expect(document.querySelector('.onboarding-topbar')).not.toHaveClass('onboarding-topbar-tight')
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
+    // Both stub targets report a zero rect in jsdom, so the difference in
+    // computed inline style isolates the padding math itself.
+    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '-10px' })
 
     clickNext() // coach-today -> coach-calendar
-    expect(document.querySelector('.onboarding-topbar')).toHaveClass('onboarding-topbar-tight')
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
+    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '10px' })
   })
 
   it('degrades to a centered callout with no spotlight when the target is not mounted', () => {

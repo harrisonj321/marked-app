@@ -839,16 +839,6 @@ fieldset label {
   padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
 }
 
-/* Used only on the calendar coach mark, whose spotlight highlights the real
-   "Open calendar" control -- itself in this same top-right corner. Clustering
-   Skip next to the dots keeps it clear of that spotlight at any viewport
-   width, without touching spotlight geometry or the layout of every other
-   step. */
-.onboarding-topbar-tight {
-  justify-content: flex-start;
-  gap: var(--space-2);
-}
-
 .onboarding-dots {
   display: flex;
   align-items: center;
@@ -941,6 +931,11 @@ fieldset label {
   color: var(--color-text-muted);
   font-size: 1rem;
   line-height: 1.5;
+  /* Lets a paragraph's own embedded line breaks (the closing "Just X."
+     cadence) render as short lines without splitting it into separate
+     paragraphs with a full paragraph gap between each -- ordinary
+     paragraphs have no embedded breaks, so this has no effect on them. */
+  white-space: pre-line;
 }
 
 /* Coach marks: Home stays visible (and inert -- see Home.tsx) underneath.

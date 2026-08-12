@@ -99,11 +99,11 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
 
       {step === 'concept' && (
         <IntroStep
-          title="How it works"
+          title="Just Noted."
           paragraphs={[
-            'Choose something you want to notice — anything at all.',
-            'Each day gets marked one way or the other. Neither mark is good or bad.',
-            'Over time, the pattern becomes visible. What it means is yours to decide.',
+            "It's not a habit tracker.",
+            'No streaks. No judgment. No value statements.',
+            'Just a ledger of whatever.\nJust visibility.\nJust Noted.',
           ]}
           primaryLabel="Next"
           onPrimary={goNext}
@@ -125,9 +125,18 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
         <CoachStep
           tourId="open-calendar"
           label="Calendar"
-          body="Open the calendar to see, or correct, any past day."
+          body="Open the calendar to review or change any past day."
           primaryLabel={isLastStep ? 'Done' : 'Next'}
           onPrimary={goNext}
+          // The real "Open calendar" button sits close enough to the top
+          // bar that padding the spotlight's usual amount on top would
+          // reach into Skip's normal, unmoved position. The button's own
+          // icon glyph doesn't start until partway down its 44px box
+          // (centered inside), and Skip's own text glyph ends partway up
+          // its box -- so insetting the spotlight's top edge into that
+          // shared padding still fully covers both real glyphs while
+          // clearing Skip, without moving Skip, the button, or the icon.
+          spotlightTopPaddingPx={-10}
         />
       )}
 
@@ -140,17 +149,7 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
         />
       )}
 
-      <TourTopbar
-        index={index}
-        total={steps.length}
-        onSkip={step === 'install' ? undefined : skip}
-        // The calendar coach mark spotlights the real "Open calendar"
-        // control, which sits in the same top-right corner Skip normally
-        // occupies -- clustering Skip next to the dots instead keeps it
-        // clear of that spotlight without touching spotlight geometry or
-        // restructuring the top bar for every other step.
-        tight={step === 'coach-calendar'}
-      />
+      <TourTopbar index={index} total={steps.length} onSkip={step === 'install' ? undefined : skip} />
     </>
   )
 }
@@ -159,13 +158,11 @@ interface TourTopbarProps {
   index: number
   total: number
   onSkip?: () => void
-  /** Clusters Skip next to the dots instead of the far corner -- see the coach-calendar call site. */
-  tight?: boolean
 }
 
-function TourTopbar({ index, total, onSkip, tight }: TourTopbarProps) {
+function TourTopbar({ index, total, onSkip }: TourTopbarProps) {
   return (
-    <div className={tight ? 'onboarding-topbar onboarding-topbar-tight' : 'onboarding-topbar'}>
+    <div className="onboarding-topbar">
       <div className="onboarding-dots" aria-hidden="true">
         {Array.from({ length: total }, (_, dotIndex) => (
           <span
@@ -231,9 +228,18 @@ interface CoachStepProps {
   body: string
   primaryLabel: string
   onPrimary: () => void
+  /** Overrides the spotlight's top padding only, e.g. to stay clear of the fixed top bar above it. */
+  spotlightTopPaddingPx?: number
 }
 
-function CoachStep({ tourId, label, body, primaryLabel, onPrimary }: CoachStepProps) {
+function CoachStep({
+  tourId,
+  label,
+  body,
+  primaryLabel,
+  onPrimary,
+  spotlightTopPaddingPx = SPOTLIGHT_PADDING_PX,
+}: CoachStepProps) {
   const rect = useTourTargetRect(tourId)
   const headingId = useId()
   const primaryRef = useRef<HTMLButtonElement>(null)
@@ -251,10 +257,10 @@ function CoachStep({ tourId, label, body, primaryLabel, onPrimary }: CoachStepPr
           className="tour-spotlight"
           aria-hidden="true"
           style={{
-            top: rect.top - SPOTLIGHT_PADDING_PX,
+            top: rect.top - spotlightTopPaddingPx,
             left: rect.left - SPOTLIGHT_PADDING_PX,
             width: rect.width + SPOTLIGHT_PADDING_PX * 2,
-            height: rect.height + SPOTLIGHT_PADDING_PX * 2,
+            height: rect.height + spotlightTopPaddingPx + SPOTLIGHT_PADDING_PX,
           }}
         />
       )}
