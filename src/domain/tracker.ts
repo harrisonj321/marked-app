@@ -74,6 +74,11 @@ export function resolveStateLabels(stateLabels: Partial<StateLabels> | undefined
   }
 }
 
+/** The DayState that is not `state` -- 'did' and 'didnt' are the only two. */
+export function otherDayState(state: DayState): DayState {
+  return state === 'did' ? 'didnt' : 'did'
+}
+
 export function resolveEffectiveState(
   defaultState: DayState,
   override: DayState | null,

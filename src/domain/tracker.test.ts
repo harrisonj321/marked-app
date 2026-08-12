@@ -4,11 +4,19 @@ import {
   STATE_LABEL_MAX_LENGTH,
   TRACKER_NAME_MAX_LENGTH,
   isOverrideNeeded,
+  otherDayState,
   resolveEffectiveState,
   resolveStateLabels,
   validateStateLabel,
   validateTrackerName,
 } from './tracker'
+
+describe('otherDayState', () => {
+  it('returns didnt for did and did for didnt', () => {
+    expect(otherDayState('did')).toBe('didnt')
+    expect(otherDayState('didnt')).toBe('did')
+  })
+})
 
 describe('resolveEffectiveState', () => {
   it('resolves to the default "did" when there is no override', () => {

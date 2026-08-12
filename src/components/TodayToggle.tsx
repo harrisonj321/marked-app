@@ -4,7 +4,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { DEFAULT_STATE_LABELS, type DayState, type StateLabels } from '../domain/tracker'
+import { DEFAULT_STATE_LABELS, otherDayState, type DayState, type StateLabels } from '../domain/tracker'
 
 interface TodayToggleProps {
   state: DayState
@@ -46,7 +46,7 @@ export function TodayToggle({
   const drag = useRef<DragTracking | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  const otherState: DayState = defaultState === 'did' ? 'didnt' : 'did'
+  const otherState: DayState = otherDayState(defaultState)
   const positions: readonly DayState[] = [defaultState, otherState]
   const activeSide = state === defaultState ? 'left' : 'right'
 

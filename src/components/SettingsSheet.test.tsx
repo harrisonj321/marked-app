@@ -4,8 +4,7 @@ import { SettingsSheet } from './SettingsSheet'
 
 const DEFAULT_LABELS = { did: 'Did', didnt: "Didn't" }
 
-const FIRST_DEFAULT_RADIO = 'First option is the untouched-day default'
-const SECOND_DEFAULT_RADIO = 'Second option is the untouched-day default'
+const SWAP_BUTTON = 'Swap which state is default'
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
@@ -35,54 +34,83 @@ function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {
 }
 
 describe('SettingsSheet', () => {
-  it('marks the current default option', () => {
+  it('shows exactly two role fields and no radio buttons', () => {
     renderSheet()
 
-    expect(screen.getByRole('radio', { name: FIRST_DEFAULT_RADIO })).toBeChecked()
-    expect(screen.getByRole('radio', { name: SECOND_DEFAULT_RADIO })).not.toBeChecked()
+    expect(screen.getByLabelText('Default')).toBeInTheDocument()
+    expect(screen.getByLabelText('Noted.')).toBeInTheDocument()
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
   })
 
-  it('marks the second option when it is the default', () => {
-    renderSheet({ defaultState: 'didnt' })
-
-    expect(screen.getByRole('radio', { name: SECOND_DEFAULT_RADIO })).toBeChecked()
-    expect(screen.getByRole('radio', { name: FIRST_DEFAULT_RADIO })).not.toBeChecked()
-  })
-
-  it('explains what the selected option means and where it lands on the toggle', () => {
+  it('does not show the old explanatory paragraph', () => {
     renderSheet()
 
-    expect(screen.getByText(/what an untouched day means/i)).toBeInTheDocument()
-    expect(screen.getByText(/left of today's toggle/i)).toBeInTheDocument()
-    expect(screen.getByText(/already marked keep what they say/i)).toBeInTheDocument()
+    expect(screen.queryByText(/what an untouched day means/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/left of today's toggle/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/two states/i)).not.toBeInTheDocument()
   })
 
-  it('presents one combined control per state rather than separate default and label sections', () => {
-    renderSheet()
-
-    // Exactly one fieldset carries both the default choice and its label,
-    // not two disconnected fieldsets for the same two concepts.
-    expect(screen.getAllByRole('group')).toHaveLength(1)
-    expect(screen.getByRole('group', { name: 'The two states' })).toBeInTheDocument()
-  })
-
-  it('pre-fills the label fields with the current labels', () => {
+  it('pre-fills Default with the label for the current default state and Noted. with the other', () => {
     renderSheet({ stateLabels: { did: 'Took it', didnt: "Didn't take it" } })
 
-    expect(screen.getByLabelText('First option')).toHaveValue('Took it')
-    expect(screen.getByLabelText('Second option')).toHaveValue("Didn't take it")
+    expect(screen.getByLabelText('Default')).toHaveValue('Took it')
+    expect(screen.getByLabelText('Noted.')).toHaveValue("Didn't take it")
   })
 
-  it('selecting a different default does not change either label value', () => {
-    renderSheet()
+  it('pre-fills the fields in swapped order when didnt is the default', () => {
+    renderSheet({ defaultState: 'didnt', stateLabels: { did: 'Took it', didnt: "Didn't take it" } })
 
-    fireEvent.click(screen.getByRole('radio', { name: SECOND_DEFAULT_RADIO }))
-
-    expect(screen.getByLabelText('First option')).toHaveValue('Did')
-    expect(screen.getByLabelText('Second option')).toHaveValue("Didn't")
+    expect(screen.getByLabelText('Default')).toHaveValue("Didn't take it")
+    expect(screen.getByLabelText('Noted.')).toHaveValue('Took it')
   })
 
-  it('re-syncs the selection when the stored default changes under an open sheet', () => {
+  it('swapping trades the field contents and marks the default state changed', async () => {
+    const { onSaveDefaultState } = renderSheet({
+      stateLabels: { did: 'Took it', didnt: "Didn't take it" },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: SWAP_BUTTON }))
+
+    expect(screen.getByLabelText('Default')).toHaveValue("Didn't take it")
+    expect(screen.getByLabelText('Noted.')).toHaveValue('Took it')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => {
+      expect(onSaveDefaultState).toHaveBeenCalledWith('didnt')
+    })
+  })
+
+  it('swapping twice returns to the original default with no changes to save', async () => {
+    const { onSaveDefaultState, onSaveStateLabels, onDismiss } = renderSheet()
+
+    fireEvent.click(screen.getByRole('button', { name: SWAP_BUTTON }))
+    fireEvent.click(screen.getByRole('button', { name: SWAP_BUTTON }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => {
+      expect(onDismiss).toHaveBeenCalled()
+    })
+    expect(onSaveDefaultState).not.toHaveBeenCalled()
+    expect(onSaveStateLabels).not.toHaveBeenCalled()
+  })
+
+  it('editing a field while swapped edits the label for the underlying state now shown', async () => {
+    const { onSaveStateLabels } = renderSheet({ defaultState: 'didnt' })
+
+    // Default currently shows "Didn't" (the didnt label); Noted. shows "Did".
+    fireEvent.click(screen.getByRole('button', { name: SWAP_BUTTON }))
+    // After swapping, draft default is 'did', so Default field now shows "Did".
+    expect(screen.getByLabelText('Default')).toHaveValue('Did')
+    fireEvent.change(screen.getByLabelText('Default'), { target: { value: 'Took it' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => {
+      expect(onSaveStateLabels).toHaveBeenCalledWith({ did: 'Took it', didnt: "Didn't" })
+    })
+  })
+
+  it('re-syncs the fields when the stored default changes under an open sheet', () => {
     const onSaveDefaultState = vi.fn()
     const onSaveStateLabels = vi.fn()
     const onDismiss = vi.fn()
@@ -107,7 +135,8 @@ describe('SettingsSheet', () => {
       />,
     )
 
-    expect(screen.getByRole('radio', { name: SECOND_DEFAULT_RADIO })).toBeChecked()
+    expect(screen.getByLabelText('Default')).toHaveValue("Didn't")
+    expect(screen.getByLabelText('Noted.')).toHaveValue('Did')
 
     // Saving an untouched form must not push the stale value back.
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -136,21 +165,8 @@ describe('SettingsSheet', () => {
       />,
     )
 
-    expect(screen.getByLabelText('First option')).toHaveValue('Took it')
-    expect(screen.getByLabelText('Second option')).toHaveValue("Didn't take it")
-  })
-
-  it('saves the newly selected default and closes', async () => {
-    const { onSaveDefaultState, onSaveStateLabels, onDismiss } = renderSheet()
-
-    fireEvent.click(screen.getByRole('radio', { name: SECOND_DEFAULT_RADIO }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await vi.waitFor(() => {
-      expect(onSaveDefaultState).toHaveBeenCalledWith('didnt')
-      expect(onDismiss).toHaveBeenCalled()
-    })
-    expect(onSaveStateLabels).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Default')).toHaveValue('Took it')
+    expect(screen.getByLabelText('Noted.')).toHaveValue("Didn't take it")
   })
 
   it('closes without writing when nothing is changed', async () => {
@@ -170,7 +186,7 @@ describe('SettingsSheet', () => {
       onSaveDefaultState: vi.fn().mockRejectedValue(new Error('offline')),
     })
 
-    fireEvent.click(screen.getByRole('radio', { name: SECOND_DEFAULT_RADIO }))
+    fireEvent.click(screen.getByRole('button', { name: SWAP_BUTTON }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not save. Try again.')
@@ -190,8 +206,8 @@ describe('SettingsSheet', () => {
   it('saves renamed labels and closes', async () => {
     const { onSaveDefaultState, onSaveStateLabels, onDismiss } = renderSheet()
 
-    fireEvent.change(screen.getByLabelText('First option'), { target: { value: 'Took it' } })
-    fireEvent.change(screen.getByLabelText('Second option'), {
+    fireEvent.change(screen.getByLabelText('Default'), { target: { value: 'Took it' } })
+    fireEvent.change(screen.getByLabelText('Noted.'), {
       target: { value: "Didn't take it" },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -206,7 +222,7 @@ describe('SettingsSheet', () => {
   it('trims whitespace from renamed labels before saving', async () => {
     const { onSaveStateLabels } = renderSheet()
 
-    fireEvent.change(screen.getByLabelText('First option'), { target: { value: '  Took it  ' } })
+    fireEvent.change(screen.getByLabelText('Default'), { target: { value: '  Took it  ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => {
@@ -217,7 +233,7 @@ describe('SettingsSheet', () => {
   it('rejects an empty label and does not save', async () => {
     const { onSaveStateLabels, onDismiss } = renderSheet()
 
-    fireEvent.change(screen.getByLabelText('First option'), { target: { value: '   ' } })
+    fireEvent.change(screen.getByLabelText('Default'), { target: { value: '   ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a label.')
@@ -228,8 +244,8 @@ describe('SettingsSheet', () => {
   it('saves both the default state and renamed labels together in one submit', async () => {
     const { onSaveDefaultState, onSaveStateLabels, onDismiss } = renderSheet()
 
-    fireEvent.click(screen.getByRole('radio', { name: SECOND_DEFAULT_RADIO }))
-    fireEvent.change(screen.getByLabelText('First option'), { target: { value: 'Took it' } })
+    fireEvent.click(screen.getByRole('button', { name: SWAP_BUTTON }))
+    fireEvent.change(screen.getByLabelText('Noted.'), { target: { value: 'Took it' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => {
@@ -244,7 +260,7 @@ describe('SettingsSheet', () => {
       onSaveStateLabels: vi.fn().mockRejectedValue(new Error('offline')),
     })
 
-    fireEvent.change(screen.getByLabelText('First option'), { target: { value: 'Took it' } })
+    fireEvent.change(screen.getByLabelText('Default'), { target: { value: 'Took it' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not save. Try again.')
@@ -254,7 +270,7 @@ describe('SettingsSheet', () => {
   it('renaming a label does not change which state is the default', async () => {
     const { onSaveDefaultState, onSaveStateLabels } = renderSheet({ defaultState: 'didnt' })
 
-    fireEvent.change(screen.getByLabelText('Second option'), {
+    fireEvent.change(screen.getByLabelText('Default'), {
       target: { value: 'Rest day' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))

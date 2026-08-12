@@ -332,6 +332,14 @@ fieldset label {
     0 10px 20px rgb(var(--color-shadow-rgb) / 0.05);
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
+  /* Without these, pressing and holding on the word text (exactly what a
+     drag gesture starts with) can trigger iOS Safari's text-selection
+     loupe/callout instead of delivering pointermove -- the touch gets
+     stolen before the drag ever starts, even though tapping still works
+     fine since a quick release never gives the callout time to arm. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .today-toggle[data-position='right'] {
@@ -687,20 +695,37 @@ fieldset label {
   gap: 0.375rem;
 }
 
-/* One row per state: a radio marking it as the untouched-day default,
-   plus the editable text for what it's called. Combining both into a
-   single control is what replaces the old separate default-state and
-   label fieldsets. */
-.settings-sheet .state-row {
+/* The two fixed roles: Default (what an untouched day resolves to) and
+   Noted. (what the user actively marks). Each is just a labeled text
+   field for its wording; the swap control between them is the only way
+   to change which underlying state is currently the default. */
+.state-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.state-role-row {
   display: flex;
   align-items: center;
   gap: 0.625rem;
   min-height: 44px;
 }
 
-.settings-sheet .state-row .field {
+.state-role-row label {
+  width: 4.5rem;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.state-role-row input {
   flex: 1;
-  gap: 0;
+}
+
+.state-role-swap {
+  align-self: center;
+  margin: -0.125rem 0;
 }
 
 .day-detail-actions,

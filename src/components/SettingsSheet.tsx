@@ -1,11 +1,12 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react'
 import {
   STATE_LABEL_MAX_LENGTH,
+  otherDayState,
   validateStateLabel,
   type DayState,
   type StateLabels,
 } from '../domain/tracker'
-import { CloseIcon } from './icons'
+import { CloseIcon, SwapIcon } from './icons'
 
 interface SettingsSheetProps {
   defaultState: DayState
@@ -24,15 +25,14 @@ export function SettingsSheet({
 }: SettingsSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [draft, setDraft] = useState<DayState>(defaultState)
-  const [didLabelDraft, setDidLabelDraft] = useState(stateLabels.did)
-  const [didntLabelDraft, setDidntLabelDraft] = useState(stateLabels.didnt)
-  const [didLabelError, setDidLabelError] = useState<string | null>(null)
-  const [didntLabelError, setDidntLabelError] = useState<string | null>(null)
+  const [labelDrafts, setLabelDrafts] = useState<StateLabels>(stateLabels)
+  const [defaultLabelError, setDefaultLabelError] = useState<string | null>(null)
+  const [notedLabelError, setNotedLabelError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const titleId = useId()
-  const didLabelId = useId()
-  const didntLabelId = useId()
+  const defaultLabelId = useId()
+  const notedLabelId = useId()
 
   // The tracker is live, so the stored default and labels can change under
   // an open sheet (another device). Re-sync during render rather than in
@@ -47,8 +47,7 @@ export function SettingsSheet({
   const [syncedLabels, setSyncedLabels] = useState(stateLabels)
   if (stateLabels.did !== syncedLabels.did || stateLabels.didnt !== syncedLabels.didnt) {
     setSyncedLabels(stateLabels)
-    setDidLabelDraft(stateLabels.did)
-    setDidntLabelDraft(stateLabels.didnt)
+    setLabelDrafts(stateLabels)
   }
 
   useEffect(() => {
@@ -61,22 +60,38 @@ export function SettingsSheet({
     }
   }
 
+  // The "Default" field always edits the label of whichever underlying
+  // DayState is currently draft's default, and "Noted." always edits the
+  // other -- so swapping just flips draft, and the two fields'  contents
+  // trade places with it, keeping the role/position fixed.
+  const notedState: DayState = otherDayState(draft)
+
+  function handleSwap() {
+    setDraft((current) => otherDayState(current))
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
 
-    const didValidation = validateStateLabel(didLabelDraft)
-    const didntValidation = validateStateLabel(didntLabelDraft)
+    const defaultValidation = validateStateLabel(labelDrafts[draft])
+    const notedValidation = validateStateLabel(labelDrafts[notedState])
 
-    setDidLabelError(didValidation.valid ? null : didValidation.error)
-    setDidntLabelError(didntValidation.valid ? null : didntValidation.error)
+    setDefaultLabelError(defaultValidation.valid ? null : defaultValidation.error)
+    setNotedLabelError(notedValidation.valid ? null : notedValidation.error)
 
-    if (!didValidation.valid || !didntValidation.valid) {
+    if (!defaultValidation.valid || !notedValidation.valid) {
       return
+    }
+
+    const nextLabels: StateLabels = {
+      ...labelDrafts,
+      [draft]: defaultValidation.label,
+      [notedState]: notedValidation.label,
     }
 
     const defaultStateChanged = draft !== defaultState
     const labelsChanged =
-      didValidation.label !== syncedLabels.did || didntValidation.label !== syncedLabels.didnt
+      nextLabels.did !== syncedLabels.did || nextLabels.didnt !== syncedLabels.didnt
 
     if (!defaultStateChanged && !labelsChanged) {
       dialogRef.current?.close()
@@ -90,7 +105,7 @@ export function SettingsSheet({
         await onSaveDefaultState(draft)
       }
       if (labelsChanged) {
-        await onSaveStateLabels({ did: didValidation.label, didnt: didntValidation.label })
+        await onSaveStateLabels(nextLabels)
       }
       dialogRef.current?.close()
     } catch {
@@ -120,71 +135,52 @@ export function SettingsSheet({
       </div>
 
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <fieldset>
-          <legend>The two states</legend>
-
-          <div className="state-row">
+        <div className="state-roles">
+          <div className="state-role-row">
+            <label htmlFor={defaultLabelId}>Default</label>
             <input
-              type="radio"
-              name={`${titleId}-default`}
-              value="did"
-              checked={draft === 'did'}
-              onChange={() => setDraft('did')}
-              aria-label="First option is the untouched-day default"
+              id={defaultLabelId}
+              type="text"
+              value={labelDrafts[draft]}
+              onChange={(event) =>
+                setLabelDrafts((current) => ({ ...current, [draft]: event.target.value }))
+              }
+              maxLength={STATE_LABEL_MAX_LENGTH}
             />
-            <div className="field">
-              <label htmlFor={didLabelId} className="visually-hidden">
-                First option
-              </label>
-              <input
-                id={didLabelId}
-                type="text"
-                value={didLabelDraft}
-                onChange={(event) => setDidLabelDraft(event.target.value)}
-                maxLength={STATE_LABEL_MAX_LENGTH}
-              />
-            </div>
           </div>
-          {didLabelError && (
+          {defaultLabelError && (
             <p role="alert" className="message">
-              {didLabelError}
+              {defaultLabelError}
             </p>
           )}
 
-          <div className="state-row">
+          <button
+            type="button"
+            className="icon-button state-role-swap"
+            aria-label="Swap which state is default"
+            onClick={handleSwap}
+          >
+            <SwapIcon />
+          </button>
+
+          <div className="state-role-row">
+            <label htmlFor={notedLabelId}>Noted.</label>
             <input
-              type="radio"
-              name={`${titleId}-default`}
-              value="didnt"
-              checked={draft === 'didnt'}
-              onChange={() => setDraft('didnt')}
-              aria-label="Second option is the untouched-day default"
+              id={notedLabelId}
+              type="text"
+              value={labelDrafts[notedState]}
+              onChange={(event) =>
+                setLabelDrafts((current) => ({ ...current, [notedState]: event.target.value }))
+              }
+              maxLength={STATE_LABEL_MAX_LENGTH}
             />
-            <div className="field">
-              <label htmlFor={didntLabelId} className="visually-hidden">
-                Second option
-              </label>
-              <input
-                id={didntLabelId}
-                type="text"
-                value={didntLabelDraft}
-                onChange={(event) => setDidntLabelDraft(event.target.value)}
-                maxLength={STATE_LABEL_MAX_LENGTH}
-              />
-            </div>
           </div>
-          {didntLabelError && (
+          {notedLabelError && (
             <p role="alert" className="message">
-              {didntLabelError}
+              {notedLabelError}
             </p>
           )}
-        </fieldset>
-
-        <p className="message">
-          The selected option is what an untouched day means, on the left of today&#39;s
-          toggle. The other is what you actively Note, on the right. Days already marked
-          keep what they say.
-        </p>
+        </div>
 
         {error && (
           <p role="alert" className="message">
