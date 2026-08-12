@@ -13,6 +13,7 @@ interface SettingsSheetProps {
   stateLabels: StateLabels
   onSaveDefaultState: (defaultState: DayState) => Promise<void>
   onSaveStateLabels: (stateLabels: StateLabels) => Promise<void>
+  onTourNoted: () => void
   onDismiss: () => void
 }
 
@@ -21,6 +22,7 @@ export function SettingsSheet({
   stateLabels,
   onSaveDefaultState,
   onSaveStateLabels,
+  onTourNoted,
   onDismiss,
 }: SettingsSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -194,6 +196,12 @@ export function SettingsSheet({
           </button>
         </div>
       </form>
+
+      <div className="settings-secondary-actions">
+        <button type="button" className="footer-link" onClick={onTourNoted}>
+          Tour Noted.
+        </button>
+      </div>
     </dialog>
   )
 }

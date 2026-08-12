@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
 const { useAuthUserMock, useTrackerMock } = vi.hoisted(() => ({
@@ -35,6 +35,10 @@ vi.mock('./lib/auth', () => ({
 }))
 
 const { default: App } = await import('./App')
+
+beforeEach(() => {
+  window.localStorage.clear()
+})
 
 describe('App', () => {
   it('shows a neutral loading screen while auth resolves', () => {

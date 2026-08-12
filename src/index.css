@@ -810,3 +810,241 @@ fieldset label {
   min-height: 36px;
   font-size: 0.875rem;
 }
+
+.inline-icon {
+  display: inline;
+  vertical-align: -0.2em;
+}
+
+/* Onboarding */
+
+.settings-secondary-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-1);
+}
+
+.onboarding-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: max(var(--space-2), calc(var(--space-1) + env(safe-area-inset-top, 0px)));
+  padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+  padding-bottom: var(--space-1);
+  padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+}
+
+/* Used only on the calendar coach mark, whose spotlight highlights the real
+   "Open calendar" control -- itself in this same top-right corner. Clustering
+   Skip next to the dots keeps it clear of that spotlight at any viewport
+   width, without touching spotlight geometry or the layout of every other
+   step. */
+.onboarding-topbar-tight {
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+
+.onboarding-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.onboarding-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+
+.onboarding-dot-active {
+  background: var(--color-accent);
+}
+
+.onboarding-skip {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.25rem;
+}
+
+.onboarding-footer {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.onboarding-footer button {
+  flex: 1;
+}
+
+.onboarding-back {
+  background: none;
+}
+
+/* The one accent-filled treatment already established elsewhere in Noted.
+   (the update banner's Reload, the active count chip) -- reused here so the
+   forward/progression action in the tour reads as clearly primary without
+   inventing a new visual language. */
+.onboarding-primary {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Intro slides: an opaque full-screen takeover, matching Setup/SignIn's
+   plain-screen treatment rather than a dialog card, since there is nothing
+   underneath for them to sit "on top of" -- they are the current screen. */
+.onboarding-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+  padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+}
+
+.onboarding-intro-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-2);
+  max-width: 26rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.onboarding-intro-body h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.onboarding-intro-body p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* Coach marks: Home stays visible (and inert -- see Home.tsx) underneath.
+   The spotlight is a transparent box whose oversized box-shadow darkens
+   everything else on screen, so the real control shows through at full
+   brightness in the one place nothing is drawn over it. */
+.onboarding-coach {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.tour-spotlight {
+  position: fixed;
+  border-radius: 1rem;
+  box-shadow: 0 0 0 9999px rgb(var(--color-shadow-rgb) / 0.55);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tour-spotlight {
+    transition:
+      top 200ms ease,
+      left 200ms ease,
+      width 200ms ease,
+      height 200ms ease;
+  }
+}
+
+.tour-callout {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  width: min(22rem, calc(100vw - 2rem));
+  box-sizing: border-box;
+  background: var(--color-surface);
+  border-radius: 0.75rem;
+  padding: var(--space-2);
+  box-shadow:
+    0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
+    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12);
+  display: flex;
+  flex-direction: column;
+  /* Tighter than a modal card's rhythm (space-2): this is a brief
+     contextual callout pointing at a real control, not a form. */
+  gap: var(--space-1);
+}
+
+.tour-callout p {
+  margin: 0;
+}
+
+.tour-callout-label {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* A natural-width, right-aligned action (not a stretched full-width bar)
+   reads as "tap to continue" rather than a form submit -- consistent with
+   the callout's smaller, contextual footprint. */
+.tour-callout-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Install step: no specific control to highlight, so it reads as a normal
+   centered card overlay -- the same treatment as Settings/Day detail. */
+.onboarding-install {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgb(var(--color-shadow-rgb) / 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) calc(var(--space-3) + env(safe-area-inset-right, 0px))
+    calc(var(--space-3) + env(safe-area-inset-bottom, 0px)) calc(var(--space-3) + env(safe-area-inset-left, 0px));
+}
+
+.onboarding-card {
+  background: var(--color-surface);
+  border-radius: 0.75rem;
+  padding: var(--space-3);
+  width: min(24rem, 100%);
+  box-sizing: border-box;
+  box-shadow:
+    0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
+    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.onboarding-card h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.onboarding-card p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}

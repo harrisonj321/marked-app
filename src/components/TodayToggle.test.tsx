@@ -33,6 +33,15 @@ describe('TodayToggle', () => {
     expect(screen.getByRole('radio', { name: "Didn't" })).not.toBeChecked()
   })
 
+  it('exposes a stable tour-anchor id for onboarding coach marks', () => {
+    render(<TodayToggle state="did" defaultState="did" onSelect={vi.fn()} />)
+
+    expect(screen.getByRole('radiogroup', { name: 'Today' })).toHaveAttribute(
+      'data-tour-id',
+      'today-toggle',
+    )
+  })
+
   it('reflects the didnt state symmetrically', () => {
     render(<TodayToggle state="didnt" defaultState="did" onSelect={vi.fn()} />)
 

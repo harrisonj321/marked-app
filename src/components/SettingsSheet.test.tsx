@@ -19,6 +19,7 @@ beforeEach(() => {
 function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {}) {
   const onSaveDefaultState = vi.fn().mockResolvedValue(undefined)
   const onSaveStateLabels = vi.fn().mockResolvedValue(undefined)
+  const onTourNoted = vi.fn()
   const onDismiss = vi.fn()
   render(
     <SettingsSheet
@@ -26,11 +27,12 @@ function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {
       stateLabels={DEFAULT_LABELS}
       onSaveDefaultState={onSaveDefaultState}
       onSaveStateLabels={onSaveStateLabels}
+      onTourNoted={onTourNoted}
       onDismiss={onDismiss}
       {...overrides}
     />,
   )
-  return { onSaveDefaultState, onSaveStateLabels, onDismiss }
+  return { onSaveDefaultState, onSaveStateLabels, onTourNoted, onDismiss }
 }
 
 describe('SettingsSheet', () => {
@@ -121,6 +123,7 @@ describe('SettingsSheet', () => {
         stateLabels={DEFAULT_LABELS}
         onSaveDefaultState={onSaveDefaultState}
         onSaveStateLabels={onSaveStateLabels}
+        onTourNoted={vi.fn()}
         onDismiss={onDismiss}
       />,
     )
@@ -131,6 +134,7 @@ describe('SettingsSheet', () => {
         stateLabels={DEFAULT_LABELS}
         onSaveDefaultState={onSaveDefaultState}
         onSaveStateLabels={onSaveStateLabels}
+        onTourNoted={vi.fn()}
         onDismiss={onDismiss}
       />,
     )
@@ -151,6 +155,7 @@ describe('SettingsSheet', () => {
         stateLabels={DEFAULT_LABELS}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
+        onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
       />,
     )
@@ -161,6 +166,7 @@ describe('SettingsSheet', () => {
         stateLabels={{ did: 'Took it', didnt: "Didn't take it" }}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
+        onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
       />,
     )
@@ -264,6 +270,17 @@ describe('SettingsSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not save. Try again.')
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it('offers a Tour Noted. action that replays onboarding without touching saved state', () => {
+    const { onTourNoted, onSaveDefaultState, onSaveStateLabels, onDismiss } = renderSheet()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
+
+    expect(onTourNoted).toHaveBeenCalled()
+    expect(onSaveDefaultState).not.toHaveBeenCalled()
+    expect(onSaveStateLabels).not.toHaveBeenCalled()
     expect(onDismiss).not.toHaveBeenCalled()
   })
 

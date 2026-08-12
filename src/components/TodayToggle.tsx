@@ -201,6 +201,7 @@ export function TodayToggle({
       ref={trackRef}
       className={isDragging ? 'today-toggle today-toggle-dragging' : 'today-toggle'}
       data-position={activeSide}
+      data-tour-id="today-toggle"
       role="radiogroup"
       aria-label="Today"
       onPointerDown={handlePointerDown}
