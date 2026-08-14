@@ -1,12 +1,18 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react'
 import { TRACKER_NAME_MAX_LENGTH, validateTrackerName, type DayState } from '../domain/tracker'
-import { LEDGER_COLORS, LEDGER_COLOR_LABELS, type Ledger, type LedgerColor } from '../domain/ledger'
+import {
+  DEFAULT_LEDGER_COLOR,
+  LEDGER_COLORS,
+  LEDGER_COLOR_LABELS,
+  type Ledger,
+  type LedgerColor,
+} from '../domain/ledger'
 import { CloseIcon, EditIcon } from './icons'
 
 export interface NewLedgerInput {
   name: string
   defaultState: DayState
-  color: LedgerColor | null
+  color: LedgerColor
 }
 
 interface LedgerSwitcherSheetProps {
@@ -40,7 +46,7 @@ export function LedgerSwitcherSheet({
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDefaultState, setNewDefaultState] = useState<DayState | null>(null)
-  const [newColor, setNewColor] = useState<LedgerColor | null>(null)
+  const [newColor, setNewColor] = useState<LedgerColor>(DEFAULT_LEDGER_COLOR)
   const [newNameError, setNewNameError] = useState<string | null>(null)
   const [newFormError, setNewFormError] = useState<string | null>(null)
   const [savingCreate, setSavingCreate] = useState(false)
@@ -70,7 +76,7 @@ export function LedgerSwitcherSheet({
   function startCreating() {
     setNewName('')
     setNewDefaultState(null)
-    setNewColor(null)
+    setNewColor(DEFAULT_LEDGER_COLOR)
     setNewNameError(null)
     setNewFormError(null)
     setCreating(true)
@@ -198,8 +204,8 @@ interface NewLedgerFieldsProps {
   nameError: string | null
   defaultState: DayState | null
   onDefaultStateChange: (value: DayState) => void
-  color: LedgerColor | null
-  onColorChange: (value: LedgerColor | null) => void
+  color: LedgerColor
+  onColorChange: (value: LedgerColor) => void
 }
 
 function NewLedgerFields({
@@ -259,13 +265,6 @@ function NewLedgerFields({
       <div className="field">
         <span id={colorLabelId}>Color</span>
         <div className="ledger-color-picker" role="group" aria-labelledby={colorLabelId}>
-          <button
-            type="button"
-            className="ledger-color-chip ledger-color-chip-none"
-            aria-pressed={color === null}
-            aria-label="None"
-            onClick={() => onColorChange(null)}
-          />
           {LEDGER_COLORS.map((swatch) => (
             <button
               key={swatch}

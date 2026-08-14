@@ -860,6 +860,18 @@ describe('ledgers -- color', () => {
     )
   })
 
+  it('allows creating a ledger with the espresso default color', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        ...validLedger,
+        color: 'espresso',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
   it('allows creating a ledger with no color at all', async () => {
     const db = dbAs(OWNER_UID)
     await assertSucceeds(
@@ -889,6 +901,17 @@ describe('ledgers -- color', () => {
     await assertSucceeds(
       updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
         color: 'moss',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('owner can set the color to espresso on update, same as any other palette color', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1', { ...validLedger, color: 'clay' })
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        color: 'espresso',
         updatedAt: serverTimestamp(),
       }),
     )

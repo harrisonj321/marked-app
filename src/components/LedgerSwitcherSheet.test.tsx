@@ -142,15 +142,17 @@ describe('LedgerSwitcherSheet', () => {
       expect(onCreate).not.toHaveBeenCalled()
     })
 
-    it('creates with no color by default', async () => {
+    it('pre-selects Espresso, the canonical default color, without requiring a color choice', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+      expect(screen.getByRole('button', { name: 'Espresso' })).toHaveAttribute('aria-pressed', 'true')
+
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
       fireEvent.click(screen.getByRole('radio', { name: "I didn't do it" }))
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
-        expect(onCreate).toHaveBeenCalledWith({ name: 'Reading', defaultState: 'didnt', color: null })
+        expect(onCreate).toHaveBeenCalledWith({ name: 'Reading', defaultState: 'didnt', color: 'espresso' })
       })
     })
 
@@ -165,6 +167,12 @@ describe('LedgerSwitcherSheet', () => {
       await vi.waitFor(() => {
         expect(onCreate).toHaveBeenCalledWith({ name: 'Reading', defaultState: 'did', color: 'moss' })
       })
+    })
+
+    it('does not offer a "None"/background swatch -- Espresso is the real default color', () => {
+      renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+      expect(screen.queryByRole('button', { name: 'None' })).not.toBeInTheDocument()
     })
 
     it('closes the sheet after a successful create', async () => {

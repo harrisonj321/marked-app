@@ -31,13 +31,20 @@
   --space-2: 1rem;
   --space-3: 1.5rem;
   --space-4: 2.5rem;
-  /* A ledger's optional identifying color -- a small, fixed, muted palette
-     (see domain/ledger.ts's LEDGER_COLORS), not freeform hex, so nothing a
-     user picks can clash with the app's warm, quiet palette. Deep enough in
+  /* A ledger's identifying color -- a small, fixed, muted palette (see
+     domain/ledger.ts's LEDGER_COLORS), not freeform hex, so nothing a user
+     picks can clash with the app's warm, quiet palette. Deep enough in
      light mode (and light enough in dark mode) to keep --color-accent-text
      legible when used as the today-toggle's own accent fill -- the same
      pairing the app's one shared accent already relies on, just recolored,
-     never a second contrast system. */
+     never a second contrast system.
+
+     --ledger-color-espresso is a live alias for --color-accent itself, not
+     a separate value: it's what an uncolored ledger has always rendered
+     as, so aliasing (rather than duplicating the hex) guarantees the two
+     can never drift apart, and it automatically follows --color-accent's
+     own light/dark redefinition below without needing one of its own. */
+  --ledger-color-espresso: var(--color-accent);
   --ledger-color-clay: #8a4a32;
   --ledger-color-moss: #4f5c38;
   --ledger-color-dust: #3f5866;
@@ -917,10 +924,6 @@ fieldset label {
   border-radius: 50%;
   border: 1px solid rgb(var(--color-shadow-rgb) / 0.15);
   padding: 0;
-}
-
-.ledger-color-chip-none {
-  background: var(--color-surface);
 }
 
 /* A ring outside the swatch, not a change to the swatch's own fill, so the

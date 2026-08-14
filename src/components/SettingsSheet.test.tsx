@@ -29,7 +29,7 @@ function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {
       name="Worked out"
       defaultState="did"
       stateLabels={DEFAULT_LABELS}
-      color={null}
+      color="espresso"
       onSaveName={onSaveName}
       onSaveDefaultState={onSaveDefaultState}
       onSaveStateLabels={onSaveStateLabels}
@@ -130,7 +130,7 @@ describe('SettingsSheet', () => {
         name="Worked out"
         defaultState="did"
         stateLabels={DEFAULT_LABELS}
-        color={null}
+        color="espresso"
         onSaveName={vi.fn()}
         onSaveDefaultState={onSaveDefaultState}
         onSaveStateLabels={onSaveStateLabels}
@@ -146,7 +146,7 @@ describe('SettingsSheet', () => {
         name="Worked out"
         defaultState="didnt"
         stateLabels={DEFAULT_LABELS}
-        color={null}
+        color="espresso"
         onSaveName={vi.fn()}
         onSaveDefaultState={onSaveDefaultState}
         onSaveStateLabels={onSaveStateLabels}
@@ -172,7 +172,7 @@ describe('SettingsSheet', () => {
         name="Worked out"
         defaultState="did"
         stateLabels={DEFAULT_LABELS}
-        color={null}
+        color="espresso"
         onSaveName={vi.fn()}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
@@ -188,7 +188,7 @@ describe('SettingsSheet', () => {
         name="Worked out"
         defaultState="did"
         stateLabels={{ did: 'Took it', didnt: "Didn't take it" }}
-        color={null}
+        color="espresso"
         onSaveName={vi.fn()}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
@@ -312,20 +312,29 @@ describe('SettingsSheet', () => {
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
-  it('pre-selects None when the ledger has no color', () => {
-    renderSheet({ color: null })
-    expect(screen.getByRole('button', { name: 'None' })).toHaveAttribute('aria-pressed', 'true')
+  it('pre-selects Espresso when the ledger has no explicitly stored color -- the same color the toggle already renders as', () => {
+    // The caller (Home) always resolves an unset color to 'espresso' before
+    // this component ever sees it -- see domain/ledger.ts's
+    // resolveLedgerColor -- so this exercises that resolved value, not a
+    // literal absence.
+    renderSheet({ color: 'espresso' })
+    expect(screen.getByRole('button', { name: 'Espresso' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Clay' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('pre-selects the ledger\'s current color', () => {
     renderSheet({ color: 'moss' })
     expect(screen.getByRole('button', { name: 'Moss' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'None' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Espresso' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('does not offer a "None"/background swatch -- every ledger always has a real resolved color', () => {
+    renderSheet()
+    expect(screen.queryByRole('button', { name: 'None' })).not.toBeInTheDocument()
   })
 
   it('saves a newly picked color alongside no other changes', async () => {
-    const { onSaveColor, onSaveDefaultState, onSaveStateLabels } = renderSheet({ color: null })
+    const { onSaveColor, onSaveDefaultState, onSaveStateLabels } = renderSheet({ color: 'espresso' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Rose' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -337,14 +346,14 @@ describe('SettingsSheet', () => {
     expect(onSaveStateLabels).not.toHaveBeenCalled()
   })
 
-  it('saves color removal when None is picked for a ledger that had a color', async () => {
+  it('switches back to Espresso like any other real color, not a field-clearing action', async () => {
     const { onSaveColor } = renderSheet({ color: 'clay' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'None' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Espresso' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => {
-      expect(onSaveColor).toHaveBeenCalledWith(null)
+      expect(onSaveColor).toHaveBeenCalledWith('espresso')
     })
   })
 
@@ -365,7 +374,7 @@ describe('SettingsSheet', () => {
         name="Worked out"
         defaultState="did"
         stateLabels={DEFAULT_LABELS}
-        color={null}
+        color="espresso"
         onSaveName={vi.fn()}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
@@ -462,7 +471,7 @@ describe('SettingsSheet', () => {
     })
 
     it('saves a renamed ledger together with other changed fields in one submit', async () => {
-      const { onSaveName, onSaveColor } = renderSheet({ color: null })
+      const { onSaveName, onSaveColor } = renderSheet({ color: 'espresso' })
 
       fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Reading' } })
       fireEvent.click(screen.getByRole('button', { name: 'Rose' }))
@@ -480,7 +489,7 @@ describe('SettingsSheet', () => {
           name="Worked out"
           defaultState="did"
           stateLabels={DEFAULT_LABELS}
-          color={null}
+          color="espresso"
           onSaveName={vi.fn()}
           onSaveDefaultState={vi.fn()}
           onSaveStateLabels={vi.fn()}
@@ -496,7 +505,7 @@ describe('SettingsSheet', () => {
           name="Renamed elsewhere"
           defaultState="did"
           stateLabels={DEFAULT_LABELS}
-          color={null}
+          color="espresso"
           onSaveName={vi.fn()}
           onSaveDefaultState={vi.fn()}
           onSaveStateLabels={vi.fn()}

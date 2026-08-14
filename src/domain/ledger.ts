@@ -20,15 +20,18 @@ export const LEGACY_LEDGER_ID = 'default'
 /**
  * A small, fixed set of muted, cloth-like identifying colors -- not
  * freeform hex, so a ledger's color can never clash with the app's warm,
- * quiet palette. Deliberately has no "default"/first entry that reads as
- * the encouraged choice; ledgers start with no color at all (see
- * `LedgerColor | undefined` throughout) until the user picks one.
+ * quiet palette. Leads with 'espresso', the original dark brown Noted. has
+ * always used for its one shared accent (see `--color-accent` in
+ * index.css): every ledger resolves to a real color from this list (see
+ * `resolveLedgerColor`), and espresso is what an otherwise-uncolored ledger
+ * -- including the legacy migrated one -- has always actually rendered as.
  */
-export const LEDGER_COLORS = ['clay', 'moss', 'dust', 'plum', 'rose', 'straw'] as const
+export const LEDGER_COLORS = ['espresso', 'clay', 'moss', 'dust', 'plum', 'rose', 'straw'] as const
 
 export type LedgerColor = (typeof LEDGER_COLORS)[number]
 
 export const LEDGER_COLOR_LABELS: Record<LedgerColor, string> = {
+  espresso: 'Espresso',
   clay: 'Clay',
   moss: 'Moss',
   dust: 'Dust',
@@ -37,8 +40,28 @@ export const LEDGER_COLOR_LABELS: Record<LedgerColor, string> = {
   straw: 'Straw',
 }
 
+/**
+ * The canonical resolved color for a ledger with no explicitly stored
+ * color -- the same brown/espresso the today-toggle has always shown via
+ * `--color-accent`, just now available as a real, selectable palette entry
+ * rather than an implicit CSS fallback. New ledgers that don't otherwise
+ * specify a color should also start here, so there is exactly one default
+ * source, not a separate one per surface.
+ */
+export const DEFAULT_LEDGER_COLOR: LedgerColor = 'espresso'
+
 export function isLedgerColor(value: unknown): value is LedgerColor {
   return typeof value === 'string' && (LEDGER_COLORS as readonly string[]).includes(value)
+}
+
+/**
+ * Every ledger has a real, renderable color -- this is the one place that
+ * turns "no color was ever stored" into the actual value to show/select,
+ * so the active toggle and the Settings color picker can never disagree
+ * about what a ledger's color is (see DEFAULT_LEDGER_COLOR).
+ */
+export function resolveLedgerColor(color: LedgerColor | undefined): LedgerColor {
+  return color ?? DEFAULT_LEDGER_COLOR
 }
 
 /**

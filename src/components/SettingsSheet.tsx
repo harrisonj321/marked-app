@@ -15,11 +15,12 @@ interface SettingsSheetProps {
   name: string
   defaultState: DayState
   stateLabels: StateLabels
-  color: LedgerColor | null
+  /** Always the already-resolved color (see domain/ledger.ts's resolveLedgerColor) -- never "no color", so the picker always has exactly one correct swatch to show as selected. */
+  color: LedgerColor
   onSaveName: (name: string) => Promise<void>
   onSaveDefaultState: (defaultState: DayState) => Promise<void>
   onSaveStateLabels: (stateLabels: StateLabels) => Promise<void>
-  onSaveColor: (color: LedgerColor | null) => Promise<void>
+  onSaveColor: (color: LedgerColor) => Promise<void>
   onDelete: () => Promise<void>
   onTourNoted: () => void
   onDismiss: () => void
@@ -51,7 +52,7 @@ export function SettingsSheet({
   const [nameDraft, setNameDraft] = useState(name)
   const [draft, setDraft] = useState<DayState>(defaultState)
   const [labelDrafts, setLabelDrafts] = useState<StateLabels>(stateLabels)
-  const [colorDraft, setColorDraft] = useState<LedgerColor | null>(color)
+  const [colorDraft, setColorDraft] = useState<LedgerColor>(color)
   const [nameError, setNameError] = useState<string | null>(null)
   const [defaultLabelError, setDefaultLabelError] = useState<string | null>(null)
   const [notedLabelError, setNotedLabelError] = useState<string | null>(null)
@@ -307,13 +308,6 @@ export function SettingsSheet({
                 role="group"
                 aria-labelledby={`${titleId}-color-label`}
               >
-                <button
-                  type="button"
-                  className="ledger-color-chip ledger-color-chip-none"
-                  aria-pressed={colorDraft === null}
-                  aria-label="None"
-                  onClick={() => setColorDraft(null)}
-                />
                 {LEDGER_COLORS.map((swatch) => (
                   <button
                     key={swatch}

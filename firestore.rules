@@ -51,7 +51,7 @@ service cloud.firestore {
     // A ledger's optional identifying color: a small fixed palette (see
     // domain/ledger.ts's LEDGER_COLORS), never freeform hex/strings.
     function isLedgerColor(color) {
-      return color in ['clay', 'moss', 'dust', 'plum', 'rose', 'straw'];
+      return color in ['espresso', 'clay', 'moss', 'dust', 'plum', 'rose', 'straw'];
     }
 
     function isValidOptionalLedgerColor(data) {

@@ -11,7 +11,7 @@ import { hasCompletedOnboarding, saveOnboardingRecord } from '../data/onboarding
 import { signOutUser } from '../lib/auth'
 import { formatDisplayDate, getTodayKey, resolveDeviceTimezone } from '../domain/date'
 import type { OnboardingStatus } from '../domain/onboarding'
-import type { Ledger, LedgerColor } from '../domain/ledger'
+import { resolveLedgerColor, type Ledger, type LedgerColor } from '../domain/ledger'
 import { useLocalDateKey } from '../hooks/useLocalDateKey'
 import { resolveStateLabels, type DayState, type StateLabels } from '../domain/tracker'
 import { CalendarSheet } from './CalendarSheet'
@@ -45,7 +45,7 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
   // there is no frame where Home is visible before the tour is active.
   const [tourActive, setTourActive] = useState(() => !hasCompletedOnboarding(uid))
   const labels = resolveStateLabels(activeLedger.stateLabels)
-  const accentColor = activeLedger.color ? `var(--ledger-color-${activeLedger.color})` : undefined
+  const accentColor = `var(--ledger-color-${resolveLedgerColor(activeLedger.color)})`
   const settingsLedger = ledgers.find((ledger) => ledger.id === settingsLedgerId) ?? null
 
   function handleTourFinish(status: OnboardingStatus) {
@@ -89,7 +89,7 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
       defaultState: input.defaultState,
       timezone,
       startDate: getTodayKey(timezone),
-      color: input.color ?? undefined,
+      color: input.color,
     })
     onSwitchLedger(created.id)
   }
@@ -171,7 +171,7 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
             name={settingsLedger.name}
             defaultState={settingsLedger.defaultState}
             stateLabels={resolveStateLabels(settingsLedger.stateLabels)}
-            color={settingsLedger.color ?? null}
+            color={resolveLedgerColor(settingsLedger.color)}
             onSaveName={(name) => handleRenameLedger(settingsLedger.id, name)}
             onSaveDefaultState={(defaultState) =>
               handleDefaultStateSave(settingsLedger.id, settingsLedger.defaultState, defaultState)

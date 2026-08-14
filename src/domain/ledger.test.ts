@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { isLedgerColor, resolveActiveLedgerId, type Ledger } from './ledger'
+import {
+  DEFAULT_LEDGER_COLOR,
+  LEDGER_COLORS,
+  isLedgerColor,
+  resolveActiveLedgerId,
+  resolveLedgerColor,
+  type Ledger,
+} from './ledger'
 
 function ledger(id: string): Ledger {
   return { id, name: id, defaultState: 'did', timezone: 'UTC', startDate: '2026-01-01' }
@@ -29,7 +36,7 @@ describe('resolveActiveLedgerId', () => {
 
 describe('isLedgerColor', () => {
   it('accepts every color in the fixed palette', () => {
-    for (const color of ['clay', 'moss', 'dust', 'plum', 'rose', 'straw']) {
+    for (const color of LEDGER_COLORS) {
       expect(isLedgerColor(color)).toBe(true)
     }
   })
@@ -43,5 +50,23 @@ describe('isLedgerColor', () => {
     expect(isLedgerColor(undefined)).toBe(false)
     expect(isLedgerColor(null)).toBe(false)
     expect(isLedgerColor(42)).toBe(false)
+  })
+})
+
+describe('resolveLedgerColor', () => {
+  it('resolves an explicitly stored color to itself', () => {
+    for (const color of LEDGER_COLORS) {
+      expect(resolveLedgerColor(color)).toBe(color)
+    }
+  })
+
+  it('resolves no stored color to the canonical default -- espresso, the original Noted. accent', () => {
+    expect(resolveLedgerColor(undefined)).toBe('espresso')
+    expect(resolveLedgerColor(undefined)).toBe(DEFAULT_LEDGER_COLOR)
+  })
+
+  it('espresso is a real, ordinary member of the palette, not a separate concept', () => {
+    expect(LEDGER_COLORS).toContain('espresso')
+    expect(isLedgerColor('espresso')).toBe(true)
   })
 })

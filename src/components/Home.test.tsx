@@ -60,16 +60,16 @@ vi.mock('./SettingsSheet', () => ({
   }: {
     name: string
     defaultState: string
-    color: string | null
+    color: string
     onSaveName: (next: string) => Promise<void>
     onSaveDefaultState: (next: 'did' | 'didnt') => Promise<void>
-    onSaveColor: (next: string | null) => Promise<void>
+    onSaveColor: (next: string) => Promise<void>
     onDelete: () => Promise<void>
     onTourNoted: () => void
     onDismiss: () => void
   }) => (
     <div data-testid="settings-sheet">
-      settings-sheet:{name}:{defaultState}:{color ?? 'none'}
+      settings-sheet:{name}:{defaultState}:{color}
       <button type="button" onClick={() => void onSaveName('Renamed').catch(reportSaveError)}>
         Save name
       </button>
@@ -103,7 +103,7 @@ vi.mock('./LedgerSwitcherSheet', () => ({
     ledgers: { id: string; name: string }[]
     activeLedgerId: string
     onSwitch: (id: string) => void
-    onCreate: (input: { name: string; defaultState: 'did' | 'didnt'; color: string | null }) => Promise<void>
+    onCreate: (input: { name: string; defaultState: 'did' | 'didnt'; color: string }) => Promise<void>
     onManage: (id: string) => void
     onDismiss: () => void
   }) => (
@@ -207,13 +207,24 @@ describe('Home', () => {
     expect(screen.getByText('Noted.')).toBeInTheDocument()
     expect(screen.getByText('Today · 08/10/2026')).toBeInTheDocument()
     expect(screen.getByText('Worked out')).toBeInTheDocument()
-    expect(screen.getByTestId('today-section')).toHaveTextContent('today-section:ledger-1:did:UTC:none')
+    expect(screen.getByTestId('today-section')).toHaveTextContent('today-section:ledger-1:did:UTC:var(--ledger-color-espresso)')
     expect(screen.queryByTestId('calendar-sheet')).not.toBeInTheDocument()
   })
 
   it('passes the active ledger\'s accent color through to TodaySection', () => {
     renderSettledHome({ activeLedger: { ...ledger, color: 'clay' } })
     expect(screen.getByTestId('today-section')).toHaveTextContent('var(--ledger-color-clay)')
+  })
+
+  it('resolves an uncolored ledger to the same espresso color for both the active toggle and Settings -- not two different colors', () => {
+    // `ledger` (see below) has no explicit `color` at all, matching every
+    // ledger created before color existed, including the legacy first one.
+    renderSettledHome()
+
+    expect(screen.getByTestId('today-section')).toHaveTextContent('var(--ledger-color-espresso)')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Worked out:did:espresso')
   })
 
   it('opens and closes the calendar from the header control', () => {
@@ -231,7 +242,7 @@ describe('Home', () => {
     expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Worked out:did:none')
+    expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Worked out:did:espresso')
 
     fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
     expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
@@ -376,7 +387,7 @@ describe('Home', () => {
         fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
         fireEvent.click(screen.getByRole('button', { name: 'Manage ledger-2' }))
 
-        expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Drinking:did:none')
+        expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Drinking:did:espresso')
         // The catalog itself closes -- there is exactly one settings surface open, not two.
         expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
       })
@@ -387,7 +398,7 @@ describe('Home', () => {
         fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
         fireEvent.click(screen.getByRole('button', { name: 'Manage active ledger' }))
 
-        expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Worked out:did:none')
+        expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Worked out:did:espresso')
       })
 
       it('renames a non-active ledger through the catalog-opened Settings sheet', async () => {
