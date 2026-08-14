@@ -1090,7 +1090,7 @@ fieldset label {
 
    The intro reads out at a human pace: the wordmark rises, its period
    stamps in on the same spring curve the today-toggle settles with, then
-   the three lines land one at a time, muted to ink, and the action arrives
+   the five lines land one at a time, muted to ink, and the action arrives
    last. Between coach steps the spotlight glides (its transition lives on
    .tour-spotlight above) while the new callout waits a beat and fades in
    where it lands. */
@@ -1126,8 +1126,16 @@ fieldset label {
     --enter-delay: 2200ms;
   }
 
+  .onboarding-line:nth-child(4) {
+    --enter-delay: 2700ms;
+  }
+
+  .onboarding-line:nth-child(5) {
+    --enter-delay: 3200ms;
+  }
+
   .onboarding-intro-footer {
-    --enter-delay: 2850ms;
+    --enter-delay: 3850ms;
   }
 
   .onboarding-coach {

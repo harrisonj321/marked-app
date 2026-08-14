@@ -94,8 +94,10 @@ describe('OnboardingTour', () => {
 
     expect(screen.getByRole('heading', { name: 'Noted.' })).toBeInTheDocument()
     expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
-    expect(screen.getByText(/no streaks\. no goals\. no judgment\./i)).toBeInTheDocument()
-    expect(screen.getByText(/just a record/i)).toBeInTheDocument()
+    expect(screen.getByText(/not about keeping score/i)).toBeInTheDocument()
+    expect(screen.getByText(/just a ledger of whatever/i)).toBeInTheDocument()
+    expect(screen.getByText(/just visibility/i)).toBeInTheDocument()
+    expect(screen.getByText(/^It's just Noted\.$/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
   })

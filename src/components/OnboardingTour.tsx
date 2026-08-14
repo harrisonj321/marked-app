@@ -242,7 +242,7 @@ interface IntroStepProps {
 /**
  * The one brand moment Noted. allows itself. The wordmark rises, its period
  * stamps in with the same spring the today-toggle settles with, and the
- * three lines land one at a time -- what it isn't in muted ink, what it is
+ * five lines land one at a time -- what it isn't in muted ink, what it is
  * in full ink. The primary action reads "Noted." because pressing it is the
  * product's whole gesture: acknowledge, move on.
  *
@@ -286,10 +286,10 @@ function IntroStep({ onPrimary }: IntroStepProps) {
         </h2>
         <div className="onboarding-lines">
           <p className="onboarding-line">It's not a habit tracker.</p>
-          <p className="onboarding-line">No streaks. No goals. No judgment.</p>
-          <p className="onboarding-line onboarding-line-turn">
-            {'Just something you noticed.\nJust a record.'}
-          </p>
+          <p className="onboarding-line">It's not about keeping score.</p>
+          <p className="onboarding-line onboarding-line-turn">It's just a ledger of whatever.</p>
+          <p className="onboarding-line onboarding-line-turn">It's just visibility.</p>
+          <p className="onboarding-line onboarding-line-turn">It's just Noted.</p>
         </div>
       </div>
       <div ref={footerRef} className="onboarding-footer onboarding-intro-footer">
