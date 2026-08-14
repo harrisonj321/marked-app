@@ -69,8 +69,8 @@ export function ShareIcon({ size = 18 }: IconProps) {
   )
 }
 
-/** Suggests "another one behind this" -- the ledger switcher's trigger. */
-export function LayersIcon({ size = 20 }: IconProps) {
+/** A small, quiet "this opens something" cue -- the ledger title's trigger. */
+export function ChevronDownIcon({ size = 16 }: IconProps) {
   return (
     <svg
       width={size}
@@ -84,8 +84,27 @@ export function LayersIcon({ size = 20 }: IconProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <rect x="4" y="4" width="12" height="12" rx="2" />
-      <path d="M9 20h9a2 2 0 0 0 2-2V9" />
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
+/** A quiet per-row "manage this ledger" affordance in the ledger catalog. */
+export function EditIcon({ size = 18 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
     </svg>
   )
 }

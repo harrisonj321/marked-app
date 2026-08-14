@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react'
 import { TRACKER_NAME_MAX_LENGTH, validateTrackerName, type DayState } from '../domain/tracker'
 import { LEDGER_COLORS, LEDGER_COLOR_LABELS, type Ledger, type LedgerColor } from '../domain/ledger'
-import { CloseIcon } from './icons'
+import { CloseIcon, EditIcon } from './icons'
 
 export interface NewLedgerInput {
   name: string
@@ -14,26 +14,39 @@ interface LedgerSwitcherSheetProps {
   activeLedgerId: string
   onSwitch: (ledgerId: string) => void
   onCreate: (input: NewLedgerInput) => Promise<void>
+  onRename: (ledgerId: string, name: string) => Promise<void>
+  onRecolor: (ledgerId: string, color: LedgerColor | null) => Promise<void>
   onDelete: (ledgerId: string) => Promise<void>
   onDismiss: () => void
 }
 
 /**
- * The one compact surface for switching, creating, and removing ledgers.
- * Renaming a ledger and changing its color happen through the existing
- * Home/Settings flows instead, once it is the active one -- keeping this
- * sheet itself small: select, add, remove, nothing else.
+ * Noted.'s one surface for picking a ledger: primarily a list to select
+ * from, with creation and per-ledger management folded quietly in rather
+ * than laid out as a table. Renaming and recoloring happen in a small
+ * edit state entered per row (see EditLedgerFields); Delete lives one level
+ * further in, inside that edit state, rather than sitting beside every row
+ * where a single destructive action would dominate the list.
  */
 export function LedgerSwitcherSheet({
   ledgers,
   activeLedgerId,
   onSwitch,
   onCreate,
+  onRename,
+  onRecolor,
   onDelete,
   onDismiss,
 }: LedgerSwitcherSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
+
+  const [managingId, setManagingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editColor, setEditColor] = useState<LedgerColor | null>(null)
+  const [editNameError, setEditNameError] = useState<string | null>(null)
+  const [editFormError, setEditFormError] = useState<string | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
 
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -64,6 +77,58 @@ export function LedgerSwitcherSheet({
     dialogRef.current?.close()
   }
 
+  function startManaging(ledger: Ledger) {
+    setConfirmingDeleteId(null)
+    setDeleteError(null)
+    setEditName(ledger.name)
+    setEditColor(ledger.color ?? null)
+    setEditNameError(null)
+    setEditFormError(null)
+    setManagingId(ledger.id)
+  }
+
+  function cancelManaging() {
+    setManagingId(null)
+    setConfirmingDeleteId(null)
+    setEditNameError(null)
+    setEditFormError(null)
+  }
+
+  async function handleEditSubmit(event: FormEvent, ledger: Ledger) {
+    event.preventDefault()
+
+    const validation = validateTrackerName(editName)
+    if (!validation.valid) {
+      setEditNameError(validation.error)
+      return
+    }
+
+    const nameChanged = validation.name !== ledger.name
+    const colorChanged = editColor !== (ledger.color ?? null)
+
+    if (!nameChanged && !colorChanged) {
+      setManagingId(null)
+      return
+    }
+
+    setEditNameError(null)
+    setEditFormError(null)
+    setEditSaving(true)
+    try {
+      if (nameChanged) {
+        await onRename(ledger.id, validation.name)
+      }
+      if (colorChanged) {
+        await onRecolor(ledger.id, editColor)
+      }
+      setManagingId(null)
+    } catch {
+      setEditFormError('Could not save. Try again.')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
   function startConfirmingDelete(ledgerId: string) {
     setDeleteError(null)
     setConfirmingDeleteId(ledgerId)
@@ -80,6 +145,7 @@ export function LedgerSwitcherSheet({
     try {
       await onDelete(ledgerId)
       setConfirmingDeleteId(null)
+      setManagingId(null)
     } catch {
       setDeleteError('Could not delete. Try again.')
     } finally {
@@ -169,6 +235,19 @@ export function LedgerSwitcherSheet({
                   </button>
                 </div>
               </div>
+            ) : managingId === ledger.id ? (
+              <EditLedgerFields
+                name={editName}
+                onNameChange={setEditName}
+                nameError={editNameError}
+                color={editColor}
+                onColorChange={setEditColor}
+                formError={editFormError}
+                saving={editSaving}
+                onSubmit={(event) => void handleEditSubmit(event, ledger)}
+                onCancel={cancelManaging}
+                onDeleteRequest={() => startConfirmingDelete(ledger.id)}
+              />
             ) : (
               <>
                 <button
@@ -188,11 +267,11 @@ export function LedgerSwitcherSheet({
                 </button>
                 <button
                   type="button"
-                  className="footer-link ledger-row-delete"
-                  aria-label={`Delete ${ledger.name}`}
-                  onClick={() => startConfirmingDelete(ledger.id)}
+                  className="icon-button ledger-row-manage"
+                  aria-label={`Manage ${ledger.name}`}
+                  onClick={() => startManaging(ledger)}
                 >
-                  Delete
+                  <EditIcon />
                 </button>
               </>
             )}
@@ -235,6 +314,37 @@ export function LedgerSwitcherSheet({
         </div>
       )}
     </dialog>
+  )
+}
+
+interface ColorPickerProps {
+  color: LedgerColor | null
+  onColorChange: (value: LedgerColor | null) => void
+  labelId: string
+}
+
+function ColorPicker({ color, onColorChange, labelId }: ColorPickerProps) {
+  return (
+    <div className="ledger-color-picker" role="group" aria-labelledby={labelId}>
+      <button
+        type="button"
+        className="ledger-color-chip ledger-color-chip-none"
+        aria-pressed={color === null}
+        aria-label="None"
+        onClick={() => onColorChange(null)}
+      />
+      {LEDGER_COLORS.map((swatch) => (
+        <button
+          key={swatch}
+          type="button"
+          className="ledger-color-chip"
+          style={{ background: `var(--ledger-color-${swatch})` }}
+          aria-pressed={color === swatch}
+          aria-label={LEDGER_COLOR_LABELS[swatch]}
+          onClick={() => onColorChange(swatch)}
+        />
+      ))}
+    </div>
   )
 }
 
@@ -304,27 +414,97 @@ function NewLedgerFields({
 
       <div className="field">
         <span id={colorLabelId}>Color</span>
-        <div className="ledger-color-picker" role="group" aria-labelledby={colorLabelId}>
-          <button
-            type="button"
-            className="ledger-color-chip ledger-color-chip-none"
-            aria-pressed={color === null}
-            aria-label="None"
-            onClick={() => onColorChange(null)}
-          />
-          {LEDGER_COLORS.map((swatch) => (
-            <button
-              key={swatch}
-              type="button"
-              className="ledger-color-chip"
-              style={{ background: `var(--ledger-color-${swatch})` }}
-              aria-pressed={color === swatch}
-              aria-label={LEDGER_COLOR_LABELS[swatch]}
-              onClick={() => onColorChange(swatch)}
-            />
-          ))}
-        </div>
+        <ColorPicker color={color} onColorChange={onColorChange} labelId={colorLabelId} />
       </div>
     </>
+  )
+}
+
+interface EditLedgerFieldsProps {
+  name: string
+  onNameChange: (value: string) => void
+  nameError: string | null
+  color: LedgerColor | null
+  onColorChange: (value: LedgerColor | null) => void
+  formError: string | null
+  saving: boolean
+  onSubmit: (event: FormEvent) => void
+  onCancel: () => void
+  onDeleteRequest: () => void
+}
+
+/**
+ * The tightly scoped manage view for one ledger row: rename and recolor
+ * only (default state and word labels stay Settings' job for the active
+ * ledger, unchanged). Delete lives here, quiet and last, rather than beside
+ * every row in the list -- entering this view is itself the confirmation
+ * that the user meant to manage this specific ledger, and the existing
+ * confirm-before-delete step still guards the destructive step itself.
+ */
+function EditLedgerFields({
+  name,
+  onNameChange,
+  nameError,
+  color,
+  onColorChange,
+  formError,
+  saving,
+  onSubmit,
+  onCancel,
+  onDeleteRequest,
+}: EditLedgerFieldsProps) {
+  const nameId = useId()
+  const colorLabelId = useId()
+
+  return (
+    <form onSubmit={onSubmit} noValidate className="ledger-edit-form">
+      <div className="field">
+        <label htmlFor={nameId} className="visually-hidden">
+          Ledger name
+        </label>
+        <input
+          id={nameId}
+          type="text"
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          maxLength={TRACKER_NAME_MAX_LENGTH}
+          autoComplete="off"
+          autoFocus
+        />
+        {nameError && (
+          <p role="alert" className="message">
+            {nameError}
+          </p>
+        )}
+      </div>
+
+      <div className="field">
+        <span id={colorLabelId} className="visually-hidden">
+          Color
+        </span>
+        <ColorPicker color={color} onColorChange={onColorChange} labelId={colorLabelId} />
+      </div>
+
+      {formError && (
+        <p role="alert" className="message">
+          {formError}
+        </p>
+      )}
+
+      <div className="settings-actions">
+        <button type="button" onClick={onCancel} disabled={saving}>
+          Cancel
+        </button>
+        <button type="submit" disabled={saving}>
+          Save
+        </button>
+      </div>
+
+      <div className="settings-secondary-actions">
+        <button type="button" className="footer-link ledger-row-delete" onClick={onDeleteRequest}>
+          Delete
+        </button>
+      </div>
+    </form>
   )
 }

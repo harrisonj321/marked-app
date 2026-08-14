@@ -48,17 +48,24 @@ function useEntranceSettled(
   return settled
 }
 
-type CoachStepId = 'coach-today' | 'coach-calendar' | 'coach-customize'
+type CoachStepId = 'coach-today' | 'coach-calendar' | 'coach-customize' | 'coach-ledger'
 type StepId = 'welcome' | CoachStepId | 'install'
 
 /**
  * Coach order follows the product's importance hierarchy, not screen
  * geometry: the daily mark first (the whole product), then the record it
- * accumulates into, then the wording -- a detail, so it comes last. The
- * three spotlights also happen to sweep center, top, bottom, which keeps
- * the eye moving instead of ping-ponging.
+ * accumulates into, then the wording -- a detail, so it comes last before
+ * the optional capability, multiple ledgers, which comes last of all: most
+ * users only ever have the one ledger this tour already walked them
+ * through, so the affordance to switch or add another is a quiet mention on
+ * the way out rather than an early, prominent stop.
  */
-const COACH_SEQUENCE: readonly CoachStepId[] = ['coach-today', 'coach-calendar', 'coach-customize']
+const COACH_SEQUENCE: readonly CoachStepId[] = [
+  'coach-today',
+  'coach-calendar',
+  'coach-customize',
+  'coach-ledger',
+]
 
 const INTRO_AND_COACH_STEPS: readonly StepId[] = ['welcome', ...COACH_SEQUENCE]
 
@@ -98,6 +105,11 @@ const COACH_STEPS: Record<CoachStepId, CoachStepConfig> = {
     label: 'Your words',
     body: "Rename the two states to fit what you're noting, and choose what an untouched day means.",
   },
+  'coach-ledger': {
+    tourId: 'ledger-title',
+    label: 'More to note?',
+    body: 'Tap the name to switch ledgers or add another.',
+  },
 }
 
 function isCoachStep(step: StepId): step is CoachStepId {
@@ -109,12 +121,12 @@ interface OnboardingTourProps {
 }
 
 /**
- * Drives the first-run/replayable tour: one staged full-screen intro, three
+ * Drives the first-run/replayable tour: one staged full-screen intro, four
  * coach marks anchored to the real Home controls, then an optional PWA
  * install step. Home stays mounted (and inert) underneath the whole time --
  * see Home's use of the `inert` attribute -- so this component only ever
  * needs to render whichever single step is current. The one exception to
- * "single step" thinking: all three coach steps share one persistent
+ * "single step" thinking: all four coach steps share one persistent
  * CoachOverlay so the spotlight element survives step changes and its CSS
  * position transition glides it from control to control.
  */

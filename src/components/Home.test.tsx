@@ -85,6 +85,8 @@ vi.mock('./LedgerSwitcherSheet', () => ({
     activeLedgerId,
     onSwitch,
     onCreate,
+    onRename,
+    onRecolor,
     onDelete,
     onDismiss,
   }: {
@@ -92,6 +94,8 @@ vi.mock('./LedgerSwitcherSheet', () => ({
     activeLedgerId: string
     onSwitch: (id: string) => void
     onCreate: (input: { name: string; defaultState: 'did' | 'didnt'; color: string | null }) => Promise<void>
+    onRename: (id: string, name: string) => Promise<void>
+    onRecolor: (id: string, color: string | null) => Promise<void>
     onDelete: (id: string) => Promise<void>
     onDismiss: () => void
   }) => (
@@ -107,6 +111,18 @@ vi.mock('./LedgerSwitcherSheet', () => ({
         }
       >
         Create ledger
+      </button>
+      <button
+        type="button"
+        onClick={() => void onRename('ledger-2', 'Reading').catch(reportSaveError)}
+      >
+        Rename ledger-2
+      </button>
+      <button
+        type="button"
+        onClick={() => void onRecolor('ledger-2', 'moss').catch(reportSaveError)}
+      >
+        Recolor ledger-2
       </button>
       <button type="button" onClick={() => void onDelete('ledger-1').catch(reportSaveError)}>
         Delete active ledger
@@ -263,7 +279,30 @@ describe('Home', () => {
   })
 
   describe('ledger switcher', () => {
-    it('opens and closes the switcher from the header control, listing every ledger', () => {
+    it('has no separate header control -- the ledger title itself is the only trigger', () => {
+      renderSettledHome()
+      // Only "Open calendar" remains in the header; the old stacked-squares
+      // trigger beside it is gone entirely, per the guardrail that the app
+      // should show no second visible navigation control.
+      expect(screen.getByRole('button', { name: 'Open calendar' })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: /switch ledger/i })).toHaveLength(1)
+    })
+
+    it('no longer shows an Edit link under the ledger title', () => {
+      renderSettledHome()
+      expect(screen.queryByRole('button', { name: /edit tracker name/i })).not.toBeInTheDocument()
+      expect(screen.queryByText('Edit')).not.toBeInTheDocument()
+    })
+
+    it('marks the ledger title as the switcher coach mark\'s anchor', () => {
+      renderSettledHome()
+      expect(screen.getByRole('button', { name: /switch ledger/i })).toHaveAttribute(
+        'data-tour-id',
+        'ledger-title',
+      )
+    })
+
+    it('opens and closes the switcher from the ledger title, listing every ledger', () => {
       const otherLedger = { id: 'ledger-2', name: 'Drinking', defaultState: 'did' as const, timezone: 'UTC', startDate: '2026-08-01' }
       renderSettledHome({ ledgers: [ledger, otherLedger] })
       expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
@@ -314,6 +353,28 @@ describe('Home', () => {
 
       await vi.waitFor(() => {
         expect(deleteLedgerMock).toHaveBeenCalledWith('u1', 'ledger-1')
+      })
+    })
+
+    it('renames a ledger from the catalog, active or not', async () => {
+      renderSettledHome()
+
+      fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'Rename ledger-2' }))
+
+      await vi.waitFor(() => {
+        expect(updateLedgerNameMock).toHaveBeenCalledWith('u1', 'ledger-2', 'Reading')
+      })
+    })
+
+    it('recolors a ledger from the catalog, active or not', async () => {
+      renderSettledHome()
+
+      fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'Recolor ledger-2' }))
+
+      await vi.waitFor(() => {
+        expect(updateLedgerColorMock).toHaveBeenCalledWith('u1', 'ledger-2', 'moss')
       })
     })
   })

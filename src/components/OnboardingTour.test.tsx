@@ -38,6 +38,7 @@ function renderTour(onFinish = vi.fn()) {
       <div data-tour-id="open-settings" />
       <div data-tour-id="today-toggle" />
       <div data-tour-id="open-calendar" />
+      <div data-tour-id="ledger-title" />
       <OnboardingTour onFinish={onFinish} />
     </>,
   )
@@ -73,6 +74,7 @@ function mockDistinctTourRects() {
     'open-settings': { top: 700, left: 10, width: 20, height: 20, bottom: 720, right: 30 } as DOMRect,
     'today-toggle': { top: 300, left: 10, width: 20, height: 20, bottom: 320, right: 30 } as DOMRect,
     'open-calendar': { top: 40, left: 10, width: 20, height: 20, bottom: 60, right: 30 } as DOMRect,
+    'ledger-title': { top: 200, left: 10, width: 20, height: 20, bottom: 220, right: 30 } as DOMRect,
   }
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
     this: Element,
@@ -177,7 +179,7 @@ describe('OnboardingTour', () => {
     expect(screen.queryByRole('heading', { name: 'Noted.' })).not.toBeInTheDocument()
   })
 
-  it('walks the coach marks in importance order: today, then the record, then wording', () => {
+  it('walks the coach marks in importance order: today, then the record, then wording, then ledgers last', () => {
     mockPlatform()
     renderTour()
 
@@ -192,6 +194,10 @@ describe('OnboardingTour', () => {
     clickNext() // coach-calendar -> coach-customize
     expect(screen.getByText('Your words')).toBeInTheDocument()
     expect(screen.getByText(/rename the two states/i)).toBeInTheDocument()
+
+    clickNext() // coach-customize -> coach-ledger
+    expect(screen.getByText('More to note?')).toBeInTheDocument()
+    expect(screen.getByText(/tap the name to switch ledgers or add another/i)).toBeInTheDocument()
   })
 
   it('keeps one persistent spotlight element across coach steps, so its position transition can glide between controls', () => {
@@ -224,17 +230,45 @@ describe('OnboardingTour', () => {
     expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '690px' })
   })
 
+  it('measures the real ledger-title element specifically for its own coach mark', () => {
+    mockDistinctTourRects()
+    mockPlatform()
+    renderTour()
+
+    clickNext() // welcome -> coach-today
+    clickNext() // coach-today -> coach-calendar
+    clickNext() // coach-calendar -> coach-customize
+    clickNext() // coach-customize -> coach-ledger
+    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '190px' })
+  })
+
+  it('still reaches and anchors the ledger coach mark when there is only one ledger', () => {
+    // The trigger renders identically regardless of ledger count -- this
+    // step's geometry and reachability do not depend on there being
+    // anything to switch to yet.
+    mockPlatform()
+    renderTour()
+
+    clickNext() // welcome -> coach-today
+    clickNext() // coach-today -> coach-calendar
+    clickNext() // coach-calendar -> coach-customize
+    clickNext() // coach-customize -> coach-ledger
+
+    expect(screen.getByText('More to note?')).toBeInTheDocument()
+    expect(document.querySelector('.tour-spotlight')).toBeInTheDocument()
+  })
+
   it('shows exactly one progress dot per step, adapting when the install step is present or omitted', () => {
     mockPlatform({ ios: false, standalone: false, canPromptInstall: false })
     renderTour()
-    // welcome, coach-today, coach-calendar, coach-customize -- no install step.
-    expect(document.querySelectorAll('.onboarding-dot')).toHaveLength(4)
+    // welcome, coach-today, coach-calendar, coach-customize, coach-ledger -- no install step.
+    expect(document.querySelectorAll('.onboarding-dot')).toHaveLength(5)
   })
 
-  it('adds a fifth progress dot when the install step applies', () => {
+  it('adds a sixth progress dot when the install step applies', () => {
     mockPlatform({ ios: true, standalone: false, canPromptInstall: false })
     renderTour()
-    expect(document.querySelectorAll('.onboarding-dot')).toHaveLength(5)
+    expect(document.querySelectorAll('.onboarding-dot')).toHaveLength(6)
   })
 
   it('keeps the top bar in one unchanging layout across every step, so Skip never changes position', () => {
@@ -249,6 +283,8 @@ describe('OnboardingTour', () => {
     clickNext() // coach-today -> coach-calendar
     expect(topbarClassName()).toBe('onboarding-topbar')
     clickNext() // coach-calendar -> coach-customize
+    expect(topbarClassName()).toBe('onboarding-topbar')
+    clickNext() // coach-customize -> coach-ledger
     expect(topbarClassName()).toBe('onboarding-topbar')
   })
 
@@ -304,6 +340,7 @@ describe('OnboardingTour', () => {
     clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> coach-customize
+    clickNext() // coach-customize -> coach-ledger
 
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
@@ -318,6 +355,7 @@ describe('OnboardingTour', () => {
     clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> coach-customize
+    clickNext() // coach-customize -> coach-ledger
 
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
   })
@@ -329,7 +367,8 @@ describe('OnboardingTour', () => {
     clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> coach-customize
-    clickNext() // coach-customize -> install
+    clickNext() // coach-customize -> coach-ledger
+    clickNext() // coach-ledger -> install
 
     const icon = document.querySelector('.onboarding-install-icon')
     expect(icon).toBeInTheDocument()
@@ -343,7 +382,8 @@ describe('OnboardingTour', () => {
     clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> coach-customize
-    clickNext() // coach-customize -> install
+    clickNext() // coach-customize -> coach-ledger
+    clickNext() // coach-ledger -> install
 
     expect(screen.getByRole('dialog')).toHaveTextContent(/Share, then/)
     // "Got it" rather than "Done": Noted. has no way to confirm the user
@@ -360,7 +400,8 @@ describe('OnboardingTour', () => {
     clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> coach-customize
-    clickNext() // coach-customize -> install
+    clickNext() // coach-customize -> coach-ledger
+    clickNext() // coach-ledger -> install
 
     fireEvent.click(screen.getByRole('button', { name: 'Add to Home Screen' }))
 
@@ -377,7 +418,8 @@ describe('OnboardingTour', () => {
     clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> coach-customize
-    clickNext() // coach-customize -> install
+    clickNext() // coach-customize -> coach-ledger
+    clickNext() // coach-ledger -> install
 
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
 
@@ -391,7 +433,8 @@ describe('OnboardingTour', () => {
     clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
     clickNext() // coach-calendar -> coach-customize
-    clickNext() // coach-customize -> install
+    clickNext() // coach-customize -> coach-ledger
+    clickNext() // coach-ledger -> install
 
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
   })

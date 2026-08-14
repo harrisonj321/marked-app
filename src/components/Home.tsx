@@ -19,8 +19,7 @@ import { LedgerSwitcherSheet, type NewLedgerInput } from './LedgerSwitcherSheet'
 import { OnboardingTour } from './OnboardingTour'
 import { SettingsSheet } from './SettingsSheet'
 import { TodaySection } from './TodaySection'
-import { TrackerNameEditor } from './TrackerNameEditor'
-import { CalendarIcon, LayersIcon } from './icons'
+import { CalendarIcon, ChevronDownIcon } from './icons'
 
 interface HomeProps {
   uid: string
@@ -53,10 +52,6 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
     setTourActive(true)
   }
 
-  async function handleNameSave(name: string) {
-    await updateLedgerName(uid, activeLedger.id, name)
-  }
-
   async function handleDefaultStateSave(defaultState: DayState) {
     await updateLedgerDefaultState(uid, activeLedger.id, activeLedger.defaultState, defaultState)
   }
@@ -65,8 +60,12 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
     await updateLedgerStateLabels(uid, activeLedger.id, stateLabels)
   }
 
-  async function handleColorSave(color: LedgerColor | null) {
-    await updateLedgerColor(uid, activeLedger.id, color)
+  async function handleRenameLedger(ledgerId: string, name: string) {
+    await updateLedgerName(uid, ledgerId, name)
+  }
+
+  async function handleColorSave(ledgerId: string, color: LedgerColor | null) {
+    await updateLedgerColor(uid, ledgerId, color)
   }
 
   async function handleCreateLedger(input: NewLedgerInput) {
@@ -94,21 +93,6 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
             <button
               type="button"
               className="icon-button"
-              aria-label={`Switch ledger, current: ${activeLedger.name}`}
-              onClick={() => setSwitcherOpen(true)}
-            >
-              <LayersIcon />
-              {activeLedger.color && (
-                <span
-                  className="ledger-dot ledger-dot-header"
-                  style={{ background: `var(--ledger-color-${activeLedger.color})` }}
-                  aria-hidden="true"
-                />
-              )}
-            </button>
-            <button
-              type="button"
-              className="icon-button"
               aria-label="Open calendar"
               data-tour-id="open-calendar"
               onClick={() => setCalendarOpen(true)}
@@ -120,7 +104,18 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
 
         <div className="home-main">
           {todayKey && <p className="today-date">{`Today · ${formatDisplayDate(todayKey)}`}</p>}
-          <TrackerNameEditor name={activeLedger.name} onSave={handleNameSave} />
+          <h1 className="tracker-title">
+            <button
+              type="button"
+              className="tracker-title-button"
+              data-tour-id="ledger-title"
+              aria-label={`Switch ledger, current: ${activeLedger.name}`}
+              onClick={() => setSwitcherOpen(true)}
+            >
+              <span className="tracker-title-name">{activeLedger.name}</span>
+              <ChevronDownIcon />
+            </button>
+          </h1>
           <TodaySection
             uid={uid}
             ledgerId={activeLedger.id}
@@ -164,7 +159,7 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
             color={activeLedger.color ?? null}
             onSaveDefaultState={handleDefaultStateSave}
             onSaveStateLabels={handleStateLabelsSave}
-            onSaveColor={handleColorSave}
+            onSaveColor={(color) => handleColorSave(activeLedger.id, color)}
             onTourNoted={handleTourNoted}
             onDismiss={() => setSettingsOpen(false)}
           />
@@ -176,6 +171,8 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
             activeLedgerId={activeLedger.id}
             onSwitch={onSwitchLedger}
             onCreate={handleCreateLedger}
+            onRename={handleRenameLedger}
+            onRecolor={handleColorSave}
             onDelete={handleDeleteLedger}
             onDismiss={() => setSwitcherOpen(false)}
           />

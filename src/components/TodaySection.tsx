@@ -42,16 +42,20 @@ export function TodaySection({
             labels={labels}
             accentColor={accentColor}
           />
-          {today.pending && (
-            <p className="message" aria-live="polite">
-              Saving&hellip;
+          <div className="today-status">
+            <p
+              className={`message today-status-text${today.pending ? ' today-status-text-visible' : ''}`}
+              aria-live="polite"
+            >
+              {today.pending ? 'Saving…' : ''}
             </p>
-          )}
-          {today.error && (
-            <p role="alert" className="message">
-              {today.error}
+            <p
+              role="alert"
+              className={`message today-status-text${today.error ? ' today-status-text-visible' : ''}`}
+            >
+              {today.error ?? ''}
             </p>
-          )}
+          </div>
           <button
             type="button"
             className="today-detail-link"

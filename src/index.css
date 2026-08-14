@@ -268,26 +268,13 @@ fieldset label {
 }
 
 /* A small identifying dot, reused everywhere a ledger's color needs to
-   read at a glance without becoming a theme: the switcher's rows, its new-
-   ledger color picker, and this badge on the header trigger. */
+   read at a glance without becoming a theme: the ledger catalog's rows and
+   its color pickers. */
 .ledger-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-}
-
-.ledger-dot-header {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 6px;
-  height: 6px;
-  box-shadow: 0 0 0 2px var(--color-bg);
-}
-
-.home-header-actions .icon-button {
-  position: relative;
 }
 
 .home-main {
@@ -308,10 +295,30 @@ fieldset label {
 }
 
 .tracker-title {
-  display: flex;
-  flex-direction: column;
+  margin: 0;
+  font-weight: inherit;
+}
+
+/* The ledger name doubles as the switcher's trigger: same size and weight
+   the plain heading always had, with only a small quiet chevron added to
+   suggest it opens something. A user who never notices or taps the chevron
+   should see nothing that reads as a dropdown or nav control -- just the
+   name of what they're noting, per CLAUDE.md's Single-Ledger Experience. */
+.tracker-title-button {
+  display: inline-flex;
   align-items: center;
-  gap: 0.125rem;
+  gap: 0.25rem;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tracker-title-button:hover .tracker-title-name {
+  color: var(--color-text-muted);
 }
 
 .tracker-title-name {
@@ -320,32 +327,9 @@ fieldset label {
   letter-spacing: -0.01em;
 }
 
-.tracker-title-edit {
-  border: none;
-  background: none;
+.tracker-title-button svg {
   color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  padding: 0.25rem 0.5rem;
-  min-height: auto;
-}
-
-.tracker-name-edit {
-  align-items: center;
-  width: 100%;
-  max-width: 18rem;
-  gap: var(--space-1);
-}
-
-.tracker-name-edit input {
-  text-align: center;
-}
-
-.tracker-name-actions {
-  display: flex;
-  gap: var(--space-1);
-  justify-content: center;
+  flex-shrink: 0;
 }
 
 .today {
@@ -516,6 +500,40 @@ fieldset label {
   .today-toggle:focus-within {
     outline: 2px solid var(--color-text);
     outline-offset: 3px;
+  }
+}
+
+/* A permanently reserved slot for the saving/error status, sized to one
+   .message line (0.875rem at the page's 1.5 line-height) whether or not
+   either message is currently showing. The two possible messages are both
+   always mounted, stacked in the same box, and toggle through
+   opacity/visibility instead of being inserted or removed -- so the toggle
+   above and "Add note" below never shift as a save starts, finishes, or
+   fails. Content changes within an already-mounted aria-live/alert region
+   are also the more reliable way to get either announced, versus one that
+   only appears once there is something to say. */
+.today-status {
+  position: relative;
+  width: 100%;
+  min-height: 1.3125rem;
+  text-align: center;
+}
+
+.today-status-text {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.today-status-text-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .today-status-text {
+    transition: opacity 150ms ease;
   }
 }
 
@@ -851,8 +869,24 @@ fieldset label {
   white-space: nowrap;
 }
 
+.ledger-row-manage {
+  flex-shrink: 0;
+}
+
+/* Inside the manage view, not beside the row: Delete is deliberately the
+   quietest control here, one more step in than the rest of the flow, so a
+   destructive action never dominates a list whose primary job is picking a
+   ledger. */
 .ledger-row-delete {
   flex-shrink: 0;
+}
+
+.ledger-edit-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-1) 0.25rem;
 }
 
 .ledger-row-confirm {
