@@ -6,6 +6,14 @@ import type { Ledger } from '../domain/ledger'
 const LEDGERS: Ledger[] = [
   { id: 'a', name: 'Worked out', defaultState: 'did', timezone: 'UTC', startDate: '2026-01-01', color: 'clay' },
   { id: 'b', name: 'Drinking', defaultState: 'didnt', timezone: 'UTC', startDate: '2026-01-01' },
+  {
+    id: 'c',
+    name: 'Booze',
+    defaultState: 'did',
+    timezone: 'UTC',
+    startDate: '2026-01-01',
+    color: 'espresso',
+  },
 ]
 
 beforeEach(() => {
@@ -51,11 +59,35 @@ describe('LedgerSwitcherSheet', () => {
     expect(screen.getByRole('button', { name: 'Drinking' })).not.toHaveAttribute('aria-current')
   })
 
-  it('shows a color indicator only for a ledger that has one', () => {
+  it('shows every ledger\'s resolved color dot -- no ledger ever has "no color"', () => {
     renderSheet()
     const rows = screen.getAllByRole('listitem')
-    expect(rows[0].querySelector('.ledger-dot')).toBeInTheDocument()
-    expect(rows[1].querySelector('.ledger-dot')).not.toBeInTheDocument()
+
+    // 'a': explicit non-default color renders its own dot.
+    const clayDot = rows[0].querySelector<HTMLElement>('.ledger-dot')
+    expect(clayDot).toBeInTheDocument()
+    expect(clayDot).toHaveStyle({ background: 'var(--ledger-color-clay)' })
+
+    // 'b': no explicitly stored color still resolves to an Espresso dot,
+    // the same color the toggle and Settings already show for it -- not a
+    // missing/blank indicator.
+    const unsetDot = rows[1].querySelector<HTMLElement>('.ledger-dot')
+    expect(unsetDot).toBeInTheDocument()
+    expect(unsetDot).toHaveStyle({ background: 'var(--ledger-color-espresso)' })
+
+    // 'c': explicitly stored 'espresso' renders identically to the
+    // resolved-default case above -- espresso is a real color, not a
+    // separate "unset" concept.
+    const explicitEspressoDot = rows[2].querySelector<HTMLElement>('.ledger-dot')
+    expect(explicitEspressoDot).toBeInTheDocument()
+    expect(explicitEspressoDot).toHaveStyle({ background: 'var(--ledger-color-espresso)' })
+  })
+
+  it('shows the resolved color dot on the active row too -- aria-current styling does not suppress it', () => {
+    // 'a' (clay) is the active ledger in renderSheet()'s default activeLedgerId.
+    renderSheet()
+    const activeRow = screen.getByRole('button', { name: 'Worked out' }).closest('li')
+    expect(activeRow?.querySelector('.ledger-dot')).toBeInTheDocument()
   })
 
   it('offers a quiet manage control per row and nothing else -- no inline name/color/delete controls', () => {

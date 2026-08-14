@@ -4,6 +4,7 @@ import {
   DEFAULT_LEDGER_COLOR,
   LEDGER_COLORS,
   LEDGER_COLOR_LABELS,
+  resolveLedgerColor,
   type Ledger,
   type LedgerColor,
 } from '../domain/ledger'
@@ -139,13 +140,11 @@ export function LedgerSwitcherSheet({
               aria-current={ledger.id === activeLedgerId ? 'true' : undefined}
               onClick={() => handleSelect(ledger.id)}
             >
-              {ledger.color && (
-                <span
-                  className="ledger-dot"
-                  style={{ background: `var(--ledger-color-${ledger.color})` }}
-                  aria-hidden="true"
-                />
-              )}
+              <span
+                className="ledger-dot"
+                style={{ background: `var(--ledger-color-${resolveLedgerColor(ledger.color)})` }}
+                aria-hidden="true"
+              />
               <span className="ledger-row-name">{ledger.name}</span>
             </button>
             <button
