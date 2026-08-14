@@ -1,20 +1,16 @@
-import { createTracker } from './data/tracker'
-import { getTodayKey } from './domain/date'
+import { createLedger } from './data/ledger'
+import { getTodayKey, resolveDeviceTimezone } from './domain/date'
 import { useAuthUser } from './hooks/useAuthUser'
-import { useTracker } from './hooks/useTracker'
+import { useLedgers } from './hooks/useLedgers'
 import { LoadingScreen } from './components/LoadingScreen'
 import { SignIn } from './components/SignIn'
 import { Setup } from './components/Setup'
 import { Home } from './components/Home'
 
-function resolveTimezone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-}
-
 function App() {
   const { user, loading: authLoading } = useAuthUser()
   const uid = user?.uid ?? null
-  const { tracker, loading: trackerLoading, error: trackerError } = useTracker(uid)
+  const { ledgers, activeLedger, loading: ledgersLoading, error, switchLedger } = useLedgers(uid)
 
   if (authLoading) {
     return <LoadingScreen />
@@ -24,27 +20,27 @@ function App() {
     return <SignIn />
   }
 
-  if (trackerLoading) {
+  if (ledgersLoading) {
     return <LoadingScreen />
   }
 
-  if (trackerError) {
+  if (error) {
     return (
       <main className="screen screen-center">
         <p className="brand">Noted.</p>
         <p role="alert" className="message">
-          {trackerError}
+          {error}
         </p>
       </main>
     )
   }
 
-  if (!tracker) {
+  if (!activeLedger) {
     return (
       <Setup
         onComplete={async ({ name, defaultState }) => {
-          const timezone = resolveTimezone()
-          await createTracker(user.uid, {
+          const timezone = resolveDeviceTimezone()
+          await createLedger(user.uid, {
             name,
             defaultState,
             timezone,
@@ -55,7 +51,9 @@ function App() {
     )
   }
 
-  return <Home uid={user.uid} tracker={tracker} />
+  return (
+    <Home uid={user.uid} ledgers={ledgers} activeLedger={activeLedger} onSwitchLedger={switchLedger} />
+  )
 }
 
 export default App

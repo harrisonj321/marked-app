@@ -8,23 +8,27 @@ import { TodayToggle } from './TodayToggle'
 
 interface TodaySectionProps {
   uid: string
+  ledgerId: string
   defaultState: DayState
   timezone: string
   labels?: StateLabels
+  accentColor?: string
 }
 
 export function TodaySection({
   uid,
+  ledgerId,
   defaultState,
   timezone,
   labels = DEFAULT_STATE_LABELS,
+  accentColor,
 }: TodaySectionProps) {
-  const today = useTodayState(uid, defaultState, timezone)
+  const today = useTodayState(uid, ledgerId, defaultState, timezone)
   const [detailOpen, setDetailOpen] = useState(false)
   const hasNote = Boolean(today.record.note)
 
   async function handleDetailSave(normalized: NormalizedDailyRecord) {
-    await saveDailyRecord(uid, today.dateKey, normalized)
+    await saveDailyRecord(uid, ledgerId, today.dateKey, normalized)
   }
 
   return (
@@ -36,6 +40,7 @@ export function TodaySection({
             defaultState={defaultState}
             onSelect={today.setState}
             labels={labels}
+            accentColor={accentColor}
           />
           {today.pending && (
             <p className="message" aria-live="polite">

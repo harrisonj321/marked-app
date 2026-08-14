@@ -1,99 +1,17 @@
-import {
-  doc,
-  onSnapshot,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  type FirestoreError,
-  type Unsubscribe,
-} from 'firebase/firestore'
+import { deleteDoc, doc, getDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import type { DayState, StateLabels, TrackerConfig } from '../domain/tracker'
-import { pinImplicitDayStates } from './day'
 
+/**
+ * Everything here exists only to support reading -- and, once its migrated
+ * ledger is deleted, retiring -- a pre-multi-ledger account's legacy
+ * tracker document. The app never *writes new content* to this path once
+ * multi-ledger support has shipped -- see LEGACY_LEDGER_ID in
+ * domain/ledger.ts and data/ledger.ts's migration/deletion comments for why
+ * the legacy day data itself is never moved.
+ */
 function trackerRef(uid: string) {
   return doc(db, 'users', uid, 'tracker', 'config')
-}
-
-export interface NewTracker {
-  name: string
-  defaultState: DayState
-  timezone: string
-  startDate: string
-}
-
-export async function createTracker(uid: string, input: NewTracker): Promise<void> {
-  await setDoc(trackerRef(uid), {
-    name: input.name,
-    defaultState: input.defaultState,
-    timezone: input.timezone,
-    startDate: input.startDate,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-}
-
-export async function updateTrackerName(uid: string, name: string): Promise<void> {
-  await updateDoc(trackerRef(uid), {
-    name,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-/**
- * Renames the display wording for the two DayState values. This is
- * presentation data only -- it never touches `defaultState` or any stored
- * daily record, so existing log history is unaffected.
- */
-export async function updateTrackerStateLabels(uid: string, stateLabels: StateLabels): Promise<void> {
-  await updateDoc(trackerRef(uid), {
-    stateLabels,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-/**
- * Changes what an untouched day counts as.
- *
- * Every day that already has a document keeps the state it currently
- * shows: those states are pinned onto their documents first, so a day
- * recorded as "Did 3x" still reads that way afterwards rather than
- * silently re-resolving (and losing its count) under the new default.
- * Days with no document were never marked, and those follow the new
- * default going forward and backward alike.
- *
- * Pinning runs before the config write, so an interrupted change leaves
- * the tracker on its existing default with some states made explicit --
- * a no-op in meaning, and safe to retry.
- */
-export async function updateTrackerDefaultState(
-  uid: string,
-  currentDefaultState: DayState,
-  nextDefaultState: DayState,
-): Promise<void> {
-  if (currentDefaultState === nextDefaultState) {
-    return
-  }
-
-  await pinImplicitDayStates(uid, currentDefaultState)
-  await updateDoc(trackerRef(uid), {
-    defaultState: nextDefaultState,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-export function subscribeTracker(
-  uid: string,
-  onChange: (tracker: TrackerConfig | null) => void,
-  onError?: (error: FirestoreError) => void,
-): Unsubscribe {
-  return onSnapshot(
-    trackerRef(uid),
-    (snapshot) => {
-      onChange(snapshot.exists() ? toTrackerConfig(snapshot.data()) : null)
-    },
-    onError,
-  )
 }
 
 function toTrackerConfig(data: Record<string, unknown>): TrackerConfig {
@@ -104,4 +22,22 @@ function toTrackerConfig(data: Record<string, unknown>): TrackerConfig {
     startDate: data.startDate as string,
     stateLabels: data.stateLabels as StateLabels | undefined,
   }
+}
+
+/** One-shot read; returns null for an account that never had a legacy tracker (i.e. every genuinely new account). */
+export async function getLegacyTracker(uid: string): Promise<TrackerConfig | null> {
+  const snapshot = await getDoc(trackerRef(uid))
+  return snapshot.exists() ? toTrackerConfig(snapshot.data()) : null
+}
+
+/**
+ * Called only when the migrated ledgers/default ledger is itself being
+ * deleted (see data/ledger.ts's deleteLedger) -- removes the legacy
+ * pointer doc so a later migration check (a fresh session, another device)
+ * has nothing left to resurrect that ledger from. Deleting a Firestore doc
+ * that doesn't exist is a harmless no-op, so this is safe to call even if
+ * it somehow runs twice.
+ */
+export async function deleteLegacyTracker(uid: string): Promise<void> {
+  await deleteDoc(trackerRef(uid))
 }

@@ -3,6 +3,7 @@ import {
   useId,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
@@ -13,6 +14,14 @@ interface TodayToggleProps {
   defaultState: DayState
   onSelect: (state: DayState) => void
   labels?: StateLabels
+  /**
+   * A resolved CSS color value (e.g. `var(--ledger-color-clay)`), applied as
+   * the toggle's own accent -- a subtle per-ledger identity cue, per
+   * CLAUDE.md's "active toggle treatment" example. Undefined leaves the
+   * toggle exactly as it always has been, using the app's one shared
+   * `--color-accent`.
+   */
+  accentColor?: string
 }
 
 const DRAG_THRESHOLD_PX = 6
@@ -53,6 +62,7 @@ export function TodayToggle({
   defaultState,
   onSelect,
   labels = DEFAULT_STATE_LABELS,
+  accentColor,
 }: TodayToggleProps) {
   const groupName = useId()
   const trackRef = useRef<HTMLDivElement>(null)
@@ -204,6 +214,7 @@ export function TodayToggle({
       data-tour-id="today-toggle"
       role="radiogroup"
       aria-label="Today"
+      style={accentColor ? ({ '--today-toggle-accent': accentColor } as CSSProperties) : undefined}
       onPointerDown={handlePointerDown}
       onClickCapture={handleClickCapture}
     >

@@ -9,7 +9,8 @@ vi.mock('./Calendar', () => ({
 
 const { CalendarSheet } = await import('./CalendarSheet')
 
-const tracker = {
+const ledger = {
+  id: 'ledger-1',
   name: 'Worked out',
   defaultState: 'did' as const,
   timezone: 'UTC',
@@ -29,7 +30,7 @@ beforeEach(() => {
 describe('CalendarSheet', () => {
   it('opens as a modal containing the calendar', () => {
     render(
-      <CalendarSheet uid="u1" tracker={tracker} todayKey="2026-08-10" onDismiss={vi.fn()} />,
+      <CalendarSheet uid="u1" ledger={ledger} todayKey="2026-08-10" onDismiss={vi.fn()} />,
     )
 
     expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalled()
@@ -39,7 +40,7 @@ describe('CalendarSheet', () => {
   it('dismisses via the close control', () => {
     const onDismiss = vi.fn()
     render(
-      <CalendarSheet uid="u1" tracker={tracker} todayKey="2026-08-10" onDismiss={onDismiss} />,
+      <CalendarSheet uid="u1" ledger={ledger} todayKey="2026-08-10" onDismiss={onDismiss} />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Close calendar' }))

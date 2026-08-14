@@ -1,19 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { hasCompletedOnboarding, loadOnboardingRecord, saveOnboardingRecord } from '../data/onboarding'
+import { getTodayKey, resolveDeviceTimezone } from '../domain/date'
 
-const { reportSaveError, updateTrackerDefaultStateMock, updateTrackerNameMock } = vi.hoisted(
-  () => ({
-    reportSaveError: vi.fn(),
-    updateTrackerDefaultStateMock: vi.fn(),
-    updateTrackerNameMock: vi.fn(),
-  }),
-)
+const {
+  reportSaveError,
+  createLedgerMock,
+  deleteLedgerMock,
+  updateLedgerColorMock,
+  updateLedgerDefaultStateMock,
+  updateLedgerNameMock,
+} = vi.hoisted(() => ({
+  reportSaveError: vi.fn(),
+  createLedgerMock: vi.fn(),
+  deleteLedgerMock: vi.fn(),
+  updateLedgerColorMock: vi.fn(),
+  updateLedgerDefaultStateMock: vi.fn(),
+  updateLedgerNameMock: vi.fn(),
+}))
 
 vi.mock('./TodaySection', () => ({
-  TodaySection: ({ defaultState, timezone }: { defaultState: string; timezone: string }) => (
+  TodaySection: ({
+    ledgerId,
+    defaultState,
+    timezone,
+    accentColor,
+  }: {
+    ledgerId: string
+    defaultState: string
+    timezone: string
+    accentColor?: string
+  }) => (
     <div data-testid="today-section">
-      today-section:{defaultState}:{timezone}
+      today-section:{ledgerId}:{defaultState}:{timezone}:{accentColor ?? 'none'}
     </div>
   ),
 }))
@@ -30,19 +49,26 @@ vi.mock('./CalendarSheet', () => ({
 vi.mock('./SettingsSheet', () => ({
   SettingsSheet: ({
     defaultState,
+    color,
     onSaveDefaultState,
+    onSaveColor,
     onTourNoted,
     onDismiss,
   }: {
     defaultState: string
+    color: string | null
     onSaveDefaultState: (next: 'did' | 'didnt') => Promise<void>
+    onSaveColor: (next: string | null) => Promise<void>
     onTourNoted: () => void
     onDismiss: () => void
   }) => (
     <div data-testid="settings-sheet">
-      settings-sheet:{defaultState}
+      settings-sheet:{defaultState}:{color ?? 'none'}
       <button type="button" onClick={() => void onSaveDefaultState('didnt').catch(reportSaveError)}>
         Save didnt
+      </button>
+      <button type="button" onClick={() => void onSaveColor('moss').catch(reportSaveError)}>
+        Save moss
       </button>
       <button type="button" onClick={onTourNoted}>
         Tour Noted.
@@ -53,27 +79,71 @@ vi.mock('./SettingsSheet', () => ({
     </div>
   ),
 }))
+vi.mock('./LedgerSwitcherSheet', () => ({
+  LedgerSwitcherSheet: ({
+    ledgers,
+    activeLedgerId,
+    onSwitch,
+    onCreate,
+    onDelete,
+    onDismiss,
+  }: {
+    ledgers: { id: string; name: string }[]
+    activeLedgerId: string
+    onSwitch: (id: string) => void
+    onCreate: (input: { name: string; defaultState: 'did' | 'didnt'; color: string | null }) => Promise<void>
+    onDelete: (id: string) => Promise<void>
+    onDismiss: () => void
+  }) => (
+    <div data-testid="ledger-switcher-sheet">
+      ledger-switcher-sheet:{activeLedgerId}:{ledgers.map((l) => l.name).join(',')}
+      <button type="button" onClick={() => onSwitch('ledger-2')}>
+        Switch to ledger-2
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          void onCreate({ name: 'Reading', defaultState: 'did', color: 'clay' }).catch(reportSaveError)
+        }
+      >
+        Create ledger
+      </button>
+      <button type="button" onClick={() => void onDelete('ledger-1').catch(reportSaveError)}>
+        Delete active ledger
+      </button>
+      <button type="button" onClick={onDismiss}>
+        Close switcher
+      </button>
+    </div>
+  ),
+}))
 vi.mock('../hooks/useLocalDateKey', () => ({
   useLocalDateKey: () => '2026-08-10',
 }))
-vi.mock('../data/tracker', () => ({
-  updateTrackerName: updateTrackerNameMock,
-  updateTrackerDefaultState: updateTrackerDefaultStateMock,
+vi.mock('../data/ledger', () => ({
+  createLedger: (...args: unknown[]) => createLedgerMock(...args),
+  deleteLedger: (...args: unknown[]) => deleteLedgerMock(...args),
+  updateLedgerColor: (...args: unknown[]) => updateLedgerColorMock(...args),
+  updateLedgerDefaultState: (...args: unknown[]) => updateLedgerDefaultStateMock(...args),
+  updateLedgerName: (...args: unknown[]) => updateLedgerNameMock(...args),
+  updateLedgerStateLabels: vi.fn(),
 }))
 vi.mock('../lib/auth', () => ({ signOutUser: vi.fn() }))
 
-const WELCOME_TEXT = /not a habit tracker/i
-
 beforeEach(() => {
   reportSaveError.mockReset()
-  updateTrackerNameMock.mockReset().mockResolvedValue(undefined)
-  updateTrackerDefaultStateMock.mockReset().mockResolvedValue(undefined)
+  createLedgerMock.mockReset().mockResolvedValue({ id: 'ledger-new', name: 'Reading', defaultState: 'did', timezone: 'UTC', startDate: '2026-08-10' })
+  deleteLedgerMock.mockReset().mockResolvedValue(undefined)
+  updateLedgerColorMock.mockReset().mockResolvedValue(undefined)
+  updateLedgerDefaultStateMock.mockReset().mockResolvedValue(undefined)
+  updateLedgerNameMock.mockReset().mockResolvedValue(undefined)
   window.localStorage.clear()
 })
 
 const { Home } = await import('./Home')
 
-const tracker = {
+const ledger = {
+  id: 'ledger-1',
   name: 'Worked out',
   defaultState: 'did' as const,
   timezone: 'UTC',
@@ -87,20 +157,36 @@ const tracker = {
  * steady state -- rather than incidentally colliding with the auto-shown
  * tour on a bare uid with no record.
  */
-function renderSettledHome(uid = 'u1') {
+function renderSettledHome(overrides: Partial<Parameters<typeof Home>[0]> = {}) {
+  const uid = overrides.uid ?? 'u1'
   saveOnboardingRecord(uid, 'completed')
-  return render(<Home uid={uid} tracker={tracker} />)
+  const onSwitchLedger = vi.fn()
+  render(
+    <Home
+      uid={uid}
+      ledgers={[ledger]}
+      activeLedger={ledger}
+      onSwitchLedger={onSwitchLedger}
+      {...overrides}
+    />,
+  )
+  return { onSwitchLedger }
 }
 
 describe('Home', () => {
-  it('renders the brand, date, tracker name, and today section without the calendar', () => {
+  it('renders the brand, date, ledger name, and today section without the calendar', () => {
     renderSettledHome()
 
     expect(screen.getByText('Noted.')).toBeInTheDocument()
     expect(screen.getByText('Today · 08/10/2026')).toBeInTheDocument()
     expect(screen.getByText('Worked out')).toBeInTheDocument()
-    expect(screen.getByTestId('today-section')).toHaveTextContent('today-section:did:UTC')
+    expect(screen.getByTestId('today-section')).toHaveTextContent('today-section:ledger-1:did:UTC:none')
     expect(screen.queryByTestId('calendar-sheet')).not.toBeInTheDocument()
+  })
+
+  it('passes the active ledger\'s accent color through to TodaySection', () => {
+    renderSettledHome({ activeLedger: { ...ledger, color: 'clay' } })
+    expect(screen.getByTestId('today-section')).toHaveTextContent('var(--ledger-color-clay)')
   })
 
   it('opens and closes the calendar from the header control', () => {
@@ -118,7 +204,7 @@ describe('Home', () => {
     expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:did')
+    expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:did:none')
 
     fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
     expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
@@ -132,19 +218,19 @@ describe('Home', () => {
     )
   })
 
-  it('saves a new default state with the current one, so existing days can be pinned first', async () => {
+  it('saves a new default state for the active ledger, with the current one first so existing days can be pinned', async () => {
     renderSettledHome()
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save didnt' }))
 
     await vi.waitFor(() => {
-      expect(updateTrackerDefaultStateMock).toHaveBeenCalledWith('u1', 'did', 'didnt')
+      expect(updateLedgerDefaultStateMock).toHaveBeenCalledWith('u1', 'ledger-1', 'did', 'didnt')
     })
   })
 
   it('propagates a failed default-state save so the sheet can report it', async () => {
-    updateTrackerDefaultStateMock.mockRejectedValue(new Error('offline'))
+    updateLedgerDefaultStateMock.mockRejectedValue(new Error('offline'))
     renderSettledHome()
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -152,6 +238,17 @@ describe('Home', () => {
 
     await vi.waitFor(() => {
       expect(reportSaveError).toHaveBeenCalled()
+    })
+  })
+
+  it('saves a new color for the active ledger', async () => {
+    renderSettledHome()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save moss' }))
+
+    await vi.waitFor(() => {
+      expect(updateLedgerColorMock).toHaveBeenCalledWith('u1', 'ledger-1', 'moss')
     })
   })
 
@@ -165,41 +262,98 @@ describe('Home', () => {
     expect(screen.getByText(`Made with ❤️ by Maker 428 · v${__APP_VERSION__}`)).toBeInTheDocument()
   })
 
+  describe('ledger switcher', () => {
+    it('opens and closes the switcher from the header control, listing every ledger', () => {
+      const otherLedger = { id: 'ledger-2', name: 'Drinking', defaultState: 'did' as const, timezone: 'UTC', startDate: '2026-08-01' }
+      renderSettledHome({ ledgers: [ledger, otherLedger] })
+      expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+      expect(screen.getByTestId('ledger-switcher-sheet')).toHaveTextContent(
+        'ledger-switcher-sheet:ledger-1:Worked out,Drinking',
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close switcher' }))
+      expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
+    })
+
+    it('switching calls the onSwitchLedger callback from the parent', () => {
+      const { onSwitchLedger } = renderSettledHome()
+
+      fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to ledger-2' }))
+
+      expect(onSwitchLedger).toHaveBeenCalledWith('ledger-2')
+    })
+
+    it('creates a new ledger and switches to it', async () => {
+      const { onSwitchLedger } = renderSettledHome()
+      const expectedTimezone = resolveDeviceTimezone()
+      const expectedStartDate = getTodayKey(expectedTimezone)
+
+      fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'Create ledger' }))
+
+      await vi.waitFor(() => {
+        expect(createLedgerMock).toHaveBeenCalledWith('u1', {
+          name: 'Reading',
+          defaultState: 'did',
+          timezone: expectedTimezone,
+          startDate: expectedStartDate,
+          color: 'clay',
+        })
+        expect(onSwitchLedger).toHaveBeenCalledWith('ledger-new')
+      })
+    })
+
+    it('deletes a ledger', async () => {
+      renderSettledHome()
+
+      fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete active ledger' }))
+
+      await vi.waitFor(() => {
+        expect(deleteLedgerMock).toHaveBeenCalledWith('u1', 'ledger-1')
+      })
+    })
+  })
+
   describe('onboarding tour', () => {
+    const WELCOME_TEXT = /not a habit tracker/i
+
     it('auto-starts for an established authenticated user with no current-version onboarding record', () => {
-      // No isNewUser concept at all: an account with history (tracker
-      // already exists, as it always does by the time Home renders) still
-      // gets the tour on its next normal open if nothing is recorded yet.
-      render(<Home uid="u1" tracker={tracker} />)
+      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
       expect(screen.getByText(WELCOME_TEXT)).toBeInTheDocument()
     })
 
     it('does not auto-start when a completed record exists for this uid', () => {
       saveOnboardingRecord('u1', 'completed')
-      render(<Home uid="u1" tracker={tracker} />)
+      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
     })
 
     it('does not auto-start when a skipped record exists for this uid', () => {
       saveOnboardingRecord('u1', 'skipped')
-      render(<Home uid="u1" tracker={tracker} />)
+      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
     })
 
     it('auto-starts independently per uid, so one account having a record does not suppress another', () => {
       saveOnboardingRecord('u1', 'completed')
-      render(<Home uid="u2" tracker={tracker} />)
+      render(<Home uid="u2" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
       expect(screen.getByText(WELCOME_TEXT)).toBeInTheDocument()
     })
 
     it('makes the main content inert while the tour is active, so it cannot be interacted with underneath', () => {
-      const { container } = render(<Home uid="u1" tracker={tracker} />)
+      const { container } = render(
+        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />,
+      )
       expect(container.querySelector('main')).toHaveAttribute('inert')
     })
 
     it('is reachable from Settings regardless of completion state, closing the settings sheet when it opens', () => {
       saveOnboardingRecord('u1', 'completed')
-      render(<Home uid="u1" tracker={tracker} />)
+      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -211,7 +365,7 @@ describe('Home', () => {
 
     it('does not touch the persisted record merely by opening the replay from Settings', () => {
       saveOnboardingRecord('u1', 'completed')
-      render(<Home uid="u1" tracker={tracker} />)
+      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
       fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
@@ -220,7 +374,9 @@ describe('Home', () => {
     })
 
     it('persists Skip and does not leave the main content inert afterward', () => {
-      const { container } = render(<Home uid="u1" tracker={tracker} />)
+      const { container } = render(
+        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />,
+      )
 
       fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 

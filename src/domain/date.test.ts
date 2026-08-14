@@ -4,6 +4,7 @@ import {
   getLocalDateKey,
   getTodayKey,
   millisecondsUntilNextLocalMidnight,
+  resolveDeviceTimezone,
 } from './date'
 
 describe('getLocalDateKey', () => {
@@ -42,6 +43,12 @@ describe('getTodayKey', () => {
 describe('formatDisplayDate', () => {
   it('converts an internal YYYY-MM-DD key to MM/DD/YYYY for display', () => {
     expect(formatDisplayDate('2026-08-10')).toBe('08/10/2026')
+  })
+})
+
+describe('resolveDeviceTimezone', () => {
+  it('returns a non-empty IANA-style timezone string', () => {
+    expect(resolveDeviceTimezone().length).toBeGreaterThan(0)
   })
 })
 

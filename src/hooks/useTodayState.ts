@@ -17,6 +17,7 @@ const EMPTY_RECORD: DailyRecord = {}
 
 export function useTodayState(
   uid: string | null,
+  ledgerId: string | null,
   defaultState: DayState | null,
   timezone: string | null,
 ): TodayState {
@@ -26,9 +27,9 @@ export function useTodayState(
   const [error, setError] = useState<string | null>(null)
 
   // Reset per-day state synchronously during render when the subscription
-  // key (who/which day -- including after a local midnight rollover)
-  // changes, rather than via an effect.
-  const subscriptionKey = `${uid ?? ''}|${dateKey}`
+  // key (who/which ledger/which day -- including after a local midnight
+  // rollover, or switching ledgers) changes, rather than via an effect.
+  const subscriptionKey = `${uid ?? ''}|${ledgerId ?? ''}|${dateKey}`
   const [trackedKey, setTrackedKey] = useState(subscriptionKey)
   if (subscriptionKey !== trackedKey) {
     setTrackedKey(subscriptionKey)
@@ -38,12 +39,13 @@ export function useTodayState(
   }
 
   useEffect(() => {
-    if (!uid || !dateKey) {
+    if (!uid || !ledgerId || !dateKey) {
       return
     }
 
     return subscribeDay(
       uid,
+      ledgerId,
       dateKey,
       (snapshot) => {
         setRecord(snapshot.record)
@@ -51,7 +53,7 @@ export function useTodayState(
       },
       () => setError('Could not load today. Try again.'),
     )
-  }, [uid, dateKey])
+  }, [uid, ledgerId, dateKey])
 
   const effectiveState =
     defaultState && record !== undefined
@@ -59,7 +61,7 @@ export function useTodayState(
       : null
 
   function setState(desired: DayState) {
-    if (!uid || !dateKey || !defaultState || effectiveState === null || record === undefined) {
+    if (!uid || !ledgerId || !dateKey || !defaultState || effectiveState === null || record === undefined) {
       return
     }
     if (desired === effectiveState) {
@@ -75,7 +77,7 @@ export function useTodayState(
       count: record.count,
     })
 
-    saveDailyRecord(uid, dateKey, normalized).catch(() =>
+    saveDailyRecord(uid, ledgerId, dateKey, normalized).catch(() =>
       setError('Could not save. Try again.'),
     )
   }

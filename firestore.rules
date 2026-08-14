@@ -15,6 +15,8 @@ service cloud.firestore {
       return key is string && key.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
     }
 
+    // Shared by the legacy tracker/config doc and every ledgers/{id} doc --
+    // both are just a short display name with the same shape.
     function isTrackerName(name) {
       return name is string
         && name.size() > 0
@@ -44,6 +46,16 @@ service cloud.firestore {
           && isStateLabel(data.stateLabels.did)
           && isStateLabel(data.stateLabels.didnt)
         );
+    }
+
+    // A ledger's optional identifying color: a small fixed palette (see
+    // domain/ledger.ts's LEDGER_COLORS), never freeform hex/strings.
+    function isLedgerColor(color) {
+      return color in ['clay', 'moss', 'dust', 'plum', 'rose', 'straw'];
+    }
+
+    function isValidOptionalLedgerColor(data) {
+      return !hasKey(data, 'color') || isLedgerColor(data.color);
     }
 
     // -- Daily entry helpers -------------------------------------------
@@ -92,6 +104,19 @@ service cloud.firestore {
         || (isValidCount(data.count) && effectiveDailyState(uid, data) == 'did');
     }
 
+    // Same idea as isValidOptionalCount above, but for a day that belongs
+    // to a ledgers/{ledgerId} document instead of the legacy tracker/config.
+    function effectiveLedgerDailyState(uid, ledgerId, data) {
+      return hasKey(data, 'state')
+        ? data.state
+        : get(/databases/$(database)/documents/users/$(uid)/ledgers/$(ledgerId)).data.defaultState;
+    }
+
+    function isValidOptionalLedgerCount(uid, ledgerId, data) {
+      return !hasKey(data, 'count')
+        || (isValidCount(data.count) && effectiveLedgerDailyState(uid, ledgerId, data) == 'did');
+    }
+
     match /users/{uid} {
 
       // Single tracker config per user, at a fixed document id so no
@@ -133,7 +158,11 @@ service cloud.firestore {
           && isValidOptionalStateLabels(request.resource.data)
           && request.resource.data.updatedAt == request.time;
 
-        allow delete: if false;
+        // The client deletes this doc when the ledgers/default ledger it
+        // was migrated into is itself deleted (see data/ledger.ts's
+        // deleteLedger) -- otherwise a fresh session's migration check
+        // would find it still present and resurrect that deleted ledger.
+        allow delete: if isOwner(uid);
       }
 
       // No other documents are permitted under tracker/.
@@ -158,6 +187,106 @@ service cloud.firestore {
           && isValidOptionalCount(uid, request.resource.data);
 
         allow delete: if isOwner(uid);
+      }
+
+      // Multiple independent ledgers per user (each roughly what a single
+      // "tracker" used to be, plus an optional identifying color). Exactly
+      // one is ever the active/viewed one on the client -- see settings/app
+      // below; this collection only holds each ledger's own configuration,
+      // its daily entries live in the days/ subcollection beneath it.
+      //
+      // Accounts that predate multi-ledger support are migrated by the
+      // client into exactly one ledger with the fixed id "default" (see
+      // data/ledger.ts). That migration only ever creates this small
+      // pointer document -- it never moves or deletes the legacy
+      // users/{uid}/days data, which stays governed by the days/{dayId}
+      // rules above for that one ledger id specifically. Every other
+      // ledger, including a brand-new account's first one, stores its days
+      // under ledgers/{ledgerId}/days/{dayId} below instead.
+      match /ledgers/{ledgerId} {
+        allow read: if isOwner(uid);
+
+        allow create: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(
+               ['name', 'color', 'defaultState', 'timezone', 'startDate', 'stateLabels', 'createdAt', 'updatedAt']
+             )
+          && request.resource.data.keys().hasAll(
+               ['name', 'defaultState', 'timezone', 'startDate', 'createdAt', 'updatedAt']
+             )
+          && isTrackerName(request.resource.data.name)
+          && isValidOptionalLedgerColor(request.resource.data)
+          && isDayState(request.resource.data.defaultState)
+          && request.resource.data.timezone is string
+          && request.resource.data.timezone.size() > 0
+          && isDateKey(request.resource.data.startDate)
+          && isValidOptionalStateLabels(request.resource.data)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time;
+
+        // Only name, color, defaultState, stateLabels, and updatedAt may
+        // change after creation -- same reasoning as tracker/config's
+        // update rule above (the client pins each day's current state
+        // before changing defaultState, so no recorded day's meaning
+        // silently shifts).
+        allow update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(
+               ['name', 'color', 'defaultState', 'timezone', 'startDate', 'stateLabels', 'createdAt', 'updatedAt']
+             )
+          && isTrackerName(request.resource.data.name)
+          && isValidOptionalLedgerColor(request.resource.data)
+          && isDayState(request.resource.data.defaultState)
+          && request.resource.data.timezone == resource.data.timezone
+          && request.resource.data.startDate == resource.data.startDate
+          && request.resource.data.createdAt == resource.data.createdAt
+          && isValidOptionalStateLabels(request.resource.data)
+          && request.resource.data.updatedAt == request.time;
+
+        // Removing a ledger is a real product action (see the ledger
+        // switcher's "Delete"); the client deletes its days first via the
+        // days/{dayId} rules below, then this doc.
+        allow delete: if isOwner(uid);
+
+        // Shares its exact shape and validation with the legacy
+        // users/{uid}/days/{dayId} rule above; only the source of the
+        // effective-default-state lookup differs (this ledger's own doc,
+        // not tracker/config).
+        match /days/{dayId} {
+          allow read: if isOwner(uid);
+
+          allow create, update: if isOwner(uid)
+            && isDateKey(dayId)
+            && request.resource.data.keys().hasAll(['updatedAt'])
+            && request.resource.data.keys().hasOnly(['state', 'note', 'count', 'updatedAt'])
+            && request.resource.data.updatedAt == request.time
+            && hasAtLeastOneExplicitDailyField(request.resource.data)
+            && isValidOptionalState(request.resource.data)
+            && isValidOptionalNote(request.resource.data)
+            && isValidOptionalLedgerCount(uid, ledgerId, request.resource.data);
+
+          allow delete: if isOwner(uid);
+        }
+      }
+
+      // Account-wide app state that is not itself ledger data -- currently
+      // just which ledger is active, so reopening the app (on any device)
+      // returns to it. Fully overwritten on every write (no partial-update
+      // immutability concerns), so create and update share one rule.
+      match /settings/app {
+        allow read: if isOwner(uid);
+
+        allow create, update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['activeLedgerId', 'updatedAt'])
+          && request.resource.data.keys().hasAll(['activeLedgerId', 'updatedAt'])
+          && request.resource.data.activeLedgerId is string
+          && request.resource.data.activeLedgerId.size() > 0
+          && request.resource.data.updatedAt == request.time;
+
+        allow delete: if false;
+      }
+
+      // No other documents are permitted under settings/.
+      match /settings/{document} {
+        allow read, write: if false;
       }
     }
   }

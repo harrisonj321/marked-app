@@ -1,16 +1,16 @@
 import { useEffect, useRef, type MouseEvent } from 'react'
-import type { TrackerConfig } from '../domain/tracker'
+import type { Ledger } from '../domain/ledger'
 import { Calendar } from './Calendar'
 import { CloseIcon } from './icons'
 
 interface CalendarSheetProps {
   uid: string
-  tracker: TrackerConfig
+  ledger: Ledger
   todayKey: string
   onDismiss: () => void
 }
 
-export function CalendarSheet({ uid, tracker, todayKey, onDismiss }: CalendarSheetProps) {
+export function CalendarSheet({ uid, ledger, todayKey, onDismiss }: CalendarSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export function CalendarSheet({ uid, tracker, todayKey, onDismiss }: CalendarShe
           <CloseIcon />
         </button>
       </div>
-      <Calendar uid={uid} tracker={tracker} todayKey={todayKey} />
+      <Calendar uid={uid} ledger={ledger} todayKey={todayKey} />
     </dialog>
   )
 }

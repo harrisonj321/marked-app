@@ -14,6 +14,11 @@ export function getTodayKey(timeZone: string): string {
   return getLocalDateKey(new Date(), timeZone)
 }
 
+/** The device's current IANA timezone, used when creating a ledger (the first one, or any later one). */
+export function resolveDeviceTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
 export function formatDisplayDate(dateKey: string): string {
   const [year, month, day] = dateKey.split('-')
   return `${month}/${day}/${year}`

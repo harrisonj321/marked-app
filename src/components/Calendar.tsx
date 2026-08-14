@@ -11,14 +11,15 @@ import {
 } from '../domain/calendar'
 import { formatDisplayDate } from '../domain/date'
 import { formatCount, type NormalizedDailyRecord } from '../domain/day'
-import { resolveStateLabels, type StateLabels, type TrackerConfig } from '../domain/tracker'
+import { resolveStateLabels, type StateLabels } from '../domain/tracker'
+import type { Ledger } from '../domain/ledger'
 import { saveDailyRecord } from '../data/day'
 import { useMonthRecords } from '../hooks/useMonthRecords'
 import { DayDetail } from './DayDetail'
 
 interface CalendarProps {
   uid: string
-  tracker: TrackerConfig
+  ledger: Ledger
   todayKey: string
 }
 
@@ -33,15 +34,15 @@ function buildDayAriaLabel(view: CalendarDayView, labels: StateLabels): string {
   return parts.join(', ')
 }
 
-export function Calendar({ uid, tracker, todayKey }: CalendarProps) {
+export function Calendar({ uid, ledger, todayKey }: CalendarProps) {
   const todayYearMonth = yearMonthFromDateKey(todayKey)
   const [visibleMonth, setVisibleMonth] = useState<YearMonth>(todayYearMonth)
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null)
 
-  const { records, error } = useMonthRecords(uid, visibleMonth)
+  const { records, error } = useMonthRecords(uid, ledger.id, visibleMonth)
   const calendarMonth = getCalendarMonth(visibleMonth.year, visibleMonth.month)
   const canGoNext = compareYearMonth(visibleMonth, todayYearMonth) < 0
-  const labels = resolveStateLabels(tracker.stateLabels)
+  const labels = resolveStateLabels(ledger.stateLabels)
 
   function goToPreviousMonth() {
     setVisibleMonth((current) => addMonths(current, -1))
@@ -54,7 +55,7 @@ export function Calendar({ uid, tracker, todayKey }: CalendarProps) {
   }
 
   async function handleDetailSave(dateKey: string, normalized: NormalizedDailyRecord) {
-    await saveDailyRecord(uid, dateKey, normalized)
+    await saveDailyRecord(uid, ledger.id, dateKey, normalized)
   }
 
   return (
@@ -99,8 +100,8 @@ export function Calendar({ uid, tracker, todayKey }: CalendarProps) {
               dateKey: cell.dateKey,
               dayOfMonth: cell.dayOfMonth,
               todayKey,
-              startDate: tracker.startDate,
-              defaultState: tracker.defaultState,
+              startDate: ledger.startDate,
+              defaultState: ledger.defaultState,
               record: records.get(cell.dateKey),
             })
             return (
@@ -118,7 +119,7 @@ export function Calendar({ uid, tracker, todayKey }: CalendarProps) {
       {selectedDateKey && (
         <DayDetail
           dateKey={selectedDateKey}
-          defaultState={tracker.defaultState}
+          defaultState={ledger.defaultState}
           initialRecord={records.get(selectedDateKey) ?? {}}
           labels={labels}
           onSave={(normalized) => handleDetailSave(selectedDateKey, normalized)}

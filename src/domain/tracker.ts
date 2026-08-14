@@ -1,3 +1,5 @@
+import type { LedgerColor } from './ledger'
+
 export type DayState = 'did' | 'didnt'
 
 export interface StateLabels {
@@ -11,6 +13,8 @@ export interface TrackerConfig {
   timezone: string
   startDate: string
   stateLabels?: StateLabels
+  /** A ledger's optional identifying color; absent means unset, not "no color assigned yet" as an error state. */
+  color?: LedgerColor
 }
 
 export const TRACKER_NAME_MAX_LENGTH = 60

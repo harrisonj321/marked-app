@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { deleteDoc, deleteField, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 
 const PROJECT_ID = 'noted-app-rules-test'
 const OWNER_UID = 'owner-uid'
@@ -57,6 +57,37 @@ async function seedTracker(uid: string, data: Record<string, unknown> = validTra
 async function seedDayDoc(uid: string, dateKey: string, data: Record<string, unknown>) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), `users/${uid}/days/${dateKey}`), {
+      ...data,
+      updatedAt: new Date(),
+    })
+  })
+}
+
+const validLedger = {
+  name: 'Reading',
+  defaultState: 'did',
+  timezone: 'America/Los_Angeles',
+  startDate: '2026-08-10',
+}
+
+async function seedLedger(uid: string, ledgerId: string, data: Record<string, unknown> = validLedger) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), `users/${uid}/ledgers/${ledgerId}`), {
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+  })
+}
+
+async function seedLedgerDayDoc(
+  uid: string,
+  ledgerId: string,
+  dateKey: string,
+  data: Record<string, unknown>,
+) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), `users/${uid}/ledgers/${ledgerId}/days/${dateKey}`), {
       ...data,
       updatedAt: new Date(),
     })
@@ -294,6 +325,28 @@ describe('tracker config', () => {
         updatedAt: serverTimestamp(),
       }),
     )
+  })
+
+  // The client deletes this doc when the ledgers/default ledger migrated
+  // from it is itself deleted (see data/ledger.ts's deleteLedger) -- so
+  // that a fresh session's migration check has nothing left to resurrect
+  // that ledger from.
+  it('owner can delete their own legacy tracker document', async () => {
+    await seedTracker(OWNER_UID)
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(deleteDoc(doc(db, `users/${OWNER_UID}/tracker/config`)))
+  })
+
+  it('another authenticated user cannot delete someone else\'s legacy tracker document', async () => {
+    await seedTracker(OWNER_UID)
+    const db = dbAs(OTHER_UID)
+    await assertFails(deleteDoc(doc(db, `users/${OWNER_UID}/tracker/config`)))
+  })
+
+  it('unauthenticated user cannot delete a legacy tracker document', async () => {
+    await seedTracker(OWNER_UID)
+    const db = dbAs(null)
+    await assertFails(deleteDoc(doc(db, `users/${OWNER_UID}/tracker/config`)))
   })
 })
 
@@ -638,6 +691,445 @@ describe('daily entries -- counts', () => {
       setDoc(doc(db, `users/${OWNER_UID}/days/2026-08-10`), {
         state: 'did',
         count: 100,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+})
+
+describe('ledgers', () => {
+  it('authenticated owner can create a ledger', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        ...validLedger,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('allows more than one ledger for the same owner, unlike the single legacy tracker doc', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-2`), {
+        ...validLedger,
+        name: 'Drinking',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('unauthenticated user cannot read or write a ledger', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(null)
+    await assertFails(getDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`)))
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        ...validLedger,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('another authenticated user cannot read, create, or update a ledger', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OTHER_UID)
+    await assertFails(getDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`)))
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-2`), {
+        ...validLedger,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertFails(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        name: 'Hijacked',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('owner can read the ledger and rename it', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(getDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`)))
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        name: 'Renamed',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('owner can change defaultState on update', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        defaultState: 'didnt',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects changing timezone, startDate, or createdAt on update', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        timezone: 'UTC',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertFails(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        startDate: '2099-01-01',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertFails(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects an unrecognized field', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        ...validLedger,
+        extra: 'not allowed',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects an invalid default state', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        ...validLedger,
+        defaultState: 'sometimes',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a whitespace-only name', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        ...validLedger,
+        name: '   ',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('denies a write to any subcollection other than days', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/notARealSubcollection/x`), {
+        anything: true,
+      }),
+    )
+  })
+})
+
+describe('ledgers -- color', () => {
+  it('allows creating a ledger with a valid color', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        ...validLedger,
+        color: 'clay',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('allows creating a ledger with no color at all', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        ...validLedger,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a color outside the fixed palette, including freeform hex', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        ...validLedger,
+        color: '#ff0000',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('owner can set a color on update', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        color: 'moss',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('owner can remove a color on update', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1', { ...validLedger, color: 'clay' })
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        color: deleteField(),
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('another authenticated user cannot change the color', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OTHER_UID)
+    await assertFails(
+      updateDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1`), {
+        color: 'moss',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+})
+
+describe('ledger days', () => {
+  it('owner can create, read, and delete a day within a ledger', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    const ref = doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`)
+    await assertSucceeds(setDoc(ref, { state: 'didnt', updatedAt: serverTimestamp() }))
+    await assertSucceeds(getDoc(ref))
+    await assertSucceeds(deleteDoc(ref))
+  })
+
+  it('another user cannot read, write, or delete a day within someone else\'s ledger', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    await seedLedgerDayDoc(OWNER_UID, 'ledger-1', '2026-08-10', { state: 'did' })
+    const db = dbAs(OTHER_UID)
+    const ref = doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`)
+    await assertFails(getDoc(ref))
+    await assertFails(deleteDoc(ref))
+    await assertFails(setDoc(ref, { state: 'did', updatedAt: serverTimestamp() }))
+  })
+
+  it('unauthenticated user cannot read or write a day within a ledger', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    await seedLedgerDayDoc(OWNER_UID, 'ledger-1', '2026-08-10', { state: 'did' })
+    const db = dbAs(null)
+    const ref = doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`)
+    await assertFails(getDoc(ref))
+    await assertFails(setDoc(ref, { state: 'did', updatedAt: serverTimestamp() }))
+  })
+
+  it('rejects an invalid state, a malformed day id, and an unrecognized field', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`), {
+        state: 'maybe',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/not-a-date`), {
+        state: 'did',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`), {
+        state: 'did',
+        tag: 'not supported',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a document with only updatedAt and no explicit field', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`), {
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('allows a valid note alongside a state override', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1')
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`), {
+        state: 'didnt',
+        note: 'Sick',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it("a count's validity resolves against this ledger's own default state, not the legacy tracker", async () => {
+    await seedLedger(OWNER_UID, 'ledger-1', { ...validLedger, defaultState: 'did' })
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`), {
+        count: 3,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a count when this ledger\'s own default state makes the day effectively didnt', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1', { ...validLedger, defaultState: 'didnt' })
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`), {
+        count: 2,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a count on an explicit didnt day even when the ledger default is did', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1', { ...validLedger, defaultState: 'did' })
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`), {
+        state: 'didnt',
+        count: 2,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('keeps the two ledgers\' days completely independent', async () => {
+    await seedLedger(OWNER_UID, 'ledger-1', { ...validLedger, defaultState: 'did' })
+    await seedLedger(OWNER_UID, 'ledger-2', { ...validLedger, defaultState: 'didnt' })
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-1/days/2026-08-10`), {
+        state: 'didnt',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+    await assertSucceeds(getDoc(doc(db, `users/${OWNER_UID}/ledgers/ledger-2/days/2026-08-10`)))
+  })
+})
+
+describe('settings/app', () => {
+  it('authenticated owner can set the active ledger', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/settings/app`), {
+        activeLedgerId: 'ledger-1',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('owner can read and overwrite the selection', async () => {
+    const db = dbAs(OWNER_UID)
+    await setDoc(doc(db, `users/${OWNER_UID}/settings/app`), {
+      activeLedgerId: 'ledger-1',
+      updatedAt: serverTimestamp(),
+    })
+    await assertSucceeds(getDoc(doc(db, `users/${OWNER_UID}/settings/app`)))
+    await assertSucceeds(
+      setDoc(doc(db, `users/${OWNER_UID}/settings/app`), {
+        activeLedgerId: 'ledger-2',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('unauthenticated user cannot read or write the selection', async () => {
+    const db = dbAs(null)
+    await assertFails(getDoc(doc(db, `users/${OWNER_UID}/settings/app`)))
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/settings/app`), {
+        activeLedgerId: 'ledger-1',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('another authenticated user cannot read or write the selection', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/${OWNER_UID}/settings/app`), {
+        activeLedgerId: 'ledger-1',
+        updatedAt: new Date(),
+      })
+    })
+    const db = dbAs(OTHER_UID)
+    await assertFails(getDoc(doc(db, `users/${OWNER_UID}/settings/app`)))
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/settings/app`), {
+        activeLedgerId: 'hijacked',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects a non-string activeLedgerId', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/settings/app`), {
+        activeLedgerId: 42,
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects an empty activeLedgerId', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/settings/app`), {
+        activeLedgerId: '',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('rejects an unrecognized field', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/settings/app`), {
+        activeLedgerId: 'ledger-1',
+        extra: 'not allowed',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('denies any document under settings/ other than app', async () => {
+    const db = dbAs(OWNER_UID)
+    await assertFails(
+      setDoc(doc(db, `users/${OWNER_UID}/settings/other`), {
+        activeLedgerId: 'ledger-1',
         updatedAt: serverTimestamp(),
       }),
     )

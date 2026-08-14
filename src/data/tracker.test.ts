@@ -1,84 +1,55 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const updateDocMock = vi.fn()
-const pinImplicitDayStatesMock = vi.fn()
+const getDocMock = vi.fn()
+const deleteDocMock = vi.fn()
 
 vi.mock('firebase/firestore', () => ({
   doc: (...path: string[]) => ({ path: path.slice(1).join('/') }),
-  onSnapshot: vi.fn(),
-  serverTimestamp: () => 'server-time',
-  setDoc: vi.fn(),
-  updateDoc: (...args: unknown[]) => updateDocMock(...args),
+  getDoc: (...args: unknown[]) => getDocMock(...args),
+  deleteDoc: (...args: unknown[]) => deleteDocMock(...args),
 }))
 vi.mock('../lib/firebase', () => ({ db: {} }))
-vi.mock('./day', () => ({
-  pinImplicitDayStates: (...args: unknown[]) => pinImplicitDayStatesMock(...args),
-}))
 
-const { updateTrackerDefaultState, updateTrackerStateLabels } = await import('./tracker')
+const { deleteLegacyTracker, getLegacyTracker } = await import('./tracker')
 
 const UID = 'user-1'
 
 beforeEach(() => {
-  updateDocMock.mockReset().mockResolvedValue(undefined)
-  pinImplicitDayStatesMock.mockReset().mockResolvedValue(undefined)
+  getDocMock.mockReset()
+  deleteDocMock.mockReset().mockResolvedValue(undefined)
 })
 
-describe('updateTrackerDefaultState', () => {
-  it('pins the states days already resolve to before changing the default', async () => {
-    const order: string[] = []
-    pinImplicitDayStatesMock.mockImplementation(() => {
-      order.push('pin')
-      return Promise.resolve()
+describe('getLegacyTracker', () => {
+  it('maps the legacy tracker document', async () => {
+    getDocMock.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        name: 'Worked out',
+        defaultState: 'did',
+        timezone: 'America/Los_Angeles',
+        startDate: '2026-08-01',
+        stateLabels: { did: 'Took it', didnt: "Didn't take it" },
+      }),
     })
-    updateDocMock.mockImplementation(() => {
-      order.push('config')
-      return Promise.resolve()
-    })
 
-    await updateTrackerDefaultState(UID, 'did', 'didnt')
-
-    expect(pinImplicitDayStatesMock).toHaveBeenCalledWith(UID, 'did')
-    expect(order).toEqual(['pin', 'config'])
-  })
-
-  it('writes the new default state on the tracker config', async () => {
-    await updateTrackerDefaultState(UID, 'did', 'didnt')
-
-    expect(updateDocMock).toHaveBeenCalledWith(expect.anything(), {
-      defaultState: 'didnt',
-      updatedAt: 'server-time',
-    })
-  })
-
-  it('pins the previous default, not the new one', async () => {
-    await updateTrackerDefaultState(UID, 'didnt', 'did')
-    expect(pinImplicitDayStatesMock).toHaveBeenCalledWith(UID, 'didnt')
-  })
-
-  it('does nothing when the default is unchanged', async () => {
-    await updateTrackerDefaultState(UID, 'did', 'did')
-
-    expect(pinImplicitDayStatesMock).not.toHaveBeenCalled()
-    expect(updateDocMock).not.toHaveBeenCalled()
-  })
-
-  it('leaves the default alone when pinning fails, so no day silently re-resolves', async () => {
-    pinImplicitDayStatesMock.mockRejectedValue(new Error('offline'))
-
-    await expect(updateTrackerDefaultState(UID, 'did', 'didnt')).rejects.toThrow()
-    expect(updateDocMock).not.toHaveBeenCalled()
-  })
-})
-
-describe('updateTrackerStateLabels', () => {
-  it('writes both labels on the tracker config, without touching defaultState', async () => {
-    await updateTrackerStateLabels(UID, { did: 'Took it', didnt: "Didn't take it" })
-
-    expect(pinImplicitDayStatesMock).not.toHaveBeenCalled()
-    expect(updateDocMock).toHaveBeenCalledWith(expect.anything(), {
+    await expect(getLegacyTracker(UID)).resolves.toEqual({
+      name: 'Worked out',
+      defaultState: 'did',
+      timezone: 'America/Los_Angeles',
+      startDate: '2026-08-01',
       stateLabels: { did: 'Took it', didnt: "Didn't take it" },
-      updatedAt: 'server-time',
     })
+  })
+
+  it('returns null for an account with no legacy tracker document', async () => {
+    getDocMock.mockResolvedValue({ exists: () => false })
+    await expect(getLegacyTracker(UID)).resolves.toBeNull()
+  })
+})
+
+describe('deleteLegacyTracker', () => {
+  it('deletes the legacy tracker/config document', async () => {
+    await deleteLegacyTracker(UID)
+    expect(deleteDocMock).toHaveBeenCalledWith({ path: `users/${UID}/tracker/config` })
   })
 })

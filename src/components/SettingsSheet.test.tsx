@@ -19,20 +19,23 @@ beforeEach(() => {
 function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {}) {
   const onSaveDefaultState = vi.fn().mockResolvedValue(undefined)
   const onSaveStateLabels = vi.fn().mockResolvedValue(undefined)
+  const onSaveColor = vi.fn().mockResolvedValue(undefined)
   const onTourNoted = vi.fn()
   const onDismiss = vi.fn()
   render(
     <SettingsSheet
       defaultState="did"
       stateLabels={DEFAULT_LABELS}
+      color={null}
       onSaveDefaultState={onSaveDefaultState}
       onSaveStateLabels={onSaveStateLabels}
+      onSaveColor={onSaveColor}
       onTourNoted={onTourNoted}
       onDismiss={onDismiss}
       {...overrides}
     />,
   )
-  return { onSaveDefaultState, onSaveStateLabels, onTourNoted, onDismiss }
+  return { onSaveDefaultState, onSaveStateLabels, onSaveColor, onTourNoted, onDismiss }
 }
 
 describe('SettingsSheet', () => {
@@ -121,8 +124,10 @@ describe('SettingsSheet', () => {
       <SettingsSheet
         defaultState="did"
         stateLabels={DEFAULT_LABELS}
+        color={null}
         onSaveDefaultState={onSaveDefaultState}
         onSaveStateLabels={onSaveStateLabels}
+        onSaveColor={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={onDismiss}
       />,
@@ -132,8 +137,10 @@ describe('SettingsSheet', () => {
       <SettingsSheet
         defaultState="didnt"
         stateLabels={DEFAULT_LABELS}
+        color={null}
         onSaveDefaultState={onSaveDefaultState}
         onSaveStateLabels={onSaveStateLabels}
+        onSaveColor={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={onDismiss}
       />,
@@ -153,8 +160,10 @@ describe('SettingsSheet', () => {
       <SettingsSheet
         defaultState="did"
         stateLabels={DEFAULT_LABELS}
+        color={null}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
+        onSaveColor={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -164,8 +173,10 @@ describe('SettingsSheet', () => {
       <SettingsSheet
         defaultState="did"
         stateLabels={{ did: 'Took it', didnt: "Didn't take it" }}
+        color={null}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
+        onSaveColor={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -282,6 +293,83 @@ describe('SettingsSheet', () => {
     expect(onSaveDefaultState).not.toHaveBeenCalled()
     expect(onSaveStateLabels).not.toHaveBeenCalled()
     expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it('pre-selects None when the ledger has no color', () => {
+    renderSheet({ color: null })
+    expect(screen.getByRole('button', { name: 'None' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Clay' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('pre-selects the ledger\'s current color', () => {
+    renderSheet({ color: 'moss' })
+    expect(screen.getByRole('button', { name: 'Moss' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'None' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('saves a newly picked color alongside no other changes', async () => {
+    const { onSaveColor, onSaveDefaultState, onSaveStateLabels } = renderSheet({ color: null })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rose' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => {
+      expect(onSaveColor).toHaveBeenCalledWith('rose')
+    })
+    expect(onSaveDefaultState).not.toHaveBeenCalled()
+    expect(onSaveStateLabels).not.toHaveBeenCalled()
+  })
+
+  it('saves color removal when None is picked for a ledger that had a color', async () => {
+    const { onSaveColor } = renderSheet({ color: 'clay' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'None' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => {
+      expect(onSaveColor).toHaveBeenCalledWith(null)
+    })
+  })
+
+  it('does not save color when it is left unchanged', async () => {
+    const { onSaveColor, onDismiss } = renderSheet({ color: 'dust' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => {
+      expect(onDismiss).toHaveBeenCalled()
+    })
+    expect(onSaveColor).not.toHaveBeenCalled()
+  })
+
+  it('re-syncs the color swatch when the stored color changes under an open sheet', () => {
+    const { rerender } = render(
+      <SettingsSheet
+        defaultState="did"
+        stateLabels={DEFAULT_LABELS}
+        color={null}
+        onSaveDefaultState={vi.fn()}
+        onSaveStateLabels={vi.fn()}
+        onSaveColor={vi.fn()}
+        onTourNoted={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+
+    rerender(
+      <SettingsSheet
+        defaultState="did"
+        stateLabels={DEFAULT_LABELS}
+        color="straw"
+        onSaveDefaultState={vi.fn()}
+        onSaveStateLabels={vi.fn()}
+        onSaveColor={vi.fn()}
+        onTourNoted={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Straw' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('renaming a label does not change which state is the default', async () => {

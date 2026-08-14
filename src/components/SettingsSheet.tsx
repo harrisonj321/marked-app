@@ -6,13 +6,16 @@ import {
   type DayState,
   type StateLabels,
 } from '../domain/tracker'
+import { LEDGER_COLORS, LEDGER_COLOR_LABELS, type LedgerColor } from '../domain/ledger'
 import { CloseIcon, SwapIcon } from './icons'
 
 interface SettingsSheetProps {
   defaultState: DayState
   stateLabels: StateLabels
+  color: LedgerColor | null
   onSaveDefaultState: (defaultState: DayState) => Promise<void>
   onSaveStateLabels: (stateLabels: StateLabels) => Promise<void>
+  onSaveColor: (color: LedgerColor | null) => Promise<void>
   onTourNoted: () => void
   onDismiss: () => void
 }
@@ -20,14 +23,17 @@ interface SettingsSheetProps {
 export function SettingsSheet({
   defaultState,
   stateLabels,
+  color,
   onSaveDefaultState,
   onSaveStateLabels,
+  onSaveColor,
   onTourNoted,
   onDismiss,
 }: SettingsSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [draft, setDraft] = useState<DayState>(defaultState)
   const [labelDrafts, setLabelDrafts] = useState<StateLabels>(stateLabels)
+  const [colorDraft, setColorDraft] = useState<LedgerColor | null>(color)
   const [defaultLabelError, setDefaultLabelError] = useState<string | null>(null)
   const [notedLabelError, setNotedLabelError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -36,10 +42,10 @@ export function SettingsSheet({
   const defaultLabelId = useId()
   const notedLabelId = useId()
 
-  // The tracker is live, so the stored default and labels can change under
-  // an open sheet (another device). Re-sync during render rather than in
-  // an effect, so the form always shows what is actually stored and an
-  // untouched field can never save a stale value back.
+  // The ledger is live, so the stored default, labels, and color can
+  // change under an open sheet (another device). Re-sync during render
+  // rather than in an effect, so the form always shows what is actually
+  // stored and an untouched field can never save a stale value back.
   const [syncedDefault, setSyncedDefault] = useState(defaultState)
   if (defaultState !== syncedDefault) {
     setSyncedDefault(defaultState)
@@ -50,6 +56,12 @@ export function SettingsSheet({
   if (stateLabels.did !== syncedLabels.did || stateLabels.didnt !== syncedLabels.didnt) {
     setSyncedLabels(stateLabels)
     setLabelDrafts(stateLabels)
+  }
+
+  const [syncedColor, setSyncedColor] = useState(color)
+  if (color !== syncedColor) {
+    setSyncedColor(color)
+    setColorDraft(color)
   }
 
   useEffect(() => {
@@ -94,8 +106,9 @@ export function SettingsSheet({
     const defaultStateChanged = draft !== defaultState
     const labelsChanged =
       nextLabels.did !== syncedLabels.did || nextLabels.didnt !== syncedLabels.didnt
+    const colorChanged = colorDraft !== syncedColor
 
-    if (!defaultStateChanged && !labelsChanged) {
+    if (!defaultStateChanged && !labelsChanged && !colorChanged) {
       dialogRef.current?.close()
       return
     }
@@ -108,6 +121,9 @@ export function SettingsSheet({
       }
       if (labelsChanged) {
         await onSaveStateLabels(nextLabels)
+      }
+      if (colorChanged) {
+        await onSaveColor(colorDraft)
       }
       dialogRef.current?.close()
     } catch {
@@ -182,6 +198,34 @@ export function SettingsSheet({
               {notedLabelError}
             </p>
           )}
+        </div>
+
+        <div className="field">
+          <span id={`${titleId}-color-label`}>Color</span>
+          <div
+            className="ledger-color-picker"
+            role="group"
+            aria-labelledby={`${titleId}-color-label`}
+          >
+            <button
+              type="button"
+              className="ledger-color-chip ledger-color-chip-none"
+              aria-pressed={colorDraft === null}
+              aria-label="None"
+              onClick={() => setColorDraft(null)}
+            />
+            {LEDGER_COLORS.map((swatch) => (
+              <button
+                key={swatch}
+                type="button"
+                className="ledger-color-chip"
+                style={{ background: `var(--ledger-color-${swatch})` }}
+                aria-pressed={colorDraft === swatch}
+                aria-label={LEDGER_COLOR_LABELS[swatch]}
+                onClick={() => setColorDraft(swatch)}
+              />
+            ))}
+          </div>
         </div>
 
         {error && (

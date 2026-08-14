@@ -12,13 +12,17 @@ const EMPTY_RECORDS: MonthRecords = new Map()
 const LOADING_STATE: MonthRecordsState = { records: EMPTY_RECORDS, loading: true, error: null }
 const NO_USER_STATE: MonthRecordsState = { records: EMPTY_RECORDS, loading: false, error: null }
 
-export function useMonthRecords(uid: string | null, yearMonth: YearMonth): MonthRecordsState {
+export function useMonthRecords(
+  uid: string | null,
+  ledgerId: string | null,
+  yearMonth: YearMonth,
+): MonthRecordsState {
   const { startKey, endKey } = monthKeyRange(yearMonth)
   const [state, setState] = useState<MonthRecordsState>(uid ? LOADING_STATE : NO_USER_STATE)
 
-  // Reset synchronously during render when the visible month (or user)
-  // changes, rather than via an effect.
-  const subscriptionKey = `${uid ?? ''}|${startKey}`
+  // Reset synchronously during render when the visible month (or user, or
+  // ledger) changes, rather than via an effect.
+  const subscriptionKey = `${uid ?? ''}|${ledgerId ?? ''}|${startKey}`
   const [trackedKey, setTrackedKey] = useState(subscriptionKey)
   if (subscriptionKey !== trackedKey) {
     setTrackedKey(subscriptionKey)
@@ -26,12 +30,13 @@ export function useMonthRecords(uid: string | null, yearMonth: YearMonth): Month
   }
 
   useEffect(() => {
-    if (!uid) {
+    if (!uid || !ledgerId) {
       return
     }
 
     return subscribeMonth(
       uid,
+      ledgerId,
       startKey,
       endKey,
       (records) => setState({ records, loading: false, error: null }),
@@ -42,7 +47,7 @@ export function useMonthRecords(uid: string | null, yearMonth: YearMonth): Month
           error: 'Could not load this month. Try again.',
         }),
     )
-  }, [uid, startKey, endKey])
+  }, [uid, ledgerId, startKey, endKey])
 
   return state
 }

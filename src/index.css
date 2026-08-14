@@ -31,6 +31,19 @@
   --space-2: 1rem;
   --space-3: 1.5rem;
   --space-4: 2.5rem;
+  /* A ledger's optional identifying color -- a small, fixed, muted palette
+     (see domain/ledger.ts's LEDGER_COLORS), not freeform hex, so nothing a
+     user picks can clash with the app's warm, quiet palette. Deep enough in
+     light mode (and light enough in dark mode) to keep --color-accent-text
+     legible when used as the today-toggle's own accent fill -- the same
+     pairing the app's one shared accent already relies on, just recolored,
+     never a second contrast system. */
+  --ledger-color-clay: #8a4a32;
+  --ledger-color-moss: #4f5c38;
+  --ledger-color-dust: #3f5866;
+  --ledger-color-plum: #4a3d66;
+  --ledger-color-rose: #7a3d4c;
+  --ledger-color-straw: #7a642a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,6 +58,12 @@
     --color-accent-text: #241c14;
     --color-vignette: rgb(50 40 28 / 45%);
     --grain-opacity: 0.065;
+    --ledger-color-clay: #d9a688;
+    --ledger-color-moss: #a8bb8a;
+    --ledger-color-dust: #a3c2cf;
+    --ledger-color-plum: #b3a3d1;
+    --ledger-color-rose: #d1a3ae;
+    --ledger-color-straw: #d9c17e;
   }
 }
 
@@ -242,6 +261,35 @@ fieldset label {
   justify-content: space-between;
 }
 
+.home-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* A small identifying dot, reused everywhere a ledger's color needs to
+   read at a glance without becoming a theme: the switcher's rows, its new-
+   ledger color picker, and this badge on the header trigger. */
+.ledger-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ledger-dot-header {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
+.home-header-actions .icon-button {
+  position: relative;
+}
+
 .home-main {
   flex: 1;
   display: flex;
@@ -411,7 +459,10 @@ fieldset label {
   grid-template-columns: 1fr 1fr;
   align-items: center;
   justify-items: center;
-  background: var(--color-accent);
+  /* --today-toggle-accent is set inline only when the active ledger has a
+     color (see TodayToggle.tsx); otherwise this is exactly the app's one
+     shared accent, unchanged. */
+  background: var(--today-toggle-accent, var(--color-accent));
   color: var(--color-accent-text);
   font-size: 1.25rem;
   font-weight: 600;
@@ -449,7 +500,7 @@ fieldset label {
   }
 
   .today-toggle-option input:checked + .today-toggle-word {
-    background: var(--color-accent);
+    background: var(--today-toggle-accent, var(--color-accent));
     color: var(--color-accent-text);
   }
 }
@@ -643,7 +694,8 @@ fieldset label {
    -- balanced, with even breathing room around them, not a bottom sheet. */
 .day-detail,
 .settings-sheet,
-.calendar-sheet {
+.calendar-sheet,
+.ledger-sheet {
   border: none;
   border-radius: 0.75rem;
   background: var(--color-surface);
@@ -656,7 +708,8 @@ fieldset label {
 }
 
 .day-detail,
-.settings-sheet {
+.settings-sheet,
+.ledger-sheet {
   padding: var(--space-3);
   width: min(24rem, calc(100vw - 2rem));
 }
@@ -679,7 +732,8 @@ fieldset label {
 
 .day-detail::backdrop,
 .settings-sheet::backdrop,
-.calendar-sheet::backdrop {
+.calendar-sheet::backdrop,
+.ledger-sheet::backdrop {
   background: rgb(var(--color-shadow-rgb) / 0.4);
 }
 
@@ -699,7 +753,8 @@ fieldset label {
 }
 
 .day-detail .field,
-.settings-sheet .field {
+.settings-sheet .field,
+.ledger-sheet .field {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
@@ -746,6 +801,113 @@ fieldset label {
 .day-detail-actions button,
 .settings-actions button {
   flex: 1;
+}
+
+/* Ledger switcher */
+
+.ledger-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ledger-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ledger-row:last-child {
+  border-bottom: none;
+}
+
+.ledger-row-select {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  border: none;
+  background: none;
+  padding: 0.625rem 0.25rem;
+  min-height: 44px;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+
+/* The current selection reads by weight and full ink, not a checkmark --
+   the same restraint the today-toggle already uses for "which side is
+   current" rather than a success-style badge. */
+.ledger-row-select[aria-current='true'] {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.ledger-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-row-delete {
+  flex-shrink: 0;
+}
+
+.ledger-row-confirm {
+  width: 100%;
+  padding: var(--space-1) 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.ledger-row-confirm p {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.ledger-row-confirm-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.ledger-row-confirm-actions button {
+  flex: 1;
+}
+
+.ledger-new-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+
+.ledger-color-picker {
+  display: flex;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+.ledger-color-chip {
+  width: 1.75rem;
+  height: 1.75rem;
+  min-height: 0;
+  border-radius: 50%;
+  border: 1px solid rgb(var(--color-shadow-rgb) / 0.15);
+  padding: 0;
+}
+
+.ledger-color-chip-none {
+  background: var(--color-surface);
+}
+
+/* A ring outside the swatch, not a change to the swatch's own fill, so the
+   color itself always reads true. */
+.ledger-color-chip[aria-pressed='true'] {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
 }
 
 /* Count selector */

@@ -88,25 +88,31 @@ The app should feel like marking a paper calendar, not completing a habit tracke
 
 ---
 
-## V1 Product Scope
+## Single-Ledger Experience
 
-V1 supports exactly **one tracker per user**.
+Noted. may contain many ledgers, but the user experiences only one ledger at a time. Multi-ledger functionality must never turn the primary experience into a dashboard, checklist, or collection of simultaneous actions.
 
-Do not implement multiple trackers.
+This constraint applies to all ledger configuration below and to any future multi-ledger work; see Ledger Configuration below.
 
-A tracker contains:
+---
+
+## Ledger Configuration
+
+Multiple independent ledgers per user are supported. Do not turn this into a dashboard, checklist, or collection of simultaneous actions -- see Single-Ledger Experience above.
+
+A ledger contains:
 
 - an editable name
 - a default daily state selected during setup
 - the user's local timezone
-- a local tracker start date
+- a local ledger start date
 - creation/update timestamps as needed
 
-The tracker name and the default daily state both remain editable.
+A ledger's name and default daily state both remain editable.
 
-Changing the default daily state must not rewrite what an already-recorded day says. Days that have a stored document keep the state they currently show; days with no document follow the new default.
+Changing a ledger's default daily state must not rewrite what an already-recorded day says. Days that have a stored document keep the state they currently show; days with no document follow the new default.
 
-Days before the tracker start date do not have a state and must not be interpreted retroactively.
+Days before a ledger's start date do not have a state and must not be interpreted retroactively.
 
 ---
 
@@ -279,7 +285,6 @@ Unless the user explicitly changes the product specification, do not add:
 - public profiles
 - comparisons with other users
 - social login providers other than Google
-- multiple trackers
 - AI analysis
 - behavioral interpretation
 - automatic summaries that characterize behavior as good or bad
