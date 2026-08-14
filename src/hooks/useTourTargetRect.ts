@@ -12,19 +12,41 @@ function measureTourTarget(tourId: string): DOMRect | null {
  * finished loading yet), which callers should degrade gracefully from
  * rather than treat as an error.
  *
- * A given tourId is fixed for the life of the caller in practice (Onboarding
- * Tour mounts a fresh CoachStep per step rather than changing an existing
- * one's tourId), so the initial measurement is taken directly during render
- * via the lazy initializer; the effect exists only to subscribe to changes
- * afterward, not to duplicate that first measurement.
+ * The caller keeps one overlay mounted across coach steps (so the spotlight
+ * element persists and its CSS position transition can glide between
+ * controls), which means tourId changes on a live hook. The measurement for
+ * a new tourId is taken synchronously during that same render -- not
+ * deferred to the effect -- so the spotlight never paints one frame anchored
+ * to the previous step's control.
  */
 export function useTourTargetRect(tourId: string): DOMRect | null {
   const [rect, setRect] = useState<DOMRect | null>(() => measureTourTarget(tourId))
 
+  const [measuredTourId, setMeasuredTourId] = useState(tourId)
+  if (measuredTourId !== tourId) {
+    setMeasuredTourId(tourId)
+    setRect(measureTourTarget(tourId))
+  }
+
+  const hasTarget = rect !== null
+
   useLayoutEffect(() => {
     const element = document.querySelector(`[data-tour-id="${tourId}"]`)
     if (!element) {
-      return
+      // Not mounted yet -- e.g. the today toggle still resolving its first
+      // load when its coach step opens. Watch for it to appear so the
+      // spotlight can attach late instead of the step staying degraded;
+      // the rect update flips hasTarget, re-running this effect onto the
+      // normal subscription path below.
+      const mutationObserver = new MutationObserver(() => {
+        const mounted = document.querySelector(`[data-tour-id="${tourId}"]`)
+        if (mounted) {
+          mutationObserver.disconnect()
+          setRect(mounted.getBoundingClientRect())
+        }
+      })
+      mutationObserver.observe(document.body, { childList: true, subtree: true })
+      return () => mutationObserver.disconnect()
     }
 
     const remeasure = () => setRect(element.getBoundingClientRect())
@@ -41,7 +63,7 @@ export function useTourTargetRect(tourId: string): DOMRect | null {
       window.removeEventListener('orientationchange', remeasure)
       window.removeEventListener('scroll', remeasure, true)
     }
-  }, [tourId])
+  }, [tourId, hasTarget])
 
   return rect
 }

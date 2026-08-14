@@ -2,28 +2,121 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { OnboardingStatus } from '../domain/onboarding'
 import { useInstallPrompt, type InstallPromptOutcome } from '../hooks/useInstallPrompt'
 import { useTourTargetRect } from '../hooks/useTourTargetRect'
-import { isIOSDevice, isStandaloneDisplay } from '../lib/platform'
+import { isIOSDevice, isStandaloneDisplay, prefersReducedMotion } from '../lib/platform'
 import { ShareIcon } from './icons'
 
-type StepId = 'welcome' | 'coach-customize' | 'coach-today' | 'coach-calendar' | 'install'
+/**
+ * True once the given element's named CSS entrance animation is over --
+ * finished, cancelled, or never going to run. Focus is only moved onto a
+ * staged control once this settles, so a focus ring can never appear on a
+ * control that is still being held invisible by its animation delay.
+ *
+ * Starts settled when reduced motion strips the animations (there would be
+ * no animationend to wait for), and also treats animationcancel as settled:
+ * if reduced motion flips on mid-entrance (e.g. battery saver), the CSS
+ * media block stops applying, everything becomes instantly visible, and the
+ * cancelled animation must still open the gate. Native listeners rather
+ * than React props because React has no onAnimationCancel.
+ */
+function useEntranceSettled(
+  ref: React.RefObject<HTMLElement | null>,
+  animationName: string,
+): boolean {
+  const [settled, setSettled] = useState(prefersReducedMotion)
 
-const INTRO_AND_COACH_STEPS: readonly StepId[] = [
-  'welcome',
-  'coach-customize',
-  'coach-today',
-  'coach-calendar',
-]
+  useEffect(() => {
+    if (settled) {
+      return
+    }
+    const element = ref.current
+    if (!element) {
+      return
+    }
+    function handle(event: AnimationEvent) {
+      if (event.animationName === animationName) {
+        setSettled(true)
+      }
+    }
+    element.addEventListener('animationend', handle)
+    element.addEventListener('animationcancel', handle)
+    return () => {
+      element.removeEventListener('animationend', handle)
+      element.removeEventListener('animationcancel', handle)
+    }
+  }, [settled, ref, animationName])
+
+  return settled
+}
+
+type CoachStepId = 'coach-today' | 'coach-calendar' | 'coach-customize'
+type StepId = 'welcome' | CoachStepId | 'install'
+
+/**
+ * Coach order follows the product's importance hierarchy, not screen
+ * geometry: the daily mark first (the whole product), then the record it
+ * accumulates into, then the wording -- a detail, so it comes last. The
+ * three spotlights also happen to sweep center, top, bottom, which keeps
+ * the eye moving instead of ping-ponging.
+ */
+const COACH_SEQUENCE: readonly CoachStepId[] = ['coach-today', 'coach-calendar', 'coach-customize']
+
+const INTRO_AND_COACH_STEPS: readonly StepId[] = ['welcome', ...COACH_SEQUENCE]
+
+interface CoachStepConfig {
+  tourId: string
+  label: string
+  body: string
+  /** Overrides the spotlight's top padding only, e.g. to stay clear of the fixed top bar above it. */
+  spotlightTopPaddingPx?: number
+}
+
+const COACH_STEPS: Record<CoachStepId, CoachStepConfig> = {
+  'coach-today': {
+    tourId: 'today-toggle',
+    label: 'Today',
+    body: "Tap or slide to flip today's mark. Change it anytime.",
+  },
+  'coach-calendar': {
+    tourId: 'open-calendar',
+    label: 'The record',
+    // "a past day", not "any": days before the tracker's start date are
+    // not editable, and the replayable tour reaches users for whom such
+    // days are visible on the calendar.
+    body: 'The pattern, at a glance. Tap a past day to correct it.',
+    // The real "Open calendar" button sits close enough to the top bar
+    // that padding the spotlight's usual amount on top would reach into
+    // Skip's normal, unmoved position. The button's own icon glyph
+    // doesn't start until partway down its 44px box (centered inside),
+    // and Skip's own text glyph ends partway up its box -- so insetting
+    // the spotlight's top edge into that shared padding still fully
+    // covers both real glyphs while clearing Skip, without moving Skip,
+    // the button, or the icon.
+    spotlightTopPaddingPx: -10,
+  },
+  'coach-customize': {
+    tourId: 'open-settings',
+    label: 'Your words',
+    body: "Rename the two states to fit what you're noting, and choose what an untouched day means.",
+  },
+}
+
+function isCoachStep(step: StepId): step is CoachStepId {
+  return step in COACH_STEPS
+}
 
 interface OnboardingTourProps {
   onFinish: (status: OnboardingStatus) => void
 }
 
 /**
- * Drives the first-run/replayable tour: one full-screen intro slide, three
+ * Drives the first-run/replayable tour: one staged full-screen intro, three
  * coach marks anchored to the real Home controls, then an optional PWA
  * install step. Home stays mounted (and inert) underneath the whole time --
  * see Home's use of the `inert` attribute -- so this component only ever
- * needs to render whichever single step is current.
+ * needs to render whichever single step is current. The one exception to
+ * "single step" thinking: all three coach steps share one persistent
+ * CoachOverlay so the spotlight element survives step changes and its CSS
+ * position transition glides it from control to control.
  */
 export function OnboardingTour({ onFinish }: OnboardingTourProps) {
   const { canPromptInstall, promptInstall } = useInstallPrompt()
@@ -39,8 +132,12 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
   )
 
   const [index, setIndex] = useState(0)
-  const step = steps[index]
-  const isLastStep = index === steps.length - 1
+  // Clamped: the steps array can shrink under a live index in one rare case
+  // (`appinstalled` firing while the install step is open resets the install
+  // prompt, dropping that step), and a momentary out-of-range read would
+  // blank the whole overlay.
+  const step = steps[Math.min(index, steps.length - 1)]
+  const isLastStep = index >= steps.length - 1
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -86,54 +183,14 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
 
   return (
     <>
-      {step === 'welcome' && (
-        <IntroStep
-          title="Noted."
-          paragraphs={[
-            "It's not a habit tracker.\nIt's not about streaks, judgment, or value statements.",
-            "It's just a ledger of whatever.\nIt's just visibility.\nIt's just Noted.",
-          ]}
-          primaryLabel="Next"
-          onPrimary={goNext}
-        />
-      )}
+      {step === 'welcome' && <IntroStep onPrimary={goNext} />}
 
-      {step === 'coach-customize' && (
-        <CoachStep
-          tourId="open-settings"
-          label="Make it yours"
-          body="Name the two states whatever makes sense for what you're noting, and choose what an untouched day means."
-          primaryLabel="Next"
-          onPrimary={goNext}
-        />
-      )}
-
-      {step === 'coach-today' && (
-        <CoachStep
-          tourId="today-toggle"
-          label="Today"
-          body="Tap or slide to change today's mark. You can change it anytime."
-          primaryLabel="Next"
-          onPrimary={goNext}
-        />
-      )}
-
-      {step === 'coach-calendar' && (
-        <CoachStep
-          tourId="open-calendar"
-          label="Calendar"
-          body="Open the calendar to review or change any past day."
+      {isCoachStep(step) && (
+        <CoachOverlay
+          step={step}
+          config={COACH_STEPS[step]}
           primaryLabel={isLastStep ? 'Done' : 'Next'}
           onPrimary={goNext}
-          // The real "Open calendar" button sits close enough to the top
-          // bar that padding the spotlight's usual amount on top would
-          // reach into Skip's normal, unmoved position. The button's own
-          // icon glyph doesn't start until partway down its 44px box
-          // (centered inside), and Skip's own text glyph ends partway up
-          // its box -- so insetting the spotlight's top edge into that
-          // shared padding still fully covers both real glyphs while
-          // clearing Skip, without moving Skip, the button, or the icon.
-          spotlightTopPaddingPx={-10}
         />
       )}
 
@@ -179,31 +236,71 @@ function TourTopbar({ index, total, onSkip }: TourTopbarProps) {
 }
 
 interface IntroStepProps {
-  title: string
-  paragraphs: string[]
-  primaryLabel: string
   onPrimary: () => void
 }
 
-function IntroStep({ title, paragraphs, primaryLabel, onPrimary }: IntroStepProps) {
+/**
+ * The one brand moment Noted. allows itself. The wordmark rises, its period
+ * stamps in with the same spring the today-toggle settles with, and the
+ * three lines land one at a time -- what it isn't in muted ink, what it is
+ * in full ink. The primary action reads "Noted." because pressing it is the
+ * product's whole gesture: acknowledge, move on.
+ *
+ * Focus follows visibility: while the staged reveal is still holding the
+ * footer at opacity 0, focus rests on the dialog itself (visible from the
+ * first frame) and the hidden button is kept out of the tab order, so a
+ * keyboard user never sits on -- or tabs onto -- a control that cannot be
+ * seen. The primary takes focus once its entrance settles (see
+ * useEntranceSettled for the finished/cancelled/reduced-motion cases).
+ */
+function IntroStep({ onPrimary }: IntroStepProps) {
   const headingId = useId()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const footerRef = useRef<HTMLDivElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
+  const revealed = useEntranceSettled(footerRef, 'onboarding-rise')
 
   useEffect(() => {
-    primaryRef.current?.focus()
-  }, [])
+    if (revealed) {
+      primaryRef.current?.focus()
+    } else {
+      containerRef.current?.focus()
+    }
+  }, [revealed])
 
   return (
-    <div className="onboarding-intro" role="dialog" aria-modal="true" aria-labelledby={headingId}>
+    <div
+      ref={containerRef}
+      className="onboarding-intro"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={headingId}
+      tabIndex={-1}
+    >
       <div className="onboarding-intro-body">
-        <h2 id={headingId}>{title}</h2>
-        {paragraphs.map((paragraph) => (
-          <p key={paragraph}>{paragraph}</p>
-        ))}
+        {/* Explicit label: the period span's inline-block display can make
+            some accessible-name computations insert whitespace ("Noted .");
+            the name must read exactly "Noted." regardless of layout. */}
+        <h2 id={headingId} className="onboarding-wordmark" aria-label="Noted.">
+          Noted<span className="onboarding-wordmark-period">.</span>
+        </h2>
+        <div className="onboarding-lines">
+          <p className="onboarding-line">It's not a habit tracker.</p>
+          <p className="onboarding-line">No streaks. No goals. No judgment.</p>
+          <p className="onboarding-line onboarding-line-turn">
+            {'Just something you noticed.\nJust a record.'}
+          </p>
+        </div>
       </div>
-      <div className="onboarding-footer">
-        <button type="button" className="onboarding-primary" ref={primaryRef} onClick={onPrimary}>
-          {primaryLabel}
+      <div ref={footerRef} className="onboarding-footer onboarding-intro-footer">
+        <button
+          type="button"
+          className="onboarding-primary"
+          ref={primaryRef}
+          onClick={onPrimary}
+          tabIndex={revealed ? undefined : -1}
+        >
+          Noted.
         </button>
       </div>
     </div>
@@ -213,31 +310,23 @@ function IntroStep({ title, paragraphs, primaryLabel, onPrimary }: IntroStepProp
 const SPOTLIGHT_PADDING_PX = 10
 const CALLOUT_GAP_PX = 16
 
-interface CoachStepProps {
-  tourId: string
-  label: string
-  body: string
+interface CoachOverlayProps {
+  step: CoachStepId
+  config: CoachStepConfig
   primaryLabel: string
   onPrimary: () => void
-  /** Overrides the spotlight's top padding only, e.g. to stay clear of the fixed top bar above it. */
-  spotlightTopPaddingPx?: number
 }
 
-function CoachStep({
-  tourId,
-  label,
-  body,
-  primaryLabel,
-  onPrimary,
-  spotlightTopPaddingPx = SPOTLIGHT_PADDING_PX,
-}: CoachStepProps) {
-  const rect = useTourTargetRect(tourId)
-  const headingId = useId()
-  const primaryRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    primaryRef.current?.focus()
-  }, [])
+/**
+ * One overlay for all coach steps. The spotlight div is deliberately
+ * unkeyed so React reuses it across steps and its CSS transition glides it
+ * to the next control; the callout is keyed per step so it remounts, which
+ * both re-runs its entrance fade and moves focus onto the new step's
+ * primary action.
+ */
+function CoachOverlay({ step, config, primaryLabel, onPrimary }: CoachOverlayProps) {
+  const rect = useTourTargetRect(config.tourId)
+  const spotlightTopPaddingPx = config.spotlightTopPaddingPx ?? SPOTLIGHT_PADDING_PX
 
   const placeBelow = !rect || rect.top < window.innerHeight / 2
 
@@ -255,11 +344,12 @@ function CoachStep({
           }}
         />
       )}
-      <div
-        className="tour-callout"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={headingId}
+      <CoachCallout
+        key={step}
+        label={config.label}
+        body={config.body}
+        primaryLabel={primaryLabel}
+        onPrimary={onPrimary}
         style={
           rect
             ? placeBelow
@@ -267,16 +357,54 @@ function CoachStep({
               : { bottom: window.innerHeight - rect.top + SPOTLIGHT_PADDING_PX + CALLOUT_GAP_PX }
             : { top: '50%', transform: 'translate(-50%, -50%)' }
         }
-      >
-        <p id={headingId} className="tour-callout-label">
-          {label}
-        </p>
-        <p>{body}</p>
-        <div className="tour-callout-actions">
-          <button type="button" className="onboarding-primary" ref={primaryRef} onClick={onPrimary}>
-            {primaryLabel}
-          </button>
-        </div>
+      />
+    </div>
+  )
+}
+
+interface CoachCalloutProps {
+  label: string
+  body: string
+  primaryLabel: string
+  onPrimary: () => void
+  style: React.CSSProperties
+}
+
+/**
+ * Focus waits for the callout's entrance fade to settle (see IntroStep for
+ * the rationale: the focused control must be visible when the ring
+ * appears). Until then focus rests wherever the previous step left it --
+ * the topbar's aria-live region covers the announcement gap.
+ */
+function CoachCallout({ label, body, primaryLabel, onPrimary, style }: CoachCalloutProps) {
+  const headingId = useId()
+  const calloutRef = useRef<HTMLDivElement>(null)
+  const primaryRef = useRef<HTMLButtonElement>(null)
+  const entered = useEntranceSettled(calloutRef, 'onboarding-fade')
+
+  useEffect(() => {
+    if (entered) {
+      primaryRef.current?.focus()
+    }
+  }, [entered])
+
+  return (
+    <div
+      ref={calloutRef}
+      className="tour-callout"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={headingId}
+      style={style}
+    >
+      <p id={headingId} className="tour-callout-label">
+        {label}
+      </p>
+      <p>{body}</p>
+      <div className="tour-callout-actions">
+        <button type="button" className="onboarding-primary" ref={primaryRef} onClick={onPrimary}>
+          {primaryLabel}
+        </button>
       </div>
     </div>
   )
@@ -295,6 +423,10 @@ function InstallStep({ ios, canPromptInstall, onAddToHomeScreen, onNotNow }: Ins
   return (
     <div className="onboarding-install">
       <div className="onboarding-card" role="dialog" aria-modal="true" aria-labelledby={headingId}>
+        {/* The actual icon the Home Screen would get -- concrete, not a
+            generic illustration. Decorative here (alt=""): the heading and
+            body carry the meaning. */}
+        <img src="/icon-192.png" alt="" width={56} height={56} className="onboarding-install-icon" />
         <h2 id={headingId}>Keep it close</h2>
         {ios ? (
           <p>

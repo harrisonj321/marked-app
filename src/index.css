@@ -18,6 +18,15 @@
      strength is a fraction of the alpha below. */
   --color-vignette: rgb(253 249 240 / 55%);
   --grain-opacity: 0.05;
+  /* The two layers of the paper surface, shared between the page body and
+     any opaque full-screen takeover (the onboarding intro) that would
+     otherwise cover the body's grain and read as the one flat, paperless
+     surface in the app. Note the vignette substitutes --color-vignette
+     here on :root at computed-value time -- it follows the theme only
+     because the dark override of --color-vignette is also on :root; a
+     subtree-level override of that color would not reach this token. */
+  --texture-vignette: radial-gradient(150% 120% at 20% -10%, var(--color-vignette) 0%, transparent 60%);
+  --texture-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.35' intercept='0.33'/%3E%3CfeFuncG type='linear' slope='0.35' intercept='0.33'/%3E%3CfeFuncB type='linear' slope='0.35' intercept='0.33'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   --space-1: 0.5rem;
   --space-2: 1rem;
   --space-3: 1.5rem;
@@ -81,9 +90,7 @@ body::before {
   z-index: -1;
   pointer-events: none;
   opacity: var(--grain-opacity);
-  background-image:
-    radial-gradient(150% 120% at 20% -10%, var(--color-vignette) 0%, transparent 60%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.35' intercept='0.33'/%3E%3CfeFuncG type='linear' slope='0.35' intercept='0.33'/%3E%3CfeFuncB type='linear' slope='0.35' intercept='0.33'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: var(--texture-vignette), var(--texture-grain);
   background-repeat: no-repeat, repeat;
   background-size: cover, 160px 160px;
 }
@@ -848,12 +855,24 @@ fieldset label {
 .onboarding-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--color-border-strong);
 }
 
+/* A pill, not just a color change: over the coach steps' dimmed backdrop
+   the accent fill alone can read weaker than the idle dots, so shape is
+   what actually marks the current step. */
 .onboarding-dot-active {
+  width: 14px;
   background: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .onboarding-dot {
+    transition:
+      width 200ms ease,
+      background-color 200ms ease;
+  }
 }
 
 .onboarding-skip {
@@ -886,9 +905,9 @@ fieldset label {
   font-weight: 600;
 }
 
-/* Intro slides: an opaque full-screen takeover, matching Setup/SignIn's
+/* The intro slide: an opaque full-screen takeover, matching Setup/SignIn's
    plain-screen treatment rather than a dialog card, since there is nothing
-   underneath for them to sit "on top of" -- they are the current screen. */
+   underneath for it to sit "on top of" -- it is the current screen. */
 .onboarding-intro {
   position: fixed;
   inset: 0;
@@ -896,42 +915,105 @@ fieldset label {
   background: var(--color-bg);
   display: flex;
   flex-direction: column;
+  /* The tour locks body scrolling, so on short viewports (landscape
+     phones, large text scaling) the intro must scroll itself or its
+     bottom-anchored primary action becomes unreachable. */
+  overflow-y: auto;
   padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
   padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
   padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
   padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
 }
 
+/* The intro's opaque background sits above the body's grain (z-index 1000
+   vs -1), so without this the brand screen would be the only flat,
+   paperless surface in the app. Repainted here with the shared texture
+   layers; z-index -1 inside the intro's own stacking context keeps it
+   above the background fill but under all content. */
+/* The dialog itself briefly holds programmatic focus (tabindex -1) while
+   the staged reveal is still hiding the primary action; a focus ring drawn
+   around the entire screen would just be noise. Never keyboard-reachable,
+   so no visible-focus obligation attaches to the container itself. */
+.onboarding-intro:focus {
+  outline: none;
+}
+
+.onboarding-intro::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: var(--texture-vignette), var(--texture-grain);
+  background-repeat: no-repeat, repeat;
+  background-size: cover, 160px 160px;
+}
+
 .onboarding-intro-body {
-  flex: 1;
+  /* basis auto, never shrink: a center-justified flex item that gets
+     squeezed below its content height clips that content off the
+     scrollable extent entirely; letting the item keep its natural height
+     is what makes the container's overflow-y actually reach everything. */
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: var(--space-2);
+  gap: var(--space-4);
   max-width: 26rem;
   margin: 0 auto;
   width: 100%;
 }
 
-.onboarding-intro-body h2 {
+.onboarding-wordmark {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: clamp(2.25rem, 10vw, 2.75rem);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
-.onboarding-intro-body p {
+/* inline-block so the stamp animation's transform applies; harmless when
+   reduced motion leaves it static. The origin sits low in the em box,
+   near the glyph's actual ink, so the stamp reads as pressing down onto
+   the baseline instead of a dot floating mid-line. */
+.onboarding-wordmark-period {
+  display: inline-block;
+  transform-origin: 50% 80%;
+}
+
+.onboarding-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.onboarding-line {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 1rem;
-  line-height: 1.5;
-  /* Lets a paragraph's own embedded line breaks (the closing "Just X."
-     cadence) render as short lines without splitting it into separate
-     paragraphs with a full paragraph gap between each -- ordinary
-     paragraphs have no embedded breaks, so this has no effect on them. */
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  /* Lets a line's own embedded breaks (the closing "Just X." cadence)
+     render as short lines without splitting it into separate paragraphs
+     with a full paragraph gap between each. */
   white-space: pre-line;
+}
+
+/* The turn: what Noted. isn't stays muted; what it is lands in full ink.
+   Position and wording carry the shift too, so it never depends on the
+   color difference alone. */
+.onboarding-line-turn {
+  color: var(--color-text);
+}
+
+/* Same column as the intro body, so the action doesn't stretch into a
+   full-viewport bar on desktop. */
+.onboarding-intro-footer {
+  width: 100%;
+  max-width: 26rem;
+  margin: 0 auto;
 }
 
 /* Coach marks: Home stays visible (and inert -- see Home.tsx) underneath.
@@ -1001,6 +1083,105 @@ fieldset label {
   justify-content: flex-end;
 }
 
+/* Tour motion. All of it is staging, never content: every element is
+   mounted, focusable, and readable from the first frame, and reduced-motion
+   users simply see each step already settled. fill-mode "both" is what
+   holds a delayed element at its keyframe start during the wait.
+
+   The intro reads out at a human pace: the wordmark rises, its period
+   stamps in on the same spring curve the today-toggle settles with, then
+   the three lines land one at a time, muted to ink, and the action arrives
+   last. Between coach steps the spotlight glides (its transition lives on
+   .tour-spotlight above) while the new callout waits a beat and fades in
+   where it lands. */
+@media (prefers-reduced-motion: no-preference) {
+  .onboarding-wordmark,
+  .onboarding-line,
+  .onboarding-intro-footer {
+    animation: onboarding-rise 450ms ease-out both;
+    animation-delay: var(--enter-delay, 0ms);
+  }
+
+  .onboarding-wordmark {
+    --enter-delay: 150ms;
+  }
+
+  /* Fill-mode both hides the period (its own keyframe start) while the
+     wordmark rises, so "Noted" lands first and the period stamps onto it
+     a beat later -- the product's whole gesture, performed by the brand. */
+  .onboarding-wordmark-period {
+    animation: onboarding-stamp 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: 650ms;
+  }
+
+  .onboarding-line:nth-child(1) {
+    --enter-delay: 1150ms;
+  }
+
+  .onboarding-line:nth-child(2) {
+    --enter-delay: 1650ms;
+  }
+
+  .onboarding-line:nth-child(3) {
+    --enter-delay: 2200ms;
+  }
+
+  .onboarding-intro-footer {
+    --enter-delay: 2850ms;
+  }
+
+  .onboarding-coach {
+    animation: onboarding-fade 300ms ease both;
+  }
+
+  /* Keyed per step, so this entrance re-runs at each new position; the
+     short delay lets the spotlight start its glide first. Opacity only:
+     the callout's centering already uses transform, which a moving
+     keyframe would override mid-flight. */
+  .tour-callout {
+    animation: onboarding-fade 250ms ease both;
+    animation-delay: 120ms;
+  }
+}
+
+/* pointer-events in the `from` frames: fill-mode "both" holds staged
+   elements at opacity 0 through their delay, and opacity alone does not
+   stop hit-testing -- without this, the intro's primary would be an
+   invisible click target for its whole ~3s hold. As a discrete property
+   it flips back to auto at the fade's midpoint, when the element is
+   already clearly visible. */
+@keyframes onboarding-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.625rem);
+    pointer-events: none;
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes onboarding-stamp {
+  from {
+    opacity: 0;
+    transform: scale(0.25);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes onboarding-fade {
+  from {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
 /* Install step: no specific control to highlight, so it reads as a normal
    centered card overlay -- the same treatment as Settings/Day detail. */
 .onboarding-install {
@@ -1032,6 +1213,16 @@ fieldset label {
 .onboarding-card h2 {
   margin: 0;
   font-size: 1.125rem;
+}
+
+/* The real app icon, shown at Home Screen shape: what saying yes actually
+   puts on the phone, rather than a generic illustration. */
+.onboarding-install-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 22%;
+  align-self: flex-start;
+  box-shadow: 0 1px 3px rgb(var(--color-shadow-rgb) / 0.2);
 }
 
 .onboarding-card p {

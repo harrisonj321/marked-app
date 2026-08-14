@@ -1,16 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 
-const { useInstallPromptMock, isIOSDeviceMock, isStandaloneDisplayMock } = vi.hoisted(() => ({
-  useInstallPromptMock: vi.fn(),
-  isIOSDeviceMock: vi.fn(),
-  isStandaloneDisplayMock: vi.fn(),
-}))
+const { useInstallPromptMock, isIOSDeviceMock, isStandaloneDisplayMock, prefersReducedMotionMock } =
+  vi.hoisted(() => ({
+    useInstallPromptMock: vi.fn(),
+    isIOSDeviceMock: vi.fn(),
+    isStandaloneDisplayMock: vi.fn(),
+    prefersReducedMotionMock: vi.fn(),
+  }))
 
 vi.mock('../hooks/useInstallPrompt', () => ({ useInstallPrompt: useInstallPromptMock }))
 vi.mock('../lib/platform', () => ({
   isIOSDevice: isIOSDeviceMock,
   isStandaloneDisplay: isStandaloneDisplayMock,
+  prefersReducedMotion: prefersReducedMotionMock,
 }))
 
 const { OnboardingTour } = await import('./OnboardingTour')
@@ -19,10 +22,12 @@ function mockPlatform({
   ios = false,
   standalone = false,
   canPromptInstall = false,
+  reducedMotion = false,
   promptInstall = vi.fn().mockResolvedValue('accepted'),
 } = {}) {
   isIOSDeviceMock.mockReturnValue(ios)
   isStandaloneDisplayMock.mockReturnValue(standalone)
+  prefersReducedMotionMock.mockReturnValue(reducedMotion)
   useInstallPromptMock.mockReturnValue({ canPromptInstall, promptInstall })
   return { promptInstall }
 }
@@ -39,8 +44,21 @@ function renderTour(onFinish = vi.fn()) {
   return { onFinish }
 }
 
+// The intro's primary action is "Noted." (acknowledging is the product's
+// whole gesture); coach steps advance with Next and close with Done.
 function clickNext() {
-  fireEvent.click(screen.getByRole('button', { name: /^(Next|Done)$/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^(Noted\.|Next|Done)$/ }))
+}
+
+/**
+ * jsdom has no AnimationEvent constructor, so fireEvent.animationEnd falls
+ * back to a plain Event and drops the animationName the component's native
+ * listeners key on. Building the event manually keeps that field intact.
+ */
+function fireAnimationEnd(element: Element, animationName: string) {
+  const event = new Event('animationend', { bubbles: true }) as Event & { animationName: string }
+  event.animationName = animationName
+  fireEvent(element, event)
 }
 
 /**
@@ -70,14 +88,62 @@ afterEach(() => {
 })
 
 describe('OnboardingTour', () => {
-  it('opens on the single welcome screen with Skip visible and no Back control anywhere in the tour', () => {
+  it('opens on the intro with the staged wordmark and lines, Skip visible, and no Back control anywhere in the tour', () => {
     mockPlatform()
     renderTour()
 
     expect(screen.getByRole('heading', { name: 'Noted.' })).toBeInTheDocument()
     expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
+    expect(screen.getByText(/no streaks\. no goals\. no judgment\./i)).toBeInTheDocument()
+    expect(screen.getByText(/just a record/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+  })
+
+  it("advances from the intro with a primary action reading Noted., not generic tour language", () => {
+    mockPlatform()
+    renderTour()
+
+    expect(screen.getByRole('button', { name: 'Noted.' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the staged primary out of the tab order until its entrance finishes, then focuses it', () => {
+    mockPlatform()
+    renderTour()
+
+    const primary = screen.getByRole('button', { name: 'Noted.' })
+    // While the reveal is still holding the footer invisible, focus rests
+    // on the (visible) dialog and the hidden button is not tabbable.
+    expect(primary).toHaveAttribute('tabindex', '-1')
+    expect(document.querySelector('.onboarding-intro')).toHaveFocus()
+
+    fireAnimationEnd(primary.parentElement!, 'onboarding-rise')
+
+    expect(primary).not.toHaveAttribute('tabindex')
+    expect(primary).toHaveFocus()
+  })
+
+  it('focuses the primary immediately when reduced motion strips the entrance animations', () => {
+    mockPlatform({ reducedMotion: true })
+    renderTour()
+
+    const primary = screen.getByRole('button', { name: 'Noted.' })
+    expect(primary).not.toHaveAttribute('tabindex')
+    expect(primary).toHaveFocus()
+  })
+
+  it('moves focus to a coach step primary only after its entrance fade completes', () => {
+    mockPlatform()
+    renderTour()
+
+    clickNext() // welcome -> coach-today
+    const next = screen.getByRole('button', { name: 'Next' })
+    expect(next).not.toHaveFocus()
+
+    fireAnimationEnd(document.querySelector('.tour-callout')!, 'onboarding-fade')
+
+    expect(next).toHaveFocus()
   })
 
   it('Skip exits immediately from the first screen without advancing', () => {
@@ -94,41 +160,52 @@ describe('OnboardingTour', () => {
     mockPlatform()
     const { onFinish } = renderTour()
 
-    clickNext() // welcome -> coach-customize
+    clickNext() // welcome -> coach-today
     fireEvent.keyDown(window, { key: 'Escape' })
 
     expect(onFinish).toHaveBeenCalledWith('skipped')
   })
 
-  it('the primary action on the opening screen leads directly into contextual guidance, not another intro slide', () => {
+  it('leads from the intro straight to the primary daily control, not another intro slide or a settings detour', () => {
     mockPlatform()
     renderTour()
 
-    clickNext() // welcome -> coach-customize
-    expect(screen.getByText(/name the two states/i)).toBeInTheDocument()
+    clickNext() // welcome -> coach-today
+    expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Noted.' })).not.toBeInTheDocument()
   })
 
-  it('walks through all three coach marks anchored to the real controls, in order', () => {
+  it('walks the coach marks in importance order: today, then the record, then wording', () => {
     mockPlatform()
     renderTour()
 
-    clickNext() // welcome -> coach-customize
-    expect(screen.getByText(/name the two states/i)).toBeInTheDocument()
-
-    clickNext() // coach-customize -> coach-today
-    expect(screen.getByText(/tap or slide to change today's mark/i)).toBeInTheDocument()
+    clickNext() // welcome -> coach-today
+    expect(screen.getByText('Today')).toBeInTheDocument()
+    expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
 
     clickNext() // coach-today -> coach-calendar
-    expect(screen.getByText(/open the calendar to review or change/i)).toBeInTheDocument()
+    expect(screen.getByText('The record')).toBeInTheDocument()
+    expect(screen.getByText(/tap a past day to correct it/i)).toBeInTheDocument()
+
+    clickNext() // coach-calendar -> coach-customize
+    expect(screen.getByText('Your words')).toBeInTheDocument()
+    expect(screen.getByText(/rename the two states/i)).toBeInTheDocument()
   })
 
-  it('anchors the customization coach mark to the real Settings control', () => {
+  it('keeps one persistent spotlight element across coach steps, so its position transition can glide between controls', () => {
+    mockDistinctTourRects()
     mockPlatform()
     renderTour()
 
-    clickNext() // welcome -> coach-customize
-    expect(screen.getByText('Make it yours')).toBeInTheDocument()
+    clickNext() // welcome -> coach-today
+    const spotlight = document.querySelector('.tour-spotlight')
+    expect(spotlight).toHaveStyle({ top: '290px' })
+
+    clickNext() // coach-today -> coach-calendar
+    // Same DOM node, new position: a remounted spotlight would jump
+    // instead of transitioning.
+    expect(document.querySelector('.tour-spotlight')).toBe(spotlight)
+    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '50px' })
   })
 
   it('measures the real open-settings element specifically, not merely any coach-mark target', () => {
@@ -136,7 +213,9 @@ describe('OnboardingTour', () => {
     mockPlatform()
     renderTour()
 
-    clickNext() // welcome -> coach-customize
+    clickNext() // welcome -> coach-today
+    clickNext() // coach-today -> coach-calendar
+    clickNext() // coach-calendar -> coach-customize
     // A tourId mix-up (e.g. wired to 'today-toggle' or 'open-calendar' by
     // mistake) would measure a different stub and produce a different top --
     // this pins the spotlight to the one open-settings owns.
@@ -146,7 +225,7 @@ describe('OnboardingTour', () => {
   it('shows exactly one progress dot per step, adapting when the install step is present or omitted', () => {
     mockPlatform({ ios: false, standalone: false, canPromptInstall: false })
     renderTour()
-    // welcome, coach-customize, coach-today, coach-calendar -- no install step.
+    // welcome, coach-today, coach-calendar, coach-customize -- no install step.
     expect(document.querySelectorAll('.onboarding-dot')).toHaveLength(4)
   })
 
@@ -163,11 +242,11 @@ describe('OnboardingTour', () => {
     const topbarClassName = () => document.querySelector('.onboarding-topbar')?.className
 
     expect(topbarClassName()).toBe('onboarding-topbar')
-    clickNext() // welcome -> coach-customize
-    expect(topbarClassName()).toBe('onboarding-topbar')
-    clickNext() // coach-customize -> coach-today
+    clickNext() // welcome -> coach-today
     expect(topbarClassName()).toBe('onboarding-topbar')
     clickNext() // coach-today -> coach-calendar
+    expect(topbarClassName()).toBe('onboarding-topbar')
+    clickNext() // coach-calendar -> coach-customize
     expect(topbarClassName()).toBe('onboarding-topbar')
   })
 
@@ -175,34 +254,54 @@ describe('OnboardingTour', () => {
     mockPlatform()
     renderTour()
 
-    clickNext() // welcome -> coach-customize
-    clickNext() // coach-customize -> coach-today
+    clickNext() // welcome -> coach-today
     // All stub targets report a zero rect in jsdom, so the difference in
     // computed inline style isolates the padding math itself.
     expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '-10px' })
 
     clickNext() // coach-today -> coach-calendar
     expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '10px' })
+
+    clickNext() // coach-calendar -> coach-customize
+    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '-10px' })
   })
 
   it('degrades to a centered callout with no spotlight when the target is not mounted', () => {
     mockPlatform()
     render(<OnboardingTour onFinish={vi.fn()} />) // no stub data-tour-id elements this time
 
-    clickNext() // welcome -> coach-customize
-    clickNext() // coach-customize -> coach-today
+    clickNext() // welcome -> coach-today
 
-    expect(screen.getByText(/tap or slide to change today's mark/i)).toBeInTheDocument()
+    expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
     expect(document.querySelector('.tour-spotlight')).not.toBeInTheDocument()
+  })
+
+  it('attaches the spotlight late if the target mounts partway through its step', async () => {
+    mockPlatform()
+    render(<OnboardingTour onFinish={vi.fn()} />) // target not mounted yet (e.g. still loading)
+
+    clickNext() // welcome -> coach-today
+    expect(document.querySelector('.tour-spotlight')).not.toBeInTheDocument()
+
+    const target = document.createElement('div')
+    target.setAttribute('data-tour-id', 'today-toggle')
+    await act(async () => {
+      document.body.appendChild(target)
+      // MutationObserver delivery is asynchronous; yield one macrotask.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(document.querySelector('.tour-spotlight')).toBeInTheDocument()
+    target.remove()
   })
 
   it('finishes as completed from the final coach mark when no install step applies', () => {
     mockPlatform({ ios: false, standalone: false, canPromptInstall: false })
     const { onFinish } = renderTour()
 
-    clickNext() // welcome -> coach-customize
-    clickNext() // coach-customize -> coach-today
+    clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
+    clickNext() // coach-calendar -> coach-customize
 
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
@@ -214,21 +313,35 @@ describe('OnboardingTour', () => {
     mockPlatform({ ios: true, standalone: true, canPromptInstall: false })
     renderTour()
 
-    clickNext() // welcome -> coach-customize
-    clickNext() // coach-customize -> coach-today
+    clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
+    clickNext() // coach-calendar -> coach-customize
 
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
+  })
+
+  it('shows the real app icon on the install step, so the card previews exactly what lands on the Home Screen', () => {
+    mockPlatform({ ios: true, standalone: false, canPromptInstall: false })
+    renderTour()
+
+    clickNext() // welcome -> coach-today
+    clickNext() // coach-today -> coach-calendar
+    clickNext() // coach-calendar -> coach-customize
+    clickNext() // coach-customize -> install
+
+    const icon = document.querySelector('.onboarding-install-icon')
+    expect(icon).toBeInTheDocument()
+    expect(icon).toHaveAttribute('src', '/icon-192.png')
   })
 
   it('shows written Share-sheet guidance on iOS, where no native prompt ever exists', () => {
     mockPlatform({ ios: true, standalone: false, canPromptInstall: false })
     renderTour()
 
-    clickNext() // welcome -> coach-customize
-    clickNext() // coach-customize -> coach-today
+    clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
-    clickNext() // coach-calendar -> install
+    clickNext() // coach-calendar -> coach-customize
+    clickNext() // coach-customize -> install
 
     expect(screen.getByRole('dialog')).toHaveTextContent(/Share, then/)
     // "Got it" rather than "Done": Noted. has no way to confirm the user
@@ -242,10 +355,10 @@ describe('OnboardingTour', () => {
     const { promptInstall } = mockPlatform({ ios: false, standalone: false, canPromptInstall: true })
     const { onFinish } = renderTour()
 
-    clickNext() // welcome -> coach-customize
-    clickNext() // coach-customize -> coach-today
+    clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
-    clickNext() // coach-calendar -> install
+    clickNext() // coach-calendar -> coach-customize
+    clickNext() // coach-customize -> install
 
     fireEvent.click(screen.getByRole('button', { name: 'Add to Home Screen' }))
 
@@ -259,10 +372,10 @@ describe('OnboardingTour', () => {
     mockPlatform({ ios: false, standalone: false, canPromptInstall: true })
     const { onFinish } = renderTour()
 
-    clickNext() // welcome -> coach-customize
-    clickNext() // coach-customize -> coach-today
+    clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
-    clickNext() // coach-calendar -> install
+    clickNext() // coach-calendar -> coach-customize
+    clickNext() // coach-customize -> install
 
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
 
@@ -273,10 +386,10 @@ describe('OnboardingTour', () => {
     mockPlatform({ ios: true, standalone: false })
     renderTour()
 
-    clickNext() // welcome -> coach-customize
-    clickNext() // coach-customize -> coach-today
+    clickNext() // welcome -> coach-today
     clickNext() // coach-today -> coach-calendar
-    clickNext() // coach-calendar -> install
+    clickNext() // coach-calendar -> coach-customize
+    clickNext() // coach-customize -> install
 
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
   })
