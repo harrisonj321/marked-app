@@ -31,7 +31,12 @@ interface HomeProps {
 export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) {
   const todayKey = useLocalDateKey(activeLedger.timezone)
   const [calendarOpen, setCalendarOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  // Which ledger's Settings is open, if any -- not necessarily the active
+  // one. The footer's own Settings link targets the active ledger; the
+  // catalog's manage affordance can target any ledger. Both routes render
+  // the exact same SettingsSheet, just aimed at a different id, so there is
+  // only ever one settings experience regardless of entry point.
+  const [settingsLedgerId, setSettingsLedgerId] = useState<string | null>(null)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   // Gating is entirely about the persisted record, not about whether this
   // account is "new" -- every authenticated user without a completion/skip
@@ -41,6 +46,7 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
   const [tourActive, setTourActive] = useState(() => !hasCompletedOnboarding(uid))
   const labels = resolveStateLabels(activeLedger.stateLabels)
   const accentColor = activeLedger.color ? `var(--ledger-color-${activeLedger.color})` : undefined
+  const settingsLedger = ledgers.find((ledger) => ledger.id === settingsLedgerId) ?? null
 
   function handleTourFinish(status: OnboardingStatus) {
     saveOnboardingRecord(uid, status)
@@ -48,20 +54,28 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
   }
 
   function handleTourNoted() {
-    setSettingsOpen(false)
+    setSettingsLedgerId(null)
     setTourActive(true)
   }
 
-  async function handleDefaultStateSave(defaultState: DayState) {
-    await updateLedgerDefaultState(uid, activeLedger.id, activeLedger.defaultState, defaultState)
-  }
-
-  async function handleStateLabelsSave(stateLabels: StateLabels) {
-    await updateLedgerStateLabels(uid, activeLedger.id, stateLabels)
+  function handleManageLedger(ledgerId: string) {
+    setSettingsLedgerId(ledgerId)
   }
 
   async function handleRenameLedger(ledgerId: string, name: string) {
     await updateLedgerName(uid, ledgerId, name)
+  }
+
+  async function handleDefaultStateSave(
+    ledgerId: string,
+    currentDefaultState: DayState,
+    defaultState: DayState,
+  ) {
+    await updateLedgerDefaultState(uid, ledgerId, currentDefaultState, defaultState)
+  }
+
+  async function handleStateLabelsSave(ledgerId: string, stateLabels: StateLabels) {
+    await updateLedgerStateLabels(uid, ledgerId, stateLabels)
   }
 
   async function handleColorSave(ledgerId: string, color: LedgerColor | null) {
@@ -132,7 +146,7 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
               type="button"
               className="footer-link"
               data-tour-id="open-settings"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => setSettingsLedgerId(activeLedger.id)}
             >
               Settings
             </button>
@@ -152,16 +166,21 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
           />
         )}
 
-        {settingsOpen && (
+        {settingsLedger && (
           <SettingsSheet
-            defaultState={activeLedger.defaultState}
-            stateLabels={labels}
-            color={activeLedger.color ?? null}
-            onSaveDefaultState={handleDefaultStateSave}
-            onSaveStateLabels={handleStateLabelsSave}
-            onSaveColor={(color) => handleColorSave(activeLedger.id, color)}
+            name={settingsLedger.name}
+            defaultState={settingsLedger.defaultState}
+            stateLabels={resolveStateLabels(settingsLedger.stateLabels)}
+            color={settingsLedger.color ?? null}
+            onSaveName={(name) => handleRenameLedger(settingsLedger.id, name)}
+            onSaveDefaultState={(defaultState) =>
+              handleDefaultStateSave(settingsLedger.id, settingsLedger.defaultState, defaultState)
+            }
+            onSaveStateLabels={(stateLabels) => handleStateLabelsSave(settingsLedger.id, stateLabels)}
+            onSaveColor={(color) => handleColorSave(settingsLedger.id, color)}
+            onDelete={() => handleDeleteLedger(settingsLedger.id)}
             onTourNoted={handleTourNoted}
-            onDismiss={() => setSettingsOpen(false)}
+            onDismiss={() => setSettingsLedgerId(null)}
           />
         )}
 
@@ -171,9 +190,7 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
             activeLedgerId={activeLedger.id}
             onSwitch={onSwitchLedger}
             onCreate={handleCreateLedger}
-            onRename={handleRenameLedger}
-            onRecolor={handleColorSave}
-            onDelete={handleDeleteLedger}
+            onManage={handleManageLedger}
             onDismiss={() => setSwitcherOpen(false)}
           />
         )}

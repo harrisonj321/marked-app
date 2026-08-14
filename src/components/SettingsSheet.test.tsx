@@ -17,25 +17,30 @@ beforeEach(() => {
 })
 
 function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {}) {
+  const onSaveName = vi.fn().mockResolvedValue(undefined)
   const onSaveDefaultState = vi.fn().mockResolvedValue(undefined)
   const onSaveStateLabels = vi.fn().mockResolvedValue(undefined)
   const onSaveColor = vi.fn().mockResolvedValue(undefined)
+  const onDelete = vi.fn().mockResolvedValue(undefined)
   const onTourNoted = vi.fn()
   const onDismiss = vi.fn()
   render(
     <SettingsSheet
+      name="Worked out"
       defaultState="did"
       stateLabels={DEFAULT_LABELS}
       color={null}
+      onSaveName={onSaveName}
       onSaveDefaultState={onSaveDefaultState}
       onSaveStateLabels={onSaveStateLabels}
       onSaveColor={onSaveColor}
+      onDelete={onDelete}
       onTourNoted={onTourNoted}
       onDismiss={onDismiss}
       {...overrides}
     />,
   )
-  return { onSaveDefaultState, onSaveStateLabels, onSaveColor, onTourNoted, onDismiss }
+  return { onSaveName, onSaveDefaultState, onSaveStateLabels, onSaveColor, onDelete, onTourNoted, onDismiss }
 }
 
 describe('SettingsSheet', () => {
@@ -122,12 +127,15 @@ describe('SettingsSheet', () => {
 
     const { rerender } = render(
       <SettingsSheet
+        name="Worked out"
         defaultState="did"
         stateLabels={DEFAULT_LABELS}
         color={null}
+        onSaveName={vi.fn()}
         onSaveDefaultState={onSaveDefaultState}
         onSaveStateLabels={onSaveStateLabels}
         onSaveColor={vi.fn()}
+        onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={onDismiss}
       />,
@@ -135,12 +143,15 @@ describe('SettingsSheet', () => {
 
     rerender(
       <SettingsSheet
+        name="Worked out"
         defaultState="didnt"
         stateLabels={DEFAULT_LABELS}
         color={null}
+        onSaveName={vi.fn()}
         onSaveDefaultState={onSaveDefaultState}
         onSaveStateLabels={onSaveStateLabels}
         onSaveColor={vi.fn()}
+        onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={onDismiss}
       />,
@@ -158,12 +169,15 @@ describe('SettingsSheet', () => {
   it('re-syncs the label fields when the stored labels change under an open sheet', () => {
     const { rerender } = render(
       <SettingsSheet
+        name="Worked out"
         defaultState="did"
         stateLabels={DEFAULT_LABELS}
         color={null}
+        onSaveName={vi.fn()}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
         onSaveColor={vi.fn()}
+        onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -171,12 +185,15 @@ describe('SettingsSheet', () => {
 
     rerender(
       <SettingsSheet
+        name="Worked out"
         defaultState="did"
         stateLabels={{ did: 'Took it', didnt: "Didn't take it" }}
         color={null}
+        onSaveName={vi.fn()}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
         onSaveColor={vi.fn()}
+        onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -345,12 +362,15 @@ describe('SettingsSheet', () => {
   it('re-syncs the color swatch when the stored color changes under an open sheet', () => {
     const { rerender } = render(
       <SettingsSheet
+        name="Worked out"
         defaultState="did"
         stateLabels={DEFAULT_LABELS}
         color={null}
+        onSaveName={vi.fn()}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
         onSaveColor={vi.fn()}
+        onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -358,12 +378,15 @@ describe('SettingsSheet', () => {
 
     rerender(
       <SettingsSheet
+        name="Worked out"
         defaultState="did"
         stateLabels={DEFAULT_LABELS}
         color="straw"
+        onSaveName={vi.fn()}
         onSaveDefaultState={vi.fn()}
         onSaveStateLabels={vi.fn()}
         onSaveColor={vi.fn()}
+        onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -384,5 +407,207 @@ describe('SettingsSheet', () => {
       expect(onSaveStateLabels).toHaveBeenCalledWith({ did: 'Did', didnt: 'Rest day' })
     })
     expect(onSaveDefaultState).not.toHaveBeenCalled()
+  })
+
+  describe('name', () => {
+    it('pre-fills the Name field with the ledger name', () => {
+      renderSheet({ name: 'Drinking' })
+      expect(screen.getByLabelText('Name')).toHaveValue('Drinking')
+    })
+
+    it('saves a renamed ledger alongside no other changes', async () => {
+      const { onSaveName, onSaveDefaultState, onSaveStateLabels, onSaveColor } = renderSheet()
+
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Reading' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await vi.waitFor(() => {
+        expect(onSaveName).toHaveBeenCalledWith('Reading')
+      })
+      expect(onSaveDefaultState).not.toHaveBeenCalled()
+      expect(onSaveStateLabels).not.toHaveBeenCalled()
+      expect(onSaveColor).not.toHaveBeenCalled()
+    })
+
+    it('trims whitespace from the renamed value', async () => {
+      const { onSaveName } = renderSheet()
+
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: '  Reading  ' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await vi.waitFor(() => {
+        expect(onSaveName).toHaveBeenCalledWith('Reading')
+      })
+    })
+
+    it('rejects an emptied name and does not save', async () => {
+      const { onSaveName } = renderSheet()
+
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: '   ' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/enter a name/i)
+      expect(onSaveName).not.toHaveBeenCalled()
+    })
+
+    it('does not save the name when it is left unchanged', async () => {
+      const { onSaveName, onDismiss } = renderSheet()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await vi.waitFor(() => {
+        expect(onDismiss).toHaveBeenCalled()
+      })
+      expect(onSaveName).not.toHaveBeenCalled()
+    })
+
+    it('saves a renamed ledger together with other changed fields in one submit', async () => {
+      const { onSaveName, onSaveColor } = renderSheet({ color: null })
+
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Reading' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Rose' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await vi.waitFor(() => {
+        expect(onSaveName).toHaveBeenCalledWith('Reading')
+        expect(onSaveColor).toHaveBeenCalledWith('rose')
+      })
+    })
+
+    it('re-syncs the Name field when the stored name changes under an open sheet', () => {
+      const { rerender } = render(
+        <SettingsSheet
+          name="Worked out"
+          defaultState="did"
+          stateLabels={DEFAULT_LABELS}
+          color={null}
+          onSaveName={vi.fn()}
+          onSaveDefaultState={vi.fn()}
+          onSaveStateLabels={vi.fn()}
+          onSaveColor={vi.fn()}
+          onDelete={vi.fn()}
+          onTourNoted={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      )
+
+      rerender(
+        <SettingsSheet
+          name="Renamed elsewhere"
+          defaultState="did"
+          stateLabels={DEFAULT_LABELS}
+          color={null}
+          onSaveName={vi.fn()}
+          onSaveDefaultState={vi.fn()}
+          onSaveStateLabels={vi.fn()}
+          onSaveColor={vi.fn()}
+          onDelete={vi.fn()}
+          onTourNoted={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      )
+
+      expect(screen.getByLabelText('Name')).toHaveValue('Renamed elsewhere')
+    })
+
+    it('shows an error and stays open when saving the name fails', async () => {
+      const { onDismiss } = renderSheet({
+        onSaveName: vi.fn().mockRejectedValue(new Error('offline')),
+      })
+
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Reading' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not save. Try again.')
+      expect(onDismiss).not.toHaveBeenCalled()
+    })
+
+    it('gives the first/legacy-migrated ledger the exact same name and color editing capability as any other', () => {
+      // Nothing in this component ever branches on ledger id -- the legacy
+      // ledger id ('default') is passed in exactly like any other id would
+      // be, purely to prove no special-casing leaks into the UI.
+      renderSheet({ name: 'Worked out' })
+
+      expect(screen.getByLabelText('Name')).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: 'Color' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Delete ledger' })).toBeInTheDocument()
+    })
+  })
+
+  describe('delete', () => {
+    it('offers a quiet Delete ledger action, visually separated from normal configuration', () => {
+      renderSheet()
+      expect(screen.getByRole('button', { name: 'Delete ledger' })).toBeInTheDocument()
+    })
+
+    it('requires a confirm tap before deleting', () => {
+      const { onDelete } = renderSheet({ name: 'Worked out' })
+      fireEvent.click(screen.getByRole('button', { name: 'Delete ledger' }))
+
+      expect(onDelete).not.toHaveBeenCalled()
+      expect(screen.getByText(/Delete "Worked out" and its history\?/)).toBeInTheDocument()
+    })
+
+    it('replaces the whole form with the confirm prompt, hiding normal configuration while pending', () => {
+      renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'Delete ledger' }))
+
+      expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Default')).not.toBeInTheDocument()
+    })
+
+    it('cancel reverts to the normal settings form without deleting', () => {
+      const { onDelete } = renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'Delete ledger' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(onDelete).not.toHaveBeenCalled()
+      expect(screen.queryByText(/and its history/)).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Name')).toBeInTheDocument()
+    })
+
+    it('confirming deletes the ledger and closes the sheet', async () => {
+      const { onDelete, onDismiss } = renderSheet({ name: 'Worked out' })
+      fireEvent.click(screen.getByRole('button', { name: 'Delete ledger' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Worked out forever' }))
+
+      await vi.waitFor(() => {
+        expect(onDelete).toHaveBeenCalled()
+        expect(onDismiss).toHaveBeenCalled()
+      })
+    })
+
+    it('allows deleting even when this is the only ledger, relying on the caller for safe fallback', () => {
+      // SettingsSheet itself has no ledger count -- the safe active-ledger
+      // fallback after a delete is entirely Home/useLedgers' job.
+      renderSheet()
+      expect(screen.getByRole('button', { name: 'Delete ledger' })).toBeInTheDocument()
+    })
+
+    it('shows an error and stays in the confirm state when deletion fails', async () => {
+      const onDelete = vi.fn().mockRejectedValue(new Error('offline'))
+      renderSheet({ onDelete, name: 'Worked out' })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete ledger' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Worked out forever' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete. Try again.')
+      expect(screen.getByText(/and its history/)).toBeInTheDocument()
+    })
+
+    it('does not touch defaultState/labels/color saving when deleting', async () => {
+      const { onDelete, onSaveDefaultState, onSaveStateLabels, onSaveColor } = renderSheet({
+        name: 'Worked out',
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Delete ledger' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Worked out forever' }))
+
+      await vi.waitFor(() => {
+        expect(onDelete).toHaveBeenCalled()
+      })
+      expect(onSaveDefaultState).not.toHaveBeenCalled()
+      expect(onSaveStateLabels).not.toHaveBeenCalled()
+      expect(onSaveColor).not.toHaveBeenCalled()
+    })
   })
 })

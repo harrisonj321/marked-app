@@ -48,27 +48,39 @@ vi.mock('./CalendarSheet', () => ({
 }))
 vi.mock('./SettingsSheet', () => ({
   SettingsSheet: ({
+    name,
     defaultState,
     color,
+    onSaveName,
     onSaveDefaultState,
     onSaveColor,
+    onDelete,
     onTourNoted,
     onDismiss,
   }: {
+    name: string
     defaultState: string
     color: string | null
+    onSaveName: (next: string) => Promise<void>
     onSaveDefaultState: (next: 'did' | 'didnt') => Promise<void>
     onSaveColor: (next: string | null) => Promise<void>
+    onDelete: () => Promise<void>
     onTourNoted: () => void
     onDismiss: () => void
   }) => (
     <div data-testid="settings-sheet">
-      settings-sheet:{defaultState}:{color ?? 'none'}
+      settings-sheet:{name}:{defaultState}:{color ?? 'none'}
+      <button type="button" onClick={() => void onSaveName('Renamed').catch(reportSaveError)}>
+        Save name
+      </button>
       <button type="button" onClick={() => void onSaveDefaultState('didnt').catch(reportSaveError)}>
         Save didnt
       </button>
       <button type="button" onClick={() => void onSaveColor('moss').catch(reportSaveError)}>
         Save moss
+      </button>
+      <button type="button" onClick={() => void onDelete().catch(reportSaveError)}>
+        Delete this ledger
       </button>
       <button type="button" onClick={onTourNoted}>
         Tour Noted.
@@ -85,18 +97,14 @@ vi.mock('./LedgerSwitcherSheet', () => ({
     activeLedgerId,
     onSwitch,
     onCreate,
-    onRename,
-    onRecolor,
-    onDelete,
+    onManage,
     onDismiss,
   }: {
     ledgers: { id: string; name: string }[]
     activeLedgerId: string
     onSwitch: (id: string) => void
     onCreate: (input: { name: string; defaultState: 'did' | 'didnt'; color: string | null }) => Promise<void>
-    onRename: (id: string, name: string) => Promise<void>
-    onRecolor: (id: string, color: string | null) => Promise<void>
-    onDelete: (id: string) => Promise<void>
+    onManage: (id: string) => void
     onDismiss: () => void
   }) => (
     <div data-testid="ledger-switcher-sheet">
@@ -114,18 +122,21 @@ vi.mock('./LedgerSwitcherSheet', () => ({
       </button>
       <button
         type="button"
-        onClick={() => void onRename('ledger-2', 'Reading').catch(reportSaveError)}
+        onClick={() => {
+          onManage('ledger-1')
+          onDismiss()
+        }}
       >
-        Rename ledger-2
+        Manage active ledger
       </button>
       <button
         type="button"
-        onClick={() => void onRecolor('ledger-2', 'moss').catch(reportSaveError)}
+        onClick={() => {
+          onManage('ledger-2')
+          onDismiss()
+        }}
       >
-        Recolor ledger-2
-      </button>
-      <button type="button" onClick={() => void onDelete('ledger-1').catch(reportSaveError)}>
-        Delete active ledger
+        Manage ledger-2
       </button>
       <button type="button" onClick={onDismiss}>
         Close switcher
@@ -215,15 +226,26 @@ describe('Home', () => {
     expect(screen.queryByTestId('calendar-sheet')).not.toBeInTheDocument()
   })
 
-  it('opens and closes settings from the footer link', () => {
+  it('opens and closes settings from the footer link, targeting the active ledger', () => {
     renderSettledHome()
     expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:did:none')
+    expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Worked out:did:none')
 
     fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
     expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
+  })
+
+  it('renames the active ledger from Settings opened via the footer link', async () => {
+    renderSettledHome()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }))
+
+    await vi.waitFor(() => {
+      expect(updateLedgerNameMock).toHaveBeenCalledWith('u1', 'ledger-1', 'Renamed')
+    })
   })
 
   it('marks the real Settings control as the customization coach mark\'s anchor', () => {
@@ -345,36 +367,74 @@ describe('Home', () => {
       })
     })
 
-    it('deletes a ledger', async () => {
-      renderSettledHome()
+    describe('manage -> canonical Settings', () => {
+      const otherLedger = { id: 'ledger-2', name: 'Drinking', defaultState: 'did' as const, timezone: 'UTC', startDate: '2026-08-01' }
 
-      fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
-      fireEvent.click(screen.getByRole('button', { name: 'Delete active ledger' }))
+      it('opens the exact same Settings sheet for a non-active ledger selected from the catalog', () => {
+        renderSettledHome({ ledgers: [ledger, otherLedger] })
 
-      await vi.waitFor(() => {
-        expect(deleteLedgerMock).toHaveBeenCalledWith('u1', 'ledger-1')
+        fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+        fireEvent.click(screen.getByRole('button', { name: 'Manage ledger-2' }))
+
+        expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Drinking:did:none')
+        // The catalog itself closes -- there is exactly one settings surface open, not two.
+        expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
       })
-    })
 
-    it('renames a ledger from the catalog, active or not', async () => {
-      renderSettledHome()
+      it('opens Settings for the active ledger the same way when managed from the catalog', () => {
+        renderSettledHome()
 
-      fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
-      fireEvent.click(screen.getByRole('button', { name: 'Rename ledger-2' }))
+        fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+        fireEvent.click(screen.getByRole('button', { name: 'Manage active ledger' }))
 
-      await vi.waitFor(() => {
-        expect(updateLedgerNameMock).toHaveBeenCalledWith('u1', 'ledger-2', 'Reading')
+        expect(screen.getByTestId('settings-sheet')).toHaveTextContent('settings-sheet:Worked out:did:none')
       })
-    })
 
-    it('recolors a ledger from the catalog, active or not', async () => {
-      renderSettledHome()
+      it('renames a non-active ledger through the catalog-opened Settings sheet', async () => {
+        renderSettledHome({ ledgers: [ledger, otherLedger] })
 
-      fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
-      fireEvent.click(screen.getByRole('button', { name: 'Recolor ledger-2' }))
+        fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+        fireEvent.click(screen.getByRole('button', { name: 'Manage ledger-2' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Save name' }))
 
-      await vi.waitFor(() => {
-        expect(updateLedgerColorMock).toHaveBeenCalledWith('u1', 'ledger-2', 'moss')
+        await vi.waitFor(() => {
+          expect(updateLedgerNameMock).toHaveBeenCalledWith('u1', 'ledger-2', 'Renamed')
+        })
+      })
+
+      it('recolors a non-active ledger through the catalog-opened Settings sheet', async () => {
+        renderSettledHome({ ledgers: [ledger, otherLedger] })
+
+        fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+        fireEvent.click(screen.getByRole('button', { name: 'Manage ledger-2' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Save moss' }))
+
+        await vi.waitFor(() => {
+          expect(updateLedgerColorMock).toHaveBeenCalledWith('u1', 'ledger-2', 'moss')
+        })
+      })
+
+      it('deletes a ledger from Settings, whether opened via the footer or the catalog', async () => {
+        renderSettledHome({ ledgers: [ledger, otherLedger] })
+
+        fireEvent.click(screen.getByRole('button', { name: /switch ledger/i }))
+        fireEvent.click(screen.getByRole('button', { name: 'Manage ledger-2' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Delete this ledger' }))
+
+        await vi.waitFor(() => {
+          expect(deleteLedgerMock).toHaveBeenCalledWith('u1', 'ledger-2')
+        })
+      })
+
+      it('deletes the active ledger from Settings opened via the footer link', async () => {
+        renderSettledHome()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Delete this ledger' }))
+
+        await vi.waitFor(() => {
+          expect(deleteLedgerMock).toHaveBeenCalledWith('u1', 'ledger-1')
+        })
       })
     })
   })
