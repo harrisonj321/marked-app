@@ -144,7 +144,7 @@ describe('App', () => {
         fireAnimationEnd(document.querySelector('.onboarding-intro')!, 'onboarding-intro-leave')
       }
       if (label === 'Done') {
-        fireAnimationEnd(document.querySelector('.onboarding-placard')!, 'onboarding-close')
+        fireAnimationEnd(document.querySelector('.onboarding-coach')!, 'onboarding-close')
       }
     }
 

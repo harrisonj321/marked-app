@@ -75,6 +75,16 @@ describe('OnboardingOrientation', () => {
     expect(screen.queryByText(/Maker 428/)).not.toBeInTheDocument()
   })
 
+  it('exposes the same four spotlight anchors the tour targets, so each coach step can point at its real control', () => {
+    mockPlatform()
+    const { container } = render(<OnboardingOrientation onFinish={vi.fn()} />)
+
+    expect(container.querySelector('[data-tour-id="today-toggle"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-tour-id="open-calendar"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-tour-id="open-settings"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-tour-id="ledger-title"]')).toBeInTheDocument()
+  })
+
   it('makes the demo shell inert, so it cannot be interacted with underneath the tour', () => {
     mockPlatform()
     const { container } = render(<OnboardingOrientation onFinish={vi.fn()} />)
@@ -115,7 +125,7 @@ describe('OnboardingOrientation', () => {
     expect(shellStage(container)).toBe('ledger')
   })
 
-  it("demonstrates the toggle's gesture once during the today scene -- the mark slides over, rests, and returns", () => {
+  it("demonstrates the toggle's gesture once during the today scene -- the fingertip's slide flips the mark, its return tap puts it back", () => {
     vi.useFakeTimers()
     mockPlatform()
     render(<OnboardingOrientation onFinish={vi.fn()} />)
@@ -125,14 +135,30 @@ describe('OnboardingOrientation', () => {
     expect(didnt).toBeChecked()
 
     act(() => {
-      vi.advanceTimersByTime(1600)
+      vi.advanceTimersByTime(2100) // the slide crosses the midpoint
     })
     expect(did).toBeChecked()
 
     act(() => {
-      vi.advanceTimersByTime(1400)
+      vi.advanceTimersByTime(1450) // the return tap
     })
     expect(didnt).toBeChecked()
+  })
+
+  it('shows the fingertip touch indicator while the demonstration can play, and only then', () => {
+    vi.useFakeTimers()
+    mockPlatform()
+    const { container } = render(<OnboardingOrientation onFinish={vi.fn()} />)
+
+    // Not before the today scene...
+    expect(container.querySelector('.demo-touch')).not.toBeInTheDocument()
+
+    leaveIntro()
+    expect(container.querySelector('.demo-touch')).toBeInTheDocument()
+
+    // ...and gone once the scene moves on.
+    fireEvent.click(screen.getByRole('button', { name: 'Next' })) // today -> calendar
+    expect(container.querySelector('.demo-touch')).not.toBeInTheDocument()
   })
 
   it('cancels the demonstration and restores the mark the moment the scene moves on', () => {
@@ -142,7 +168,7 @@ describe('OnboardingOrientation', () => {
     leaveIntro()
 
     act(() => {
-      vi.advanceTimersByTime(1600)
+      vi.advanceTimersByTime(2100)
     })
     const [didnt, did] = screen.getAllByRole('radio')
     expect(did).toBeChecked()
@@ -156,10 +182,10 @@ describe('OnboardingOrientation', () => {
     expect(didnt).toBeChecked()
   })
 
-  it('skips the demonstration entirely under reduced motion', () => {
+  it('skips the demonstration entirely under reduced motion -- no flip, and no fingertip waiting to perform', () => {
     vi.useFakeTimers()
     mockPlatform({ reducedMotion: true })
-    render(<OnboardingOrientation onFinish={vi.fn()} />)
+    const { container } = render(<OnboardingOrientation onFinish={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
     act(() => {
@@ -168,6 +194,7 @@ describe('OnboardingOrientation', () => {
 
     const [didnt] = screen.getAllByRole('radio')
     expect(didnt).toBeChecked()
+    expect(container.querySelector('.demo-touch')).not.toBeInTheDocument()
   })
 
   it('propagates completion from the underlying tour', () => {
@@ -194,7 +221,7 @@ describe('OnboardingOrientation', () => {
     expect(shellStage(container)).toBe('closing')
     expect(onFinish).not.toHaveBeenCalled()
 
-    fireAnimationEnd(document.querySelector('.onboarding-placard')!, 'onboarding-close')
+    fireAnimationEnd(document.querySelector('.onboarding-coach')!, 'onboarding-close')
 
     expect(onFinish).toHaveBeenCalledWith('completed')
   })

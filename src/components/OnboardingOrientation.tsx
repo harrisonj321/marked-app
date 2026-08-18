@@ -15,15 +15,17 @@ interface OnboardingOrientationProps {
  * The full first-run tour, always run before any account exists -- see
  * App.tsx and CLAUDE.md's "onboarding/orientation before auth" requirement.
  *
- * Runs the tour in its staged presentation: instead of coach marks
- * spotlighting a finished screen, the demo shell assembles itself out of
- * the same paper the intro's lines faded from, one piece per step. The
- * tour reports which scene is current (onStageChange) and the shell
- * mirrors it as a data-stage attribute; everything else -- which elements
- * have arrived, which one carries the light, how each enters -- is CSS
- * (see "Staged orientation" in index.css). Structurally this still pairs
- * the unmodified tour state machine with a static, non-Firestore stand-in
- * for Home, exactly as Home pairs its real content with the tour during a
+ * Runs the tour in its staged presentation: the same spotlight-and-callout
+ * targeting the Settings replay uses -- the cutout plus adjacent words are
+ * what make "this control -> this explanation" readable at a glance -- but
+ * set inside one continuous scene: the demo shell assembles itself out of
+ * the same paper the intro's lines faded from, one piece per step, each
+ * new subject arriving inside the spotlight. The tour reports which scene
+ * is current (onStageChange) and the shell mirrors it as a data-stage
+ * attribute; which elements exist yet and how each enters is CSS (see
+ * "Staged orientation" in index.css). Structurally this still pairs the
+ * unmodified tour state machine with a static, non-Firestore stand-in for
+ * Home, exactly as Home pairs its real content with the tour during a
  * Settings replay.
  */
 export function OnboardingOrientation({ onFinish }: OnboardingOrientationProps) {
@@ -37,9 +39,17 @@ export function OnboardingOrientation({ onFinish }: OnboardingOrientationProps) 
   )
 }
 
-/** How long after the 'today' scene opens the toggle demonstrates its gesture, and when it puts the mark back. Long enough for the toggle's own entrance to have settled first. */
-const DEMO_FLIP_AT_MS = 1600
-const DEMO_RETURN_AT_MS = 3000
+/**
+ * The two state changes inside the toggle demonstration, in ms from the
+ * 'today' scene opening. Both are choreographed against the fingertip
+ * indicator's CSS timeline (see @keyframes demo-touch in index.css, which
+ * starts at 1300ms and runs 2900ms): the flip lands as the fingertip's
+ * slide crosses the track's midpoint, so the ink springs across and
+ * arrives with it; the restore lands on the fingertip's return tap over
+ * the other word. If one timeline moves, move the other.
+ */
+const DEMO_FLIP_AT_MS = 2100
+const DEMO_RETURN_AT_MS = 3550
 
 interface DemoShellProps {
   stage: OrientationStage
@@ -60,14 +70,22 @@ interface DemoShellProps {
  * date is shown as-is; that's calendar fact, not personal content.
  *
  * Every introduced element carries a data-demo name; the current stage
- * (data-stage on the root) decides each one's presence -- not yet arrived,
- * arrived, or carrying the light -- so attention moves by the interface
- * coming alive rather than by a spotlight rectangle. While the 'today'
- * scene has the light, the toggle performs the product's whole gesture
- * once -- the mark slides over on its real spring, rests, and returns --
- * so a first-time user sees the interaction happen instead of reading
- * about it. Skipped under reduced motion, and cancelled (mark restored)
- * the moment the scene moves on.
+ * (data-stage on the root) decides whether it has arrived on the page yet,
+ * so the interface still assembles scene by scene -- but focus itself is
+ * carried by the tour's spotlight and adjacent callout (the same
+ * data-tour-id anchors the replay uses), never by lighting subtlety.
+ *
+ * While the 'today' scene is spotlit, the toggle demonstrates the
+ * product's whole gesture once, with a visible fingertip performing it:
+ * the touch point appears over the mark, presses, slides across (the real
+ * ink following on its real spring), lifts, then returns and taps the
+ * other word to put the mark back -- so a first-time user sees that the
+ * control can be slid or tapped, and watches an interaction rather than a
+ * control moving by itself. The fingertip is pure CSS choreography (see
+ * @keyframes demo-touch); only the two real state changes live here as
+ * timers. Skipped entirely under reduced motion -- the scene then reads
+ * as a plain, settled control -- and cancelled (mark restored) the moment
+ * the scene moves on.
  */
 function DemoShell({ stage }: DemoShellProps) {
   const [state, setState] = useState<DayState>('didnt')
@@ -98,6 +116,7 @@ function DemoShell({ stage }: DemoShellProps) {
             className="icon-button"
             aria-label="Open calendar"
             data-demo="calendar"
+            data-tour-id="open-calendar"
           >
             <CalendarIcon />
           </button>
@@ -111,6 +130,7 @@ function DemoShell({ stage }: DemoShellProps) {
             type="button"
             className="tracker-title-button"
             aria-label="Switch ledger, current: Whatever."
+            data-tour-id="ledger-title"
           >
             <span className="tracker-title-name">Whatever.</span>
             {/* The switch affordance is discovered, not labeled: absent until
@@ -122,7 +142,17 @@ function DemoShell({ stage }: DemoShellProps) {
           </button>
         </h1>
         <div className="today" data-demo="toggle">
-          <TodayToggle state={state} defaultState="didnt" onSelect={setState} labels={DEFAULT_STATE_LABELS} />
+          {/* The stage wrapper matches the toggle's own footprint so the
+              fingertip's percentage positions land on the track's two
+              halves. The fingertip only exists while the demonstration can
+              actually play -- reduced motion gets a plain, settled control
+              with nothing waiting to happen. */}
+          <div className="demo-toggle-stage">
+            <TodayToggle state={state} defaultState="didnt" onSelect={setState} labels={DEFAULT_STATE_LABELS} />
+            {stage === 'today' && !prefersReducedMotion() && (
+              <span className="demo-touch" aria-hidden="true" />
+            )}
+          </div>
         </div>
       </div>
 
@@ -131,7 +161,7 @@ function DemoShell({ stage }: DemoShellProps) {
           whose footer is being introduced. */}
       <footer className="home-footer">
         <div className="home-footer-links">
-          <button type="button" className="footer-link" data-demo="settings">
+          <button type="button" className="footer-link" data-demo="settings" data-tour-id="open-settings">
             Settings
           </button>
         </div>

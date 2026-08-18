@@ -150,11 +150,14 @@ interface OnboardingTourProps {
    * actual controls, and a callout card near each one -- annotation of a
    * real screen the user already lives in.
    *
-   * 'staged' (the pre-auth orientation over the demo shell): no backdrop,
-   * no spotlight, no card. The shell's own elements arrive stage by stage
-   * (driven through onStageChange -> data-stage CSS), the step copy reads
-   * from a fixed placard at the bottom of the paper, and the intro/finale
-   * get soft exit beats so the whole sequence plays as one scene.
+   * 'staged' (the pre-auth orientation over the demo shell): the same
+   * spotlight-and-callout targeting -- a first-time user must be able to
+   * glance at a step and know exactly which control the words refer to --
+   * but softened and set inside one continuous scene: a warmer veil, the
+   * shell assembling element by element underneath (driven through
+   * onStageChange -> data-stage CSS) so each new subject arrives inside
+   * the cutout, quiet intermediate Nexts with the accent fill reserved
+   * for Done, and soft intro/finale exit beats.
    */
   presentation?: 'spotlight' | 'staged'
   /** Staged presentation only: reports the current scene so the host shell can stage itself. */
@@ -169,11 +172,11 @@ interface OnboardingTourProps {
  * replay, or the neutral demo shell for the pre-auth orientation (see
  * OnboardingOrientation) -- so this component only ever needs to render
  * whichever single step is current. The one exception to "single step"
- * thinking: in spotlight presentation all four coach steps share one
- * persistent CoachOverlay so the spotlight element survives step changes
- * and its CSS position transition glides it from control to control; in
- * staged presentation they share one persistent placard so the primary
- * action never moves under the user's thumb.
+ * thinking: all four coach steps share one persistent CoachOverlay so the
+ * spotlight element survives step changes and its CSS position transition
+ * glides it from control to control -- in both presentations; staged mode
+ * only softens the overlay's veil and button emphasis, never its
+ * targeting.
  */
 export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageChange }: OnboardingTourProps) {
   const { canPromptInstall, promptInstall } = useInstallPrompt()
@@ -294,25 +297,18 @@ export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageCh
         <IntroStep onPrimary={handleIntroPrimary} leaving={introLeaving} onLeft={handleIntroLeft} />
       )}
 
-      {isCoachStep(step) &&
-        (staged ? (
-          <StagedPlacard
-            step={step}
-            config={COACH_STEPS[step]}
-            primaryLabel={isLastStep ? 'Done' : 'Next'}
-            final={isLastStep}
-            onPrimary={goNext}
-            closing={closing}
-            onClosed={() => onFinish('completed')}
-          />
-        ) : (
-          <CoachOverlay
-            step={step}
-            config={COACH_STEPS[step]}
-            primaryLabel={isLastStep ? 'Done' : 'Next'}
-            onPrimary={goNext}
-          />
-        ))}
+      {isCoachStep(step) && (
+        <CoachOverlay
+          step={step}
+          config={COACH_STEPS[step]}
+          primaryLabel={isLastStep ? 'Done' : 'Next'}
+          onPrimary={goNext}
+          staged={staged}
+          final={isLastStep}
+          closing={closing}
+          onClosed={() => onFinish('completed')}
+        />
+      )}
 
       {step === 'install' && (
         <InstallStep
@@ -475,6 +471,20 @@ interface CoachOverlayProps {
   config: CoachStepConfig
   primaryLabel: string
   onPrimary: () => void
+  /**
+   * The staged orientation's softer dress on the same targeting: a warmer,
+   * lighter veil (the shell underneath is mid-assembly, not a finished
+   * screen) and quiet intermediate Nexts. Targeting itself -- cutout plus
+   * adjacent callout -- is identical in both modes, because that adjacency
+   * is what makes "this control -> this explanation" readable at a glance.
+   */
+  staged?: boolean
+  /** True on the sequence's last step: its action regains the accent fill the intermediate Nexts give up (staged only). */
+  final?: boolean
+  /** Staged finale beat: the overlay fades as one piece while the shell holds full ink. */
+  closing?: boolean
+  /** Fires when the closing animation reports done -- see the closing effect below. */
+  onClosed?: () => void
 }
 
 /**
@@ -483,15 +493,61 @@ interface CoachOverlayProps {
  * to the next control; the callout is keyed per step so it remounts, which
  * both re-runs its entrance fade and moves focus onto the new step's
  * primary action.
+ *
+ * In staged mode this root also carries the finale: 'closing' swaps its
+ * entrance animation for the shared onboarding-close fade, and that
+ * animation's end/cancel event is what hands control back to the tour.
+ * The tour only ever sets closing when the animation will actually play
+ * (reduced motion finishes plainly instead), so no fallback timer is
+ * needed here.
  */
-function CoachOverlay({ step, config, primaryLabel, onPrimary }: CoachOverlayProps) {
+function CoachOverlay({
+  step,
+  config,
+  primaryLabel,
+  onPrimary,
+  staged = false,
+  final = false,
+  closing = false,
+  onClosed,
+}: CoachOverlayProps) {
+  const overlayRef = useRef<HTMLDivElement>(null)
   const rect = useTourTargetRect(config.tourId)
   const spotlightTopPaddingPx = config.spotlightTopPaddingPx ?? SPOTLIGHT_PADDING_PX
 
   const placeBelow = !rect || rect.top < window.innerHeight / 2
 
+  useEffect(() => {
+    if (!closing || !onClosed) {
+      return
+    }
+    const element = overlayRef.current
+    if (!element) {
+      return
+    }
+    function handle(event: AnimationEvent) {
+      if (event.animationName === 'onboarding-close') {
+        onClosed?.()
+      }
+    }
+    element.addEventListener('animationend', handle)
+    element.addEventListener('animationcancel', handle)
+    return () => {
+      element.removeEventListener('animationend', handle)
+      element.removeEventListener('animationcancel', handle)
+    }
+  }, [closing, onClosed])
+
+  const overlayClassName = [
+    'onboarding-coach',
+    staged ? 'onboarding-coach-staged' : '',
+    closing ? 'onboarding-closing' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className="onboarding-coach">
+    <div ref={overlayRef} className={overlayClassName}>
       {rect && (
         <div
           className="tour-spotlight"
@@ -509,6 +565,7 @@ function CoachOverlay({ step, config, primaryLabel, onPrimary }: CoachOverlayPro
         label={config.label}
         body={config.body}
         primaryLabel={primaryLabel}
+        quiet={staged && !final}
         onPrimary={onPrimary}
         style={
           rect
@@ -526,6 +583,8 @@ interface CoachCalloutProps {
   label: string
   body: string
   primaryLabel: string
+  /** Quiet surface treatment for staged intermediate Nexts; the accent fill stays for the replay and for Done. */
+  quiet?: boolean
   onPrimary: () => void
   style: React.CSSProperties
 }
@@ -536,7 +595,7 @@ interface CoachCalloutProps {
  * appears). Until then focus rests wherever the previous step left it --
  * the topbar's aria-live region covers the announcement gap.
  */
-function CoachCallout({ label, body, primaryLabel, onPrimary, style }: CoachCalloutProps) {
+function CoachCallout({ label, body, primaryLabel, quiet = false, onPrimary, style }: CoachCalloutProps) {
   const headingId = useId()
   const calloutRef = useRef<HTMLDivElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
@@ -562,109 +621,15 @@ function CoachCallout({ label, body, primaryLabel, onPrimary, style }: CoachCall
       </p>
       <p>{body}</p>
       <div className="tour-callout-actions">
-        <button type="button" className="onboarding-primary" ref={primaryRef} onClick={onPrimary}>
+        <button
+          type="button"
+          className={quiet ? undefined : 'onboarding-primary'}
+          ref={primaryRef}
+          onClick={onPrimary}
+        >
           {primaryLabel}
         </button>
       </div>
-    </div>
-  )
-}
-
-interface StagedPlacardProps {
-  step: CoachStepId
-  config: CoachStepConfig
-  primaryLabel: string
-  /**
-   * True only on the sequence's last step. The accent-filled treatment is
-   * reserved for the tour's bookends -- the intro's "Noted." and the final
-   * action here; intermediate Nexts wear the app's ordinary quiet surface
-   * button so the interface being demonstrated stays the loudest thing on
-   * screen.
-   */
-  final: boolean
-  onPrimary: () => void
-  /** True during the finale beat; onClosed fires when its exit animation reports done. */
-  closing: boolean
-  onClosed: () => void
-}
-
-/**
- * The staged orientation's counterpart to CoachCallout: step copy set
- * directly on the paper in a fixed placard at the bottom of the screen,
- * not a floating card near a control -- the shell's own stage lighting
- * (see OnboardingOrientation) is what carries attention to each subject.
- *
- * One placard persists across all four coach steps, unkeyed, so the
- * primary action never moves or re-mounts: the button stays put under the
- * user's thumb -- in the same spot the intro's own primary occupied -- and
- * keeps focus while only the copy above it changes. The copy block is
- * keyed per step so its small entrance re-runs, and it sits inside a
- * persistent aria-live region so each step's words are announced without
- * needing to move focus.
- *
- * The finale ('closing') plays as one CSS animation on this root; its
- * animationend/animationcancel is what hands control back to the caller.
- * The caller only ever sets closing when the animation will actually play
- * (reduced motion finishes plainly instead), so no fallback timer is
- * needed here.
- */
-function StagedPlacard({ step, config, primaryLabel, final, onPrimary, closing, onClosed }: StagedPlacardProps) {
-  const labelId = useId()
-  const placardRef = useRef<HTMLDivElement>(null)
-  const primaryRef = useRef<HTMLButtonElement>(null)
-  const entered = useEntranceSettled(placardRef, 'onboarding-rise')
-
-  useEffect(() => {
-    if (entered) {
-      primaryRef.current?.focus()
-    }
-  }, [entered])
-
-  useEffect(() => {
-    if (!closing) {
-      return
-    }
-    const element = placardRef.current
-    if (!element) {
-      return
-    }
-    function handle(event: AnimationEvent) {
-      if (event.animationName === 'onboarding-close') {
-        onClosed()
-      }
-    }
-    element.addEventListener('animationend', handle)
-    element.addEventListener('animationcancel', handle)
-    return () => {
-      element.removeEventListener('animationend', handle)
-      element.removeEventListener('animationcancel', handle)
-    }
-  }, [closing, onClosed])
-
-  return (
-    <div
-      ref={placardRef}
-      className={closing ? 'onboarding-placard onboarding-closing' : 'onboarding-placard'}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={labelId}
-    >
-      <div className="onboarding-placard-text" aria-live="polite">
-        <div key={step} className="onboarding-placard-copy">
-          <p id={labelId} className="onboarding-placard-label">
-            {config.label}
-          </p>
-          <p className="onboarding-placard-body">{config.body}</p>
-        </div>
-      </div>
-      <button
-        type="button"
-        className={final ? 'onboarding-primary' : undefined}
-        ref={primaryRef}
-        onClick={onPrimary}
-      >
-        {primaryLabel}
-      </button>
     </div>
   )
 }

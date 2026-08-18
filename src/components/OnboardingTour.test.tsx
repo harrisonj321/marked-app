@@ -444,7 +444,15 @@ describe('OnboardingTour', () => {
       mockPlatform({ reducedMotion })
       const onFinish = vi.fn()
       const onStageChange = vi.fn()
-      render(<OnboardingTour presentation="staged" onStageChange={onStageChange} onFinish={onFinish} />)
+      render(
+        <>
+          <div data-tour-id="open-settings" />
+          <div data-tour-id="today-toggle" />
+          <div data-tour-id="open-calendar" />
+          <div data-tour-id="ledger-title" />
+          <OnboardingTour presentation="staged" onStageChange={onStageChange} onFinish={onFinish} />
+        </>,
+      )
       return { onFinish, onStageChange }
     }
 
@@ -476,35 +484,51 @@ describe('OnboardingTour', () => {
       expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
     })
 
-    it('presents coach steps on a placard with no spotlight, backdrop, or callout card', () => {
+    it('anchors each coach step with the spotlight and an adjacent callout -- explicit targeting, not a detached placard', () => {
       renderStaged()
       leaveIntro()
 
-      expect(document.querySelector('.onboarding-placard')).toBeInTheDocument()
-      expect(document.querySelector('.onboarding-coach')).not.toBeInTheDocument()
-      expect(document.querySelector('.tour-spotlight')).not.toBeInTheDocument()
-      expect(document.querySelector('.tour-callout')).not.toBeInTheDocument()
+      expect(document.querySelector('.onboarding-coach')).toBeInTheDocument()
+      // The staged veil is the softer variant of the same overlay.
+      expect(document.querySelector('.onboarding-coach')).toHaveClass('onboarding-coach-staged')
+      expect(document.querySelector('.tour-spotlight')).toBeInTheDocument()
+      expect(document.querySelector('.tour-callout')).toBeInTheDocument()
+      expect(document.querySelector('.onboarding-placard')).not.toBeInTheDocument()
     })
 
-    it('keeps one persistent primary across coach steps, holding position and focus while only the copy changes', () => {
+    it('wears the quiet surface treatment on intermediate Nexts and focuses each new callout once its entrance settles', () => {
       renderStaged()
       leaveIntro()
 
       const primary = screen.getByRole('button', { name: 'Next' })
-      fireAnimationEnd(document.querySelector('.onboarding-placard')!, 'onboarding-rise')
-      expect(primary).toHaveFocus()
-
-      // Intermediate steps wear the quiet surface treatment; the accent
-      // fill is reserved for the sequence's bookends (intro and Done).
+      // The accent fill is reserved for the sequence's bookends (intro and
+      // Done); mid-orientation the interface stays the loudest thing.
       expect(primary).not.toHaveClass('onboarding-primary')
+
+      fireAnimationEnd(document.querySelector('.tour-callout')!, 'onboarding-fade')
+      expect(primary).toHaveFocus()
 
       fireEvent.click(primary)
 
-      // Same DOM node, new words above it: a remounted button would lose
-      // both its place under the thumb and its focus.
-      expect(screen.getByRole('button', { name: 'Next' })).toBe(primary)
-      expect(primary).toHaveFocus()
       expect(screen.getByText(/tap a past day to correct it/i)).toBeInTheDocument()
+      const nextPrimary = screen.getByRole('button', { name: 'Next' })
+      expect(nextPrimary).not.toHaveClass('onboarding-primary')
+      fireAnimationEnd(document.querySelector('.tour-callout')!, 'onboarding-fade')
+      expect(nextPrimary).toHaveFocus()
+    })
+
+    it('keeps one persistent spotlight element across staged steps, so its position transition can glide between controls', () => {
+      mockDistinctTourRects()
+      renderStaged()
+      leaveIntro()
+
+      const spotlight = document.querySelector('.tour-spotlight')
+      expect(spotlight).toHaveStyle({ top: '290px' })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(document.querySelector('.tour-spotlight')).toBe(spotlight)
+      expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '50px' })
     })
 
     it('reports each scene to the host shell as the steps advance', () => {
@@ -539,9 +563,9 @@ describe('OnboardingTour', () => {
 
       expect(onFinish).not.toHaveBeenCalled()
       expect(onStageChange).toHaveBeenLastCalledWith('closing')
-      expect(document.querySelector('.onboarding-placard')).toHaveClass('onboarding-closing')
+      expect(document.querySelector('.onboarding-coach')).toHaveClass('onboarding-closing')
 
-      fireAnimationEnd(document.querySelector('.onboarding-placard')!, 'onboarding-close')
+      fireAnimationEnd(document.querySelector('.onboarding-coach')!, 'onboarding-close')
 
       expect(onFinish).toHaveBeenCalledWith('completed')
       expect(onFinish).toHaveBeenCalledTimes(1)
@@ -572,7 +596,7 @@ describe('OnboardingTour', () => {
       fireEvent.keyDown(window, { key: 'Escape' })
       expect(onFinish).not.toHaveBeenCalled()
 
-      fireAnimationEnd(document.querySelector('.onboarding-placard')!, 'onboarding-close')
+      fireAnimationEnd(document.querySelector('.onboarding-coach')!, 'onboarding-close')
       expect(onFinish).toHaveBeenCalledWith('completed')
       expect(onFinish).toHaveBeenCalledTimes(1)
     })
