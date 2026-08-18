@@ -51,7 +51,29 @@ export function useTourTargetRect(tourId: string): DOMRect | null {
 
     const remeasure = () => setRect(element.getBoundingClientRect())
 
-    const resizeObserver = new ResizeObserver(remeasure)
+    // ResizeObserver's spec-mandated first callback fires asynchronously
+    // right after observe(), reporting the size as of whenever that
+    // callback happens to run -- which is no fresher than the measurement
+    // already taken above (or by the mutation-observer branch that led
+    // here), and is vulnerable to a real race: a sibling effect elsewhere
+    // in the tree (the staged orientation's onStageChange) can flip this
+    // element's stage attribute in the same window, kicking off its CSS
+    // entrance transform (see demo-arrive in index.css) right before this
+    // callback fires. When that happens, this "initial" report captures
+    // the element mid-transform -- offset by the animation's translateY --
+    // and nothing ever re-measures afterward to correct it, since a pure
+    // transform change doesn't trigger any *later* ResizeObserver callback
+    // either. Skipping this one, always-redundant first report and
+    // trusting only genuine subsequent resizes avoids the whole failure
+    // mode without guessing at timing.
+    let skippedInitialReport = false
+    const resizeObserver = new ResizeObserver(() => {
+      if (!skippedInitialReport) {
+        skippedInitialReport = true
+        return
+      }
+      remeasure()
+    })
     resizeObserver.observe(element)
     window.addEventListener('resize', remeasure)
     window.addEventListener('orientationchange', remeasure)

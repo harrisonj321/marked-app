@@ -135,12 +135,12 @@ describe('OnboardingOrientation', () => {
     expect(didnt).toBeChecked()
 
     act(() => {
-      vi.advanceTimersByTime(2100) // the slide crosses the midpoint
+      vi.advanceTimersByTime(3100) // the slide crosses the midpoint
     })
     expect(did).toBeChecked()
 
     act(() => {
-      vi.advanceTimersByTime(1450) // the return tap
+      vi.advanceTimersByTime(2350) // the return tap
     })
     expect(didnt).toBeChecked()
   })
@@ -168,7 +168,7 @@ describe('OnboardingOrientation', () => {
     leaveIntro()
 
     act(() => {
-      vi.advanceTimersByTime(2100)
+      vi.advanceTimersByTime(3100)
     })
     const [didnt, did] = screen.getAllByRole('radio')
     expect(did).toBeChecked()
@@ -177,7 +177,7 @@ describe('OnboardingOrientation', () => {
     expect(didnt).toBeChecked()
 
     act(() => {
-      vi.advanceTimersByTime(5000)
+      vi.advanceTimersByTime(6000)
     })
     expect(didnt).toBeChecked()
   })
@@ -189,7 +189,7 @@ describe('OnboardingOrientation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
     act(() => {
-      vi.advanceTimersByTime(5000)
+      vi.advanceTimersByTime(7000)
     })
 
     const [didnt] = screen.getAllByRole('radio')

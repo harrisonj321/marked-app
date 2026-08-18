@@ -43,13 +43,17 @@ export function OnboardingOrientation({ onFinish }: OnboardingOrientationProps) 
  * The two state changes inside the toggle demonstration, in ms from the
  * 'today' scene opening. Both are choreographed against the fingertip
  * indicator's CSS timeline (see @keyframes demo-touch in index.css, which
- * starts at 1300ms and runs 2900ms): the flip lands as the fingertip's
- * slide crosses the track's midpoint, so the ink springs across and
+ * starts at 1300ms and runs 4800ms -- paced with deliberate breathing
+ * room: a settle beat before the press, a slow drag, and a long dwell on
+ * the far side before the return, rather than a uniformly faster
+ * original): the flip lands as the fingertip's slide crosses the track's
+ * midpoint (2650ms-3550ms, so 3100ms), so the ink springs across and
  * arrives with it; the restore lands on the fingertip's return tap over
- * the other word. If one timeline moves, move the other.
+ * the other word (5450ms, the keyframe's 86.46%). If one timeline moves,
+ * move the other.
  */
-const DEMO_FLIP_AT_MS = 2100
-const DEMO_RETURN_AT_MS = 3550
+const DEMO_FLIP_AT_MS = 3100
+const DEMO_RETURN_AT_MS = 5450
 
 interface DemoShellProps {
   stage: OrientationStage

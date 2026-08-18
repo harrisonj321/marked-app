@@ -213,7 +213,9 @@ describe('OnboardingTour', () => {
     // Same DOM node, new position: a remounted spotlight would jump
     // instead of transitioning.
     expect(document.querySelector('.tour-spotlight')).toBe(spotlight)
-    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '50px' })
+    // open-calendar's stub rect has top: 40 -- symmetric padding puts the
+    // spotlight's top 10px above that, at 30, on every step alike.
+    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '30px' })
   })
 
   it('measures the real open-settings element specifically, not merely any coach-mark target', () => {
@@ -288,20 +290,81 @@ describe('OnboardingTour', () => {
     expect(topbarClassName()).toBe('onboarding-topbar')
   })
 
-  it('insets the calendar spotlight from the top by more than the default coach-mark padding, to clear Skip in its one fixed position', () => {
+  it("centers the spotlight on the target's own center regardless of the target's shape -- padding is symmetric, never a per-target offset", () => {
     mockPlatform()
+    // A wide, short rect -- deliberately not square, unlike every stub in
+    // mockDistinctTourRects, so an asymmetric-padding bug (equal-looking
+    // by accident on a square target) has nowhere to hide.
+    const rect = { top: 300, left: 20, width: 320, height: 40, bottom: 340, right: 340 } as DOMRect
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const isTarget = this.getAttribute('data-tour-id') === 'today-toggle'
+      const r = isTarget ? rect : ({ top: 0, left: 0, width: 0, height: 0, bottom: 0, right: 0 } as DOMRect)
+      return { ...r, x: r.left, y: r.top, toJSON: () => {} }
+    })
     renderTour()
 
     clickNext() // welcome -> coach-today
-    // All stub targets report a zero rect in jsdom, so the difference in
-    // computed inline style isolates the padding math itself.
-    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '-10px' })
 
-    clickNext() // coach-today -> coach-calendar
-    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '10px' })
+    // Exactly 10px on every side...
+    expect(document.querySelector('.tour-spotlight')).toHaveStyle({
+      top: '290px',
+      left: '10px',
+      width: '340px',
+      height: '60px',
+    })
 
-    clickNext() // coach-calendar -> coach-customize
-    expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '-10px' })
+    // ...which is what makes the spotlight's own center land exactly on
+    // the target's center, for this or any other target shape. A
+    // per-target offset (the old calendar-only hack this test replaces)
+    // would move the center away from the target instead.
+    const spotlight = document.querySelector('.tour-spotlight')!
+    const spotlightStyle = getComputedStyle(spotlight)
+    const spotlightCenterX = parseFloat(spotlightStyle.left) + parseFloat(spotlightStyle.width) / 2
+    const spotlightCenterY = parseFloat(spotlightStyle.top) + parseFloat(spotlightStyle.height) / 2
+    expect(spotlightCenterX).toBe(rect.left + rect.width / 2)
+    expect(spotlightCenterY).toBe(rect.top + rect.height / 2)
+  })
+
+  it("anchors the callout horizontally on the target's own center when the viewport has room, rather than the middle of the screen", () => {
+    mockPlatform()
+    // jsdom's default viewport is 1024px wide; a target sitting well
+    // inside it (nowhere near either edge) should pull the callout to its
+    // own center rather than leaving it pinned to screen-center.
+    const rect = { top: 100, left: 300, width: 40, height: 40, bottom: 140, right: 340 } as DOMRect
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const isTarget = this.getAttribute('data-tour-id') === 'today-toggle'
+      const r = isTarget ? rect : ({ top: 0, left: 0, width: 0, height: 0, bottom: 0, right: 0 } as DOMRect)
+      return { ...r, x: r.left, y: r.top, toJSON: () => {} }
+    })
+    renderTour()
+
+    clickNext() // welcome -> coach-today
+
+    const targetCenterX = rect.left + rect.width / 2
+    expect(document.querySelector('.tour-callout')).toHaveStyle({ left: `${targetCenterX}px` })
+  })
+
+  it('clamps the callout inside the safe viewport margin instead of following a target all the way to the edge', () => {
+    mockPlatform()
+    // A target hugging the right edge of jsdom's 1024px-wide viewport --
+    // anchoring exactly to its center would push most of the card off-screen.
+    const rect = { top: 100, left: 1000, width: 20, height: 20, bottom: 120, right: 1020 } as DOMRect
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const isTarget = this.getAttribute('data-tour-id') === 'today-toggle'
+      const r = isTarget ? rect : ({ top: 0, left: 0, width: 0, height: 0, bottom: 0, right: 0 } as DOMRect)
+      return { ...r, x: r.left, y: r.top, toJSON: () => {} }
+    })
+    renderTour()
+
+    clickNext() // welcome -> coach-today
+
+    // Half the callout's own max width (22rem = 352px, at 16px margins on
+    // a 1024px viewport neither dimension clips the other) short of the
+    // right edge -- the card's own edge lands on the safe margin, not its
+    // center on the target.
+    const halfWidth = 352 / 2
+    const clampedCenterX = 1024 - 16 - halfWidth
+    expect(document.querySelector('.tour-callout')).toHaveStyle({ left: `${clampedCenterX}px` })
   })
 
   it('degrades to a centered callout with no spotlight when the target is not mounted', () => {
@@ -528,7 +591,9 @@ describe('OnboardingTour', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 
       expect(document.querySelector('.tour-spotlight')).toBe(spotlight)
-      expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '50px' })
+      // Same symmetric padding as the replay: open-calendar's stub rect
+      // has top: 40, so the spotlight's top sits at 30.
+      expect(document.querySelector('.tour-spotlight')).toHaveStyle({ top: '30px' })
     })
 
     it('reports each scene to the host shell as the steps advance', () => {

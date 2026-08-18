@@ -97,8 +97,6 @@ interface CoachStepConfig {
   tourId: string
   label: string
   body: string
-  /** Overrides the spotlight's top padding only, e.g. to stay clear of the fixed top bar above it. */
-  spotlightTopPaddingPx?: number
 }
 
 const COACH_STEPS: Record<CoachStepId, CoachStepConfig> = {
@@ -114,15 +112,11 @@ const COACH_STEPS: Record<CoachStepId, CoachStepConfig> = {
     // not editable, and the replayable tour reaches users for whom such
     // days are visible on the calendar.
     body: 'The pattern, at a glance. Tap a past day to correct it.',
-    // The real "Open calendar" button sits close enough to the top bar
-    // that padding the spotlight's usual amount on top would reach into
-    // Skip's normal, unmoved position. The button's own icon glyph
-    // doesn't start until partway down its 44px box (centered inside),
-    // and Skip's own text glyph ends partway up its box -- so insetting
-    // the spotlight's top edge into that shared padding still fully
-    // covers both real glyphs while clearing Skip, without moving Skip,
-    // the button, or the icon.
-    spotlightTopPaddingPx: -10,
+    // This step's spotlight sits close beneath the fixed top bar, but
+    // never needs to inset itself to stay clear of Skip: the top bar
+    // renders at a higher z-index than the veil (see .onboarding-topbar
+    // vs .onboarding-coach in index.css), so Skip stays visible and
+    // clickable no matter where the cutout falls beneath it.
   },
   'coach-customize': {
     tourId: 'open-settings',
@@ -465,6 +459,12 @@ function IntroStep({ onPrimary, leaving = false, onLeft }: IntroStepProps) {
 
 const SPOTLIGHT_PADDING_PX = 10
 const CALLOUT_GAP_PX = 16
+// Mirrors .tour-callout's own `width: min(22rem, calc(100vw - 2rem))` --
+// kept as plain px constants (at the app's one, unchanged root font size)
+// rather than read from computed style, matching how SPOTLIGHT_PADDING_PX
+// and CALLOUT_GAP_PX already shadow their rem-based CSS counterparts.
+const CALLOUT_MAX_WIDTH_PX = 352
+const CALLOUT_VIEWPORT_MARGIN_PX = 16
 
 interface CoachOverlayProps {
   step: CoachStepId
@@ -513,9 +513,22 @@ function CoachOverlay({
 }: CoachOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const rect = useTourTargetRect(config.tourId)
-  const spotlightTopPaddingPx = config.spotlightTopPaddingPx ?? SPOTLIGHT_PADDING_PX
 
   const placeBelow = !rect || rect.top < window.innerHeight / 2
+
+  // Centered on the target, not the screen, whenever there's room: the
+  // callout should read as belonging to the control beneath it. Clamped
+  // so it never crosses the same safe margin its own CSS width already
+  // respects, which is what keeps a target near either edge (the
+  // top-right calendar icon) from pushing the card half off-screen.
+  const calloutHalfWidthPx =
+    Math.min(CALLOUT_MAX_WIDTH_PX, window.innerWidth - CALLOUT_VIEWPORT_MARGIN_PX * 2) / 2
+  const calloutCenterX = rect
+    ? Math.min(
+        Math.max(rect.left + rect.width / 2, CALLOUT_VIEWPORT_MARGIN_PX + calloutHalfWidthPx),
+        window.innerWidth - CALLOUT_VIEWPORT_MARGIN_PX - calloutHalfWidthPx,
+      )
+    : null
 
   useEffect(() => {
     if (!closing || !onClosed) {
@@ -549,14 +562,17 @@ function CoachOverlay({
   return (
     <div ref={overlayRef} className={overlayClassName}>
       {rect && (
+        // Padding is always the same amount on every side: the only way to
+        // guarantee the cutout's visual center lands exactly on the
+        // target's visual center, regardless of the target's own shape.
         <div
           className="tour-spotlight"
           aria-hidden="true"
           style={{
-            top: rect.top - spotlightTopPaddingPx,
+            top: rect.top - SPOTLIGHT_PADDING_PX,
             left: rect.left - SPOTLIGHT_PADDING_PX,
             width: rect.width + SPOTLIGHT_PADDING_PX * 2,
-            height: rect.height + spotlightTopPaddingPx + SPOTLIGHT_PADDING_PX,
+            height: rect.height + SPOTLIGHT_PADDING_PX * 2,
           }}
         />
       )}
@@ -569,10 +585,13 @@ function CoachOverlay({
         onPrimary={onPrimary}
         style={
           rect
-            ? placeBelow
-              ? { top: rect.bottom + SPOTLIGHT_PADDING_PX + CALLOUT_GAP_PX }
-              : { bottom: window.innerHeight - rect.top + SPOTLIGHT_PADDING_PX + CALLOUT_GAP_PX }
-            : { top: '50%', transform: 'translate(-50%, -50%)' }
+            ? {
+                left: calloutCenterX ?? undefined,
+                ...(placeBelow
+                  ? { top: rect.bottom + SPOTLIGHT_PADDING_PX + CALLOUT_GAP_PX }
+                  : { bottom: window.innerHeight - rect.top + SPOTLIGHT_PADDING_PX + CALLOUT_GAP_PX }),
+              }
+            : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
         }
       />
     </div>

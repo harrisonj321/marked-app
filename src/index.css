@@ -1262,10 +1262,16 @@ fieldset label {
   pointer-events: none;
 }
 
+/* A soft pool of attention, not a hole punched through the veil: the
+   blur radius feathers the box-shadow's edge into a gentle falloff
+   around the target instead of a hard rectangular boundary. The blur is
+   sized to soften the transition without reading as a diffuse glow --
+   far enough from the target that its own boundary stays obvious, close
+   enough that the veil is back at full strength just past it. */
 .tour-spotlight {
   position: fixed;
   border-radius: 1rem;
-  box-shadow: 0 0 0 9999px rgb(var(--color-shadow-rgb) / 0.55);
+  box-shadow: 0 0 28px 9999px rgb(var(--color-shadow-rgb) / 0.55);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1278,6 +1284,12 @@ fieldset label {
   }
 }
 
+/* `left` here is a fallback for the rare "target not mounted" case; while a
+   target exists, CoachOverlay overrides it inline with the target's own
+   (viewport-clamped) horizontal center, so the card reads as anchored to
+   the control it explains rather than to the middle of the screen. Either
+   way `left` names a center point -- translateX(-50%) is what turns it
+   into the box's actual left edge. */
 .tour-callout {
   position: fixed;
   left: 50%;
@@ -1520,7 +1532,7 @@ fieldset label {
    warm paper, not a finished screen being annotated, so the room lights
    dim rather than go out. */
 .onboarding-coach-staged .tour-spotlight {
-  box-shadow: 0 0 0 9999px rgb(var(--color-shadow-rgb) / 0.42);
+  box-shadow: 0 0 28px 9999px rgb(var(--color-shadow-rgb) / 0.42);
 }
 
 /* The finale, shared by the staged overlay and the topbar: overlay chrome
@@ -1716,14 +1728,18 @@ fieldset label {
     animation: demo-shell-leave 400ms ease 650ms both;
   }
 
-  /* The fingertip's whole performance is one animation: appear over the
-     mark, press, slide across, rest, lift -- then return and tap the
-     other word. The two real state changes it "causes" are timers in
-     DemoShell (DEMO_FLIP_AT_MS / DEMO_RETURN_AT_MS), tuned so the ink
-     springs across as the slide passes the midpoint and springs back on
-     the tap; if this timeline moves, move those. */
+  /* The fingertip's whole performance is one animation: appear, rest
+     settled, press, slide across (slowly enough to follow), rest on the
+     far side, lift -- then return and tap the other word. The two real
+     state changes it "causes" are timers in DemoShell (DEMO_FLIP_AT_MS /
+     DEMO_RETURN_AT_MS), tuned so the ink springs across as the slide
+     passes its midpoint and springs back on the tap; if this timeline
+     moves, move those. Duration is ~1.45x the gesture's original pace --
+     not a uniform slowdown, but time added specifically where the
+     original read as rushed: a settle beat before the press, a slower
+     drag, and a longer dwell on the far side before the return. */
   .demo-touch {
-    animation: demo-touch 2900ms ease-in-out 1300ms both;
+    animation: demo-touch 4800ms ease-in-out 1300ms both;
   }
 }
 
@@ -1791,84 +1807,126 @@ fieldset label {
   box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.65);
 }
 
-/* Timeline (percentages of 2900ms, after a 1300ms delay -- absolute times
-   in the comments): fade in over the left half, press, slide to the
-   right half, rest touching, lift; travel back unseen; reappear over the
-   left word, tap, release, fade. `left` animates between the track's two
-   halves; transform carries centering plus the press scale. */
+/* Timeline (percentages of 4800ms, after a 1300ms delay -- absolute times
+   from the 'today' scene's start in the comments). Each phase gets room
+   to register before the next begins:
+     - fade in and settle over the left word, at rest, before anything
+       presses (a plateau, not an immediate press-on-arrival)
+     - press, then a slow, followable slide to the right word
+     - rest there, pressed then settled, long enough to read
+     - lift, travel back unseen, reappear over the left word
+     - a beat before the tap, then the tap, release, and one more beat
+       before fading out
+   `left` animates between the track's two halves; transform carries
+   centering plus the press scale. */
 @keyframes demo-touch {
   0% {
-    /* 1300ms */
+    /* 1300ms: hidden, about to land */
     opacity: 0;
     left: 25%;
     transform: translate(-50%, -50%) scale(1);
   }
 
-  7% {
-    /* ~1500ms: landed */
+  8.33% {
+    /* 1700ms: landed */
     opacity: 1;
     left: 25%;
     transform: translate(-50%, -50%) scale(1);
   }
 
-  12% {
-    /* ~1650ms: pressed */
+  20.83% {
+    /* 2300ms: still settled -- resting before the press begins */
+    opacity: 1;
+    left: 25%;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  25% {
+    /* 2500ms: pressed */
     opacity: 1;
     left: 25%;
     transform: translate(-50%, -50%) scale(0.82);
   }
 
-  36% {
-    /* ~2350ms: slid across, still pressed (the flip timer fires mid-slide) */
+  28.13% {
+    /* 2650ms: still pressed, about to slide */
+    opacity: 1;
+    left: 25%;
+    transform: translate(-50%, -50%) scale(0.82);
+  }
+
+  46.88% {
+    /* 3550ms: slid across, still pressed (the flip timer fires at the slide's midpoint, 3100ms) */
     opacity: 1;
     left: 75%;
     transform: translate(-50%, -50%) scale(0.82);
   }
 
-  55% {
-    /* ~2900ms: resting on the far side */
+  50% {
+    /* 3700ms: settled on the far side */
     opacity: 1;
     left: 75%;
     transform: translate(-50%, -50%) scale(0.9);
   }
 
-  62% {
-    /* ~3100ms: lifted */
+  66.67% {
+    /* 4500ms: still resting there -- long enough to register before the return */
+    opacity: 1;
+    left: 75%;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+
+  70.83% {
+    /* 4700ms: lifted */
     opacity: 0;
     left: 75%;
     transform: translate(-50%, -50%) scale(1);
   }
 
-  69% {
-    /* ~3300ms: traveled back while unseen */
+  75% {
+    /* 4900ms: traveled back while unseen */
     opacity: 0;
     left: 25%;
     transform: translate(-50%, -50%) scale(1);
   }
 
-  74% {
-    /* ~3450ms: reappeared over the first word */
+  79.17% {
+    /* 5100ms: reappeared over the first word */
     opacity: 1;
     left: 25%;
     transform: translate(-50%, -50%) scale(1);
   }
 
-  79% {
-    /* ~3600ms: the tap (the restore timer fires here) */
+  83.33% {
+    /* 5300ms: still visible -- a beat before the tap */
+    opacity: 1;
+    left: 25%;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  86.46% {
+    /* 5450ms: the tap (the restore timer fires here) */
     opacity: 1;
     left: 25%;
     transform: translate(-50%, -50%) scale(0.82);
   }
 
-  85% {
-    /* ~3750ms: released */
+  89.58% {
+    /* 5600ms: released */
+    opacity: 1;
+    left: 25%;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  95.83% {
+    /* 5900ms: still visible -- a beat before fading out */
     opacity: 1;
     left: 25%;
     transform: translate(-50%, -50%) scale(1);
   }
 
   100% {
-    /* 4200ms: gone */
+    /* 6100ms: gone */
     opacity: 0;
     left: 25%;
     transform: translate(-50%, -50%) scale(1);
