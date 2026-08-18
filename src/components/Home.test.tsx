@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { hasCompletedOnboarding, loadOnboardingRecord, saveOnboardingRecord } from '../data/onboarding'
 import { getTodayKey, resolveDeviceTimezone } from '../domain/date'
 
 const {
@@ -177,16 +176,8 @@ const ledger = {
   startDate: '2026-08-01',
 }
 
-/**
- * Every test outside the "onboarding tour" block is exercising ordinary
- * Home behavior that has nothing to do with onboarding, so it renders as an
- * account that has already completed the current tour version -- the
- * steady state -- rather than incidentally colliding with the auto-shown
- * tour on a bare uid with no record.
- */
 function renderSettledHome(overrides: Partial<Parameters<typeof Home>[0]> = {}) {
   const uid = overrides.uid ?? 'u1'
-  saveOnboardingRecord(uid, 'completed')
   const onSwitchLedger = vi.fn()
   render(
     <Home
@@ -450,50 +441,20 @@ describe('Home', () => {
     })
   })
 
-  describe('onboarding tour', () => {
+  describe('onboarding tour replay', () => {
     const WELCOME_TEXT = /not a habit tracker/i
-    // The auto-started tour skips the welcome screen entirely -- by the time
-    // a brand-new account reaches Home, it has already run pre-auth (see
-    // App's OnboardingIntro) -- so auto-start begins at the first coach mark.
-    const FIRST_COACH_TEXT = /flip today's mark/i
 
-    it('auto-starts at the first coach mark (not the welcome screen, already shown pre-auth) for an established authenticated user with no current-version onboarding record', () => {
-      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
-      expect(screen.getByText(FIRST_COACH_TEXT)).toBeInTheDocument()
-      expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
-    })
-
-    it('does not auto-start when a completed record exists for this uid', () => {
-      saveOnboardingRecord('u1', 'completed')
+    // The full onboarding/orientation experience now always runs pre-auth
+    // (see App's OnboardingOrientation), before any account or ledger
+    // exists -- Home itself never auto-starts a tour, regardless of uid or
+    // any stored record. See App.test.tsx for that pre-auth coverage.
+    it('never auto-starts, for any account', () => {
       render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
-      expect(screen.queryByText(FIRST_COACH_TEXT)).not.toBeInTheDocument()
     })
 
-    it('does not auto-start when a skipped record exists for this uid', () => {
-      saveOnboardingRecord('u1', 'skipped')
-      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
-      expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
-      expect(screen.queryByText(FIRST_COACH_TEXT)).not.toBeInTheDocument()
-    })
-
-    it('auto-starts independently per uid, so one account having a record does not suppress another', () => {
-      saveOnboardingRecord('u1', 'completed')
-      render(<Home uid="u2" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
-      expect(screen.getByText(FIRST_COACH_TEXT)).toBeInTheDocument()
-    })
-
-    it('makes the main content inert while the tour is active, so it cannot be interacted with underneath', () => {
-      const { container } = render(
-        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />,
-      )
-      expect(container.querySelector('main')).toHaveAttribute('inert')
-    })
-
-    it('is reachable from Settings regardless of completion state, closing the settings sheet when it opens', () => {
-      saveOnboardingRecord('u1', 'completed')
-      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
-      expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
+    it('is reachable from Settings, always starting from the welcome screen, and closes the settings sheet when it opens', () => {
+      renderSettledHome()
 
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
       fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
@@ -502,26 +463,32 @@ describe('Home', () => {
       expect(screen.getByText(WELCOME_TEXT)).toBeInTheDocument()
     })
 
-    it('does not touch the persisted record merely by opening the replay from Settings', () => {
-      saveOnboardingRecord('u1', 'completed')
-      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
-
-      expect(loadOnboardingRecord('u1')).toEqual({ version: 1, status: 'completed' })
-    })
-
-    it('persists Skip and does not leave the main content inert afterward', () => {
+    it('makes the main content inert while replaying, so it cannot be interacted with underneath', () => {
       const { container } = render(
         <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />,
       )
 
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
+
+      expect(container.querySelector('main')).toHaveAttribute('inert')
+    })
+
+    it('closes on Skip and leaves the main content interactive again, without writing or touching any onboarding record', () => {
+      const { container } = render(
+        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />,
+      )
+      const storageWrites = vi.spyOn(Storage.prototype, 'setItem')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
       fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
       expect(container.querySelector('main')).not.toHaveAttribute('inert')
-      expect(hasCompletedOnboarding('u1')).toBe(true)
+      expect(storageWrites).not.toHaveBeenCalled()
+
+      storageWrites.mockRestore()
     })
   })
 })

@@ -16,7 +16,7 @@ vi.mock('../lib/platform', () => ({
   prefersReducedMotion: prefersReducedMotionMock,
 }))
 
-const { OnboardingIntro, OnboardingTour } = await import('./OnboardingTour')
+const { OnboardingTour } = await import('./OnboardingTour')
 
 function mockPlatform({
   ios = false,
@@ -32,22 +32,17 @@ function mockPlatform({
   return { promptInstall }
 }
 
-function renderTour(onFinish = vi.fn(), includeWelcome?: boolean) {
+function renderTour(onFinish = vi.fn()) {
   render(
     <>
       <div data-tour-id="open-settings" />
       <div data-tour-id="today-toggle" />
       <div data-tour-id="open-calendar" />
       <div data-tour-id="ledger-title" />
-      <OnboardingTour onFinish={onFinish} includeWelcome={includeWelcome} />
+      <OnboardingTour onFinish={onFinish} />
     </>,
   )
   return { onFinish }
-}
-
-function renderIntro(onFinish = vi.fn()) {
-  const { unmount } = render(<OnboardingIntro onFinish={onFinish} />)
-  return { onFinish, unmount }
 }
 
 // The intro's primary action is "Noted." (acknowledging is the product's
@@ -442,87 +437,5 @@ describe('OnboardingTour', () => {
     clickNext() // coach-ledger -> install
 
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
-  })
-
-  describe('includeWelcome=false (the auto-started first run)', () => {
-    it('starts directly at the first coach mark, never rendering the welcome screen', () => {
-      mockPlatform()
-      renderTour(vi.fn(), false)
-
-      expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Noted.' })).not.toBeInTheDocument()
-    })
-
-    it('still walks the remaining coach marks and finishes normally', () => {
-      mockPlatform({ ios: false, standalone: false, canPromptInstall: false })
-      const { onFinish } = renderTour(vi.fn(), false)
-
-      clickNext() // coach-today -> coach-calendar
-      clickNext() // coach-calendar -> coach-customize
-      clickNext() // coach-customize -> coach-ledger
-      fireEvent.click(screen.getByRole('button', { name: 'Done' }))
-
-      expect(onFinish).toHaveBeenCalledWith('completed')
-    })
-
-    it('still offers Skip from the first coach mark', () => {
-      mockPlatform()
-      const { onFinish } = renderTour(vi.fn(), false)
-
-      fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
-
-      expect(onFinish).toHaveBeenCalledWith('skipped')
-    })
-  })
-})
-
-describe('OnboardingIntro', () => {
-  it('renders the same staged wordmark, lines, and Skip control as the tour\'s own welcome step', () => {
-    mockPlatform()
-    renderIntro()
-
-    expect(screen.getByRole('heading', { name: 'Noted.' })).toBeInTheDocument()
-    expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
-    expect(screen.getByText(/just Noted\.$/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Noted.' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
-  })
-
-  it('finishes as completed via its primary action', () => {
-    mockPlatform()
-    const { onFinish } = renderIntro()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
-
-    expect(onFinish).toHaveBeenCalledWith('completed')
-  })
-
-  it('finishes as skipped via Skip', () => {
-    mockPlatform()
-    const { onFinish } = renderIntro()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
-
-    expect(onFinish).toHaveBeenCalledWith('skipped')
-  })
-
-  it('finishes as skipped via Escape', () => {
-    mockPlatform()
-    const { onFinish } = renderIntro()
-
-    fireEvent.keyDown(window, { key: 'Escape' })
-
-    expect(onFinish).toHaveBeenCalledWith('skipped')
-  })
-
-  it('locks background scroll while mounted and restores it on unmount', () => {
-    mockPlatform()
-    const { unmount } = renderIntro()
-
-    expect(document.body.style.overflow).toBe('hidden')
-
-    unmount()
-
-    expect(document.body.style.overflow).not.toBe('hidden')
   })
 })

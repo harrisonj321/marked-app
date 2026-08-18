@@ -7,10 +7,8 @@ import {
   updateLedgerName,
   updateLedgerStateLabels,
 } from '../data/ledger'
-import { hasCompletedOnboarding, saveOnboardingRecord } from '../data/onboarding'
 import { signOutUser } from '../lib/auth'
 import { formatDisplayDate, getTodayKey, resolveDeviceTimezone } from '../domain/date'
-import type { OnboardingStatus } from '../domain/onboarding'
 import { resolveLedgerColor, type Ledger, type LedgerColor } from '../domain/ledger'
 import { useLocalDateKey } from '../hooks/useLocalDateKey'
 import { resolveStateLabels, type DayState, type StateLabels } from '../domain/tracker'
@@ -38,35 +36,24 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
   // only ever one settings experience regardless of entry point.
   const [settingsLedgerId, setSettingsLedgerId] = useState<string | null>(null)
   const [switcherOpen, setSwitcherOpen] = useState(false)
-  // Gating is entirely about the persisted record, not about whether this
-  // account is "new" -- every authenticated user without a completion/skip
-  // record for the current onboarding version sees the tour on next open,
-  // established accounts included. Lazy initializer (not an effect) so
-  // there is no frame where Home is visible before the tour is active.
-  //
-  // 'auto' vs 'replay' distinguishes *why* the tour is showing, which
-  // controls whether it includes the welcome screen: an auto-started tour
-  // means this is a brand-new account that already saw the pre-auth
-  // orientation screen before reaching Home at all (see App.tsx), so it
-  // starts straight at the first coach mark; a replay from Settings' "Tour
-  // Noted." is an explicit request to see the whole thing again, welcome
-  // included.
-  const [tourMode, setTourMode] = useState<'auto' | 'replay' | null>(() =>
-    hasCompletedOnboarding(uid) ? null : 'auto',
-  )
-  const tourActive = tourMode !== null
+  // The full onboarding/orientation tour now always runs pre-auth, before
+  // any account exists (see App's OnboardingOrientation) -- Home never
+  // auto-starts it. The only remaining entry point is an explicit replay
+  // from Settings' "Tour Noted.", which always walks the whole experience
+  // again from the welcome screen and never persists anything: replaying
+  // must not corrupt the first-run record this account already has.
+  const [tourActive, setTourActive] = useState(false)
   const labels = resolveStateLabels(activeLedger.stateLabels)
   const accentColor = `var(--ledger-color-${resolveLedgerColor(activeLedger.color)})`
   const settingsLedger = ledgers.find((ledger) => ledger.id === settingsLedgerId) ?? null
 
-  function handleTourFinish(status: OnboardingStatus) {
-    saveOnboardingRecord(uid, status)
-    setTourMode(null)
+  function handleTourFinish() {
+    setTourActive(false)
   }
 
   function handleTourNoted() {
     setSettingsLedgerId(null)
-    setTourMode('replay')
+    setTourActive(true)
   }
 
   function handleManageLedger(ledgerId: string) {
@@ -207,9 +194,7 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
         )}
       </main>
 
-      {tourActive && (
-        <OnboardingTour includeWelcome={tourMode === 'replay'} onFinish={handleTourFinish} />
-      )}
+      {tourActive && <OnboardingTour onFinish={handleTourFinish} />}
     </>
   )
 }

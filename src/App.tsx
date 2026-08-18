@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { createLedger } from './data/ledger'
-import { hasSeenOnboardingIntro, saveOnboardingIntroSeen } from './data/onboarding'
+import { hasCompletedOnboarding, saveOnboardingCompletion } from './data/onboarding'
 import { getTodayKey, resolveDeviceTimezone } from './domain/date'
 import { useAuthUser } from './hooks/useAuthUser'
 import { useLedgers } from './hooks/useLedgers'
 import { LoadingScreen } from './components/LoadingScreen'
-import { OnboardingIntro } from './components/OnboardingTour'
+import { OnboardingOrientation } from './components/OnboardingOrientation'
 import { SignIn } from './components/SignIn'
 import { Setup } from './components/Setup'
 import { Home } from './components/Home'
@@ -15,26 +15,28 @@ function App() {
   const uid = user?.uid ?? null
   const { ledgers, activeLedger, loading: ledgersLoading, error, switchLedger } = useLedgers(uid)
   // Lazy initializer (not an effect) so there is no frame where SignIn is
-  // visible before the orientation screen is. Read once at mount: whether a
-  // visitor completes/skips it later this session is tracked separately
-  // below, not by re-reading storage on every render.
-  const [introSeen, setIntroSeen] = useState(() => hasSeenOnboardingIntro())
+  // visible before the orientation is. Read once at mount: whether this
+  // visitor finishes it later this session is tracked separately below, not
+  // by re-reading storage on every render.
+  const [orientationDone, setOrientationDone] = useState(() => hasCompletedOnboarding())
 
   if (authLoading) {
     return <LoadingScreen />
   }
 
   if (!user) {
-    // Boot order: orientation before sign-in, never the reverse -- see
+    // Boot order: the full onboarding/orientation experience before sign-in
+    // -- never split across the auth boundary, never reversed. See
     // CLAUDE.md's desired new-user sequence. An already-authenticated
-    // session always skips straight past this, regardless of introSeen;
-    // this branch only ever applies to a signed-out visitor.
-    if (!introSeen) {
+    // session always skips straight past this, regardless of
+    // orientationDone; this branch only ever applies to a signed-out
+    // visitor.
+    if (!orientationDone) {
       return (
-        <OnboardingIntro
+        <OnboardingOrientation
           onFinish={(status) => {
-            saveOnboardingIntroSeen(status)
-            setIntroSeen(true)
+            saveOnboardingCompletion(status)
+            setOrientationDone(true)
           }}
         />
       )

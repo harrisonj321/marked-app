@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { getTodayKey, resolveDeviceTimezone } from './domain/date'
-import { hasSeenOnboardingIntro, saveOnboardingIntroSeen } from './data/onboarding'
+import { hasCompletedOnboarding, saveOnboardingCompletion } from './data/onboarding'
 
 const { useAuthUserMock, useLedgersMock, createLedgerMock } = vi.hoisted(() => ({
   useAuthUserMock: vi.fn(),
@@ -55,13 +55,12 @@ const ledger = {
 beforeEach(() => {
   window.localStorage.clear()
   createLedgerMock.mockReset().mockResolvedValue(undefined)
-  // Every test outside the "pre-auth onboarding" block is exercising
-  // ordinary boot behavior that has nothing to do with the orientation
-  // screen itself, so it renders as a device that has already completed it
-  // -- the steady state -- rather than incidentally colliding with the
-  // auto-shown intro on a bare device with no record. See Home.test.tsx's
-  // renderSettledHome for the identical convention with the in-Home tour.
-  saveOnboardingIntroSeen('completed')
+  // Every test outside the "pre-auth onboarding orientation" block is
+  // exercising ordinary boot behavior that has nothing to do with the
+  // orientation itself, so it renders as a device that has already
+  // completed it -- the steady state -- rather than incidentally colliding
+  // with the auto-shown orientation on a bare device with no record.
+  saveOnboardingCompletion('completed')
 })
 
 describe('App', () => {
@@ -116,40 +115,79 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
   })
 
-  describe('pre-auth onboarding', () => {
+  describe('pre-auth onboarding orientation', () => {
     beforeEach(() => {
       window.localStorage.clear()
       useAuthUserMock.mockReturnValue({ user: null, loading: false })
       useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: true, error: null, switchLedger: vi.fn() })
     })
 
-    it('shows the orientation screen before sign-in for a first-time visitor on a fresh device', () => {
+    // The intro's primary action reads "Noted."; coach steps advance with
+    // Next and the last one closes with Done -- see OnboardingTour.test.tsx.
+    function clickNext() {
+      fireEvent.click(screen.getByRole('button', { name: /^(Noted\.|Next|Done)$/ }))
+    }
+
+    // Walks the entire orientation from the welcome screen through all four
+    // coach marks to completion. No install step is exercised here: jsdom's
+    // matchMedia/UA defaults make OnboardingTour's showInstallStep false,
+    // the same baseline OnboardingTour.test.tsx's own mockPlatform() uses.
+    function walkFullOrientation() {
+      clickNext() // welcome -> coach-today
+      clickNext() // coach-today -> coach-calendar
+      clickNext() // coach-calendar -> coach-customize
+      clickNext() // coach-customize -> coach-ledger
+      clickNext() // coach-ledger -> finish (Done)
+    }
+
+    it('shows the full onboarding/orientation experience before sign-in for a first-time visitor on a fresh device', () => {
       render(<App />)
 
       expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument()
     })
 
-    it('moves on to sign-in once the visitor finishes the orientation screen, and remembers that for next time', () => {
+    it('keeps sign-in unreachable until the orientation is completed or skipped -- every coach mark still precedes it', () => {
       render(<App />)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+      clickNext() // welcome -> coach-today
+      expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument()
 
-      expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
-      expect(hasSeenOnboardingIntro()).toBe(true)
+      clickNext() // coach-today -> coach-calendar
+      expect(screen.getByText(/tap a past day to correct it/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument()
+
+      clickNext() // coach-calendar -> coach-customize
+      expect(screen.getByText(/rename the two states/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument()
+
+      clickNext() // coach-customize -> coach-ledger
+      expect(screen.getByText(/tap the name to switch ledgers/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument()
     })
 
-    it('moves on to sign-in when the visitor skips the orientation screen instead, and still remembers that', () => {
+    it('completing the full orientation leads to sign-in, and remembers that for next time', () => {
       render(<App />)
 
+      walkFullOrientation()
+
+      expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
+      expect(hasCompletedOnboarding()).toBe(true)
+    })
+
+    it('skipping the orientation at any point leads to sign-in instead, and still remembers that', () => {
+      render(<App />)
+
+      clickNext() // welcome -> coach-today
       fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
       expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
-      expect(hasSeenOnboardingIntro()).toBe(true)
+      expect(hasCompletedOnboarding()).toBe(true)
     })
 
-    it('does not show the orientation screen again for a returning signed-out visitor who already saw it on this device', () => {
-      saveOnboardingIntroSeen('skipped')
+    it('does not show the orientation again for a returning signed-out visitor who already completed it on this device -- straight to sign-in', () => {
+      saveOnboardingCompletion('skipped')
 
       render(<App />)
 
@@ -157,7 +195,7 @@ describe('App', () => {
       expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
     })
 
-    it('never shows the orientation screen to an already-authenticated user, regardless of this device\'s record', () => {
+    it('never shows the orientation to an already-authenticated user, regardless of this device\'s record', () => {
       useAuthUserMock.mockReturnValue({ user: { uid: 'u1' }, loading: false })
       useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: false, error: null, switchLedger: vi.fn() })
 
@@ -165,6 +203,33 @@ describe('App', () => {
 
       expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
       expect(screen.getByText(/what are you tracking/i)).toBeInTheDocument()
+    })
+
+    it('a new account reaches first-ledger creation after completing orientation and then authenticating', () => {
+      const { rerender } = render(<App />)
+      walkFullOrientation()
+      expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
+
+      // Simulate a successful sign-in on the same device: still no ledgers,
+      // exactly what a brand-new account looks like right after auth.
+      useAuthUserMock.mockReturnValue({ user: { uid: 'new-user' }, loading: false })
+      useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: false, error: null, switchLedger: vi.fn() })
+      rerender(<App />)
+
+      expect(screen.getByText(/what are you tracking/i)).toBeInTheDocument()
+    })
+
+    it('does not replay any part of onboarding after authenticating, for someone who just completed the pre-auth orientation', () => {
+      const { rerender } = render(<App />)
+      walkFullOrientation()
+
+      useAuthUserMock.mockReturnValue({ user: { uid: 'new-user' }, loading: false })
+      useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: false, error: null, switchLedger: vi.fn() })
+      rerender(<App />)
+
+      expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/flip today's mark/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
     })
   })
 
