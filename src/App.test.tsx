@@ -124,8 +124,28 @@ describe('App', () => {
 
     // The intro's primary action reads "Noted."; coach steps advance with
     // Next and the last one closes with Done -- see OnboardingTour.test.tsx.
+    //
+    // The staged orientation holds the welcome screen while its exit fade
+    // plays and holds the last scene through its closing beat, releasing
+    // each when its animation reports done. jsdom never fires animation
+    // events on its own (and its matchMedia leaves motion enabled), so
+    // this drives them the way a motion-enabled browser would.
+    function fireAnimationEnd(element: Element, animationName: string) {
+      const event = new Event('animationend', { bubbles: true }) as Event & { animationName: string }
+      event.animationName = animationName
+      fireEvent(element, event)
+    }
+
     function clickNext() {
-      fireEvent.click(screen.getByRole('button', { name: /^(Noted\.|Next|Done)$/ }))
+      const button = screen.getByRole('button', { name: /^(Noted\.|Next|Done)$/ })
+      const label = button.textContent
+      fireEvent.click(button)
+      if (label === 'Noted.') {
+        fireAnimationEnd(document.querySelector('.onboarding-intro')!, 'onboarding-intro-leave')
+      }
+      if (label === 'Done') {
+        fireAnimationEnd(document.querySelector('.onboarding-placard')!, 'onboarding-close')
+      }
     }
 
     // Walks the entire orientation from the welcome screen through all four

@@ -260,6 +260,15 @@ fieldset label {
 
 /* Sign-in */
 
+/* A quiet arrival, so the hand-off from the orientation's closing exhale
+   never lands as a hard cut. Plays whenever sign-in appears (skip,
+   sign-out too) -- one consistent entrance, nothing conditional. */
+@media (prefers-reduced-motion: no-preference) {
+  .signin-enter {
+    animation: onboarding-rise 400ms ease-out both;
+  }
+}
+
 .signin-actions {
   display: flex;
   flex-direction: column;
@@ -1417,7 +1426,15 @@ fieldset label {
 }
 
 /* Install step: no specific control to highlight, so it reads as a normal
-   centered card overlay -- the same treatment as Settings/Day detail. */
+   centered card overlay -- the same treatment as Settings/Day detail. Its
+   entrance is the tour's usual soft fade rather than a hard pop, so the
+   scrim never lands as a cut -- with or without the staged shell behind it. */
+@media (prefers-reduced-motion: no-preference) {
+  .onboarding-install {
+    animation: onboarding-fade 250ms ease both;
+  }
+}
+
 .onboarding-install {
   position: fixed;
   inset: 0;
@@ -1463,4 +1480,330 @@ fieldset label {
   margin: 0;
   color: var(--color-text-muted);
   line-height: 1.5;
+}
+
+/* Staged orientation (the pre-auth first run -- see OnboardingOrientation
+   and OnboardingTour's 'staged' presentation).
+
+   One scene on one paper: the intro's lines fade off the page, and the
+   interface then assembles itself out of the same page, one piece per
+   step. There is no backdrop, no spotlight, and no floating card here --
+   attention is carried by which element is arriving and which one holds
+   the light, and the step copy reads from a fixed placard at the bottom
+   of the paper. The Settings "Tour Noted." replay keeps the spotlight
+   treatment above; everything below applies only to the staged run. */
+
+/* The intro's exit beat: its lines fade, revealing the identical paper
+   (and the still-empty shell) underneath. Applied only when the animation
+   will actually play -- reduced motion advances immediately instead (see
+   OnboardingTour.handleIntroPrimary), so the rule can live entirely inside
+   the motion block. pointer-events off so the departing primary cannot be
+   pressed twice. */
+@media (prefers-reduced-motion: no-preference) {
+  .onboarding-intro-leaving {
+    animation: onboarding-intro-leave 240ms ease both;
+    pointer-events: none;
+  }
+}
+
+@keyframes onboarding-intro-leave {
+  to {
+    opacity: 0;
+  }
+}
+
+/* The placard: step copy set directly on the page, centered like the
+   intro's own lines, with one primary action occupying the same spot the
+   intro's "Noted." button held -- so the forward gesture never moves under
+   the user's thumb. Its background is the page's own color rising to full
+   strength, so on viewports too short for the shell's reserved clearance
+   (see .demo-home) content fades away beneath the words instead of
+   colliding with them. */
+.onboarding-placard {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  padding-top: var(--space-4);
+  padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+  padding-bottom: max(var(--space-2), calc(var(--space-1) + env(safe-area-inset-bottom, 0px)));
+  padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+  background: linear-gradient(to top, var(--color-bg) 72%, transparent);
+}
+
+/* Reserves the tallest step's copy (label plus three body lines at phone
+   width) so the placard keeps one height and nothing below or above the
+   words shifts between steps. */
+.onboarding-placard-text {
+  min-height: 5.75rem;
+  width: 100%;
+  max-width: 26rem;
+}
+
+.onboarding-placard-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.onboarding-placard-label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.onboarding-placard-body {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+/* Covers both button treatments: the quiet surface Next of intermediate
+   steps and the accent-filled final action. The fill is reserved for the
+   sequence's bookends (the intro's "Noted." and Done) so mid-orientation
+   attention stays on the interface being demonstrated, not the control
+   advancing past it. */
+.onboarding-placard button {
+  width: 100%;
+  max-width: 26rem;
+}
+
+/* The finale, shared by the placard and the topbar: overlay chrome is gone
+   by a third of the way through, leaving the assembled interface alone at
+   full ink (see [data-stage='closing'] below); the remaining hold is the
+   beat the shell gets to just be the product before everything exhales.
+   This animation's end is also the signal StagedPlacard hands back to the
+   tour -- staged mode never enters 'closing' under reduced motion, where
+   the animation would be stripped and the signal would never come. */
+@media (prefers-reduced-motion: no-preference) {
+  /* Doubled-up selectors on purpose: the placard's own entrance rule
+     (further down, same single-class specificity) would otherwise win the
+     cascade and silently replace this animation -- and the finish signal
+     is this animation's end event, so losing it strands the whole tour on
+     Done. */
+  .onboarding-topbar.onboarding-closing,
+  .onboarding-placard.onboarding-closing {
+    animation: onboarding-close 1100ms ease both;
+    pointer-events: none;
+  }
+}
+
+@keyframes onboarding-close {
+  30% {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+/* The demo shell's stage lighting. Each introduced element reads its
+   presence from one custom property assigned per scene:
+
+     0     not on the page yet
+     0.16  penciled in -- promised, not yet introduced
+     0.5-6 arrived, resting
+     1     carrying the light
+
+   Attention is this hierarchy plus arrival motion, never a cutout, and the
+   placard's words -- not the lighting -- carry the actual information, so
+   nothing meaningful depends on the dimmed values being read. */
+.demo-home {
+  /* Clears the placard's fixed zone (its constant height plus breathing
+     room) so every shell element -- including the footer, scene three's
+     subject -- stays visible above it. */
+  padding-bottom: calc(14.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.demo-home [data-demo] {
+  opacity: var(--demo-o, 0);
+}
+
+.demo-home [data-demo='brand'] {
+  --demo-o: var(--demo-brand, 0);
+}
+
+.demo-home [data-demo='date'] {
+  --demo-o: var(--demo-date, 0);
+}
+
+.demo-home [data-demo='title'] {
+  --demo-o: var(--demo-title, 0);
+}
+
+.demo-home [data-demo='toggle'] {
+  --demo-o: var(--demo-toggle, 0);
+}
+
+.demo-home [data-demo='calendar'] {
+  --demo-o: var(--demo-calendar, 0);
+}
+
+.demo-home [data-demo='settings'] {
+  --demo-o: var(--demo-settings, 0);
+}
+
+/* Nested inside the title, so its own presence multiplies the title's --
+   invisible until its scene regardless of how bright the name is. */
+.demo-home [data-demo='chevron'] {
+  --demo-o: var(--demo-chevron, 0);
+}
+
+.demo-chevron {
+  display: inline-flex;
+}
+
+/* The lighting values themselves. 0.3 is the penciled floor -- low enough
+   to read as not-yet, high enough to read as promised rather than
+   disabled. Resting elements sit at 0.72, alive and legible behind the
+   subject; the toggle rests a touch lower (0.66) because it is inherently
+   the loudest element on the page and must not compete with whichever
+   subject currently holds the light. */
+.demo-home[data-stage='today'] {
+  --demo-brand: 0.72;
+  --demo-date: 0.72;
+  --demo-title: 0.72;
+  --demo-toggle: 1;
+  --demo-calendar: 0.3;
+  --demo-settings: 0.3;
+}
+
+.demo-home[data-stage='calendar'] {
+  --demo-brand: 0.72;
+  --demo-date: 0.72;
+  --demo-title: 0.72;
+  --demo-toggle: 0.66;
+  --demo-calendar: 1;
+  --demo-settings: 0.3;
+}
+
+.demo-home[data-stage='settings'] {
+  --demo-brand: 0.72;
+  --demo-date: 0.72;
+  --demo-title: 0.72;
+  --demo-toggle: 0.66;
+  --demo-calendar: 0.72;
+  --demo-settings: 1;
+}
+
+.demo-home[data-stage='ledger'] {
+  --demo-brand: 0.72;
+  --demo-date: 0.72;
+  --demo-title: 1;
+  --demo-toggle: 0.66;
+  --demo-calendar: 0.72;
+  --demo-settings: 0.72;
+  --demo-chevron: 1;
+}
+
+.demo-home[data-stage='install'] {
+  --demo-brand: 0.72;
+  --demo-date: 0.72;
+  --demo-title: 0.72;
+  --demo-toggle: 0.66;
+  --demo-calendar: 0.72;
+  --demo-settings: 0.72;
+  --demo-chevron: 1;
+}
+
+/* The finale's full-ink beat: the whole assembled interface, complete, for
+   a moment -- then the shell itself exhales (see the motion block below). */
+.demo-home[data-stage='closing'] {
+  --demo-brand: 1;
+  --demo-date: 1;
+  --demo-title: 1;
+  --demo-toggle: 1;
+  --demo-calendar: 1;
+  --demo-settings: 1;
+  --demo-chevron: 1;
+}
+
+/* Staged motion. Same rules as the tour's other motion: all of it is
+   staging, never content -- reduced-motion users see each scene's lighting
+   already settled, with no arrivals, no self-demonstration (see DemoShell),
+   no exit beats. Arrival animations run only in the scene that introduces
+   an element, so revisiting brightness later (the title in the ledger
+   scene) brightens by transition without re-performing an entrance. */
+@media (prefers-reduced-motion: no-preference) {
+  .demo-home [data-demo] {
+    transition: opacity 500ms ease;
+  }
+
+  .demo-home[data-stage='today'] [data-demo='brand'] {
+    animation: demo-arrive 450ms ease-out both;
+  }
+
+  .demo-home[data-stage='today'] [data-demo='date'] {
+    animation: demo-arrive 450ms ease-out 120ms both;
+  }
+
+  .demo-home[data-stage='today'] [data-demo='title'] {
+    animation: demo-arrive 450ms ease-out 240ms both;
+  }
+
+  .demo-home[data-stage='today'] [data-demo='toggle'] {
+    animation: demo-arrive 500ms ease-out 420ms both;
+  }
+
+  .demo-home[data-stage='calendar'] [data-demo='calendar'] {
+    animation: demo-arrive 450ms ease-out both;
+  }
+
+  .demo-home[data-stage='settings'] [data-demo='settings'] {
+    animation: demo-arrive 450ms ease-out both;
+  }
+
+  /* The switch affordance is discovered, not labeled: it stamps in beside
+     the name with the same spring the intro's period lands with. */
+  .demo-home[data-stage='ledger'] [data-demo='chevron'] {
+    animation: onboarding-stamp 400ms cubic-bezier(0.34, 1.56, 0.64, 1) 150ms both;
+  }
+
+  .demo-home[data-stage='closing'] {
+    animation: demo-shell-leave 400ms ease 650ms both;
+  }
+
+  .onboarding-placard {
+    animation: onboarding-rise 450ms ease-out 350ms both;
+  }
+
+  /* Its own name, not onboarding-rise: the placard's focus gate listens
+     for onboarding-rise ending on the placard root, and this entrance
+     re-runs on every step change -- a bubbled end event sharing that name
+     could open the gate early on first mount. */
+  .onboarding-placard-copy {
+    animation: onboarding-copy-rise 300ms ease-out both;
+  }
+}
+
+/* No `to` frame: each arrival settles to whatever presence its scene
+   assigns, so one keyframe serves subjects and quiet companions alike. */
+@keyframes demo-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(0.625rem);
+  }
+}
+
+@keyframes demo-shell-leave {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes onboarding-copy-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem);
+  }
 }

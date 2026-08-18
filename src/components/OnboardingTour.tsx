@@ -52,6 +52,30 @@ type CoachStepId = 'coach-today' | 'coach-calendar' | 'coach-customize' | 'coach
 type StepId = 'welcome' | CoachStepId | 'install'
 
 /**
+ * The staged orientation's scene names, mirrored onto the demo shell (see
+ * OnboardingOrientation) as a `data-stage` attribute so CSS can stage which
+ * parts of the interface have arrived. 'closing' is the one stage with no
+ * step of its own: the brief full-ink beat after Done, before onFinish.
+ */
+export type OrientationStage =
+  | 'welcome'
+  | 'today'
+  | 'calendar'
+  | 'settings'
+  | 'ledger'
+  | 'install'
+  | 'closing'
+
+const STAGE_BY_STEP: Record<StepId, OrientationStage> = {
+  welcome: 'welcome',
+  'coach-today': 'today',
+  'coach-calendar': 'calendar',
+  'coach-customize': 'settings',
+  'coach-ledger': 'ledger',
+  install: 'install',
+}
+
+/**
  * Coach order follows the product's importance hierarchy, not screen
  * geometry: the daily mark first (the whole product), then the record it
  * accumulates into, then the wording -- a detail, so it comes last before
@@ -118,6 +142,23 @@ function isCoachStep(step: StepId): step is CoachStepId {
 
 interface OnboardingTourProps {
   onFinish: (status: OnboardingStatus) => void
+  /**
+   * How the coach steps present themselves.
+   *
+   * 'spotlight' (the default, used by Settings' "Tour Noted." replay over
+   * the real Home): a dimming backdrop with a cutout gliding between the
+   * actual controls, and a callout card near each one -- annotation of a
+   * real screen the user already lives in.
+   *
+   * 'staged' (the pre-auth orientation over the demo shell): no backdrop,
+   * no spotlight, no card. The shell's own elements arrive stage by stage
+   * (driven through onStageChange -> data-stage CSS), the step copy reads
+   * from a fixed placard at the bottom of the paper, and the intro/finale
+   * get soft exit beats so the whole sequence plays as one scene.
+   */
+  presentation?: 'spotlight' | 'staged'
+  /** Staged presentation only: reports the current scene so the host shell can stage itself. */
+  onStageChange?: (stage: OrientationStage) => void
 }
 
 /**
@@ -128,11 +169,13 @@ interface OnboardingTourProps {
  * replay, or the neutral demo shell for the pre-auth orientation (see
  * OnboardingOrientation) -- so this component only ever needs to render
  * whichever single step is current. The one exception to "single step"
- * thinking: all four coach steps share one persistent CoachOverlay so the
- * spotlight element survives step changes and its CSS position transition
- * glides it from control to control.
+ * thinking: in spotlight presentation all four coach steps share one
+ * persistent CoachOverlay so the spotlight element survives step changes
+ * and its CSS position transition glides it from control to control; in
+ * staged presentation they share one persistent placard so the primary
+ * action never moves under the user's thumb.
  */
-export function OnboardingTour({ onFinish }: OnboardingTourProps) {
+export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageChange }: OnboardingTourProps) {
   const { canPromptInstall, promptInstall } = useInstallPrompt()
   // Display mode and device class cannot meaningfully change while the tour
   // is open, so these are read once rather than re-derived every render.
@@ -153,15 +196,33 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
   const step = steps[Math.min(index, steps.length - 1)]
   const isLastStep = index >= steps.length - 1
 
+  // Staged presentation's two exit beats. Both are held only while their CSS
+  // animation plays and both are skipped entirely (state never set) when
+  // reduced motion would strip that animation -- the animationend that
+  // releases them would otherwise never fire.
+  const [introLeaving, setIntroLeaving] = useState(false)
+  const [closing, setClosing] = useState(false)
+
+  const staged = presentation === 'staged'
+
+  // An effect, not an inline call: the host shell stores the stage in its
+  // own state, and setting a parent's state during this component's render
+  // is illegal in React.
+  useEffect(() => {
+    if (staged && onStageChange) {
+      onStageChange(closing ? 'closing' : STAGE_BY_STEP[step])
+    }
+  }, [staged, onStageChange, step, closing])
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !closing) {
         onFinish('skipped')
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onFinish])
+  }, [onFinish, closing])
 
   // Background scroll would otherwise fight the fixed-position overlay on
   // long-content phones; restored on unmount regardless of how the tour ends.
@@ -174,14 +235,46 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
   }, [])
 
   function goNext() {
+    if (closing) {
+      return
+    }
     if (isLastStep) {
+      // The staged finale: the assembled interface breathes to full ink for
+      // a beat and then the whole scene exhales, before sign-in. Spotlight
+      // replays (and reduced motion) finish plainly, as they always have.
+      if (staged && !prefersReducedMotion()) {
+        setClosing(true)
+        return
+      }
       onFinish('completed')
       return
     }
     setIndex((current) => current + 1)
   }
 
+  function handleIntroPrimary() {
+    if (introLeaving) {
+      return
+    }
+    // Staged, the intro's lines fade off the paper before the shell begins
+    // arriving on it -- one scene, no hard cut. goNext runs when the exit
+    // animation reports done (see IntroStep's leaving/onLeft).
+    if (staged && !prefersReducedMotion()) {
+      setIntroLeaving(true)
+      return
+    }
+    goNext()
+  }
+
+  function handleIntroLeft() {
+    setIntroLeaving(false)
+    goNext()
+  }
+
   function skip() {
+    if (closing) {
+      return
+    }
     onFinish('skipped')
   }
 
@@ -197,16 +290,29 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
 
   return (
     <>
-      {step === 'welcome' && <IntroStep onPrimary={goNext} />}
-
-      {isCoachStep(step) && (
-        <CoachOverlay
-          step={step}
-          config={COACH_STEPS[step]}
-          primaryLabel={isLastStep ? 'Done' : 'Next'}
-          onPrimary={goNext}
-        />
+      {step === 'welcome' && (
+        <IntroStep onPrimary={handleIntroPrimary} leaving={introLeaving} onLeft={handleIntroLeft} />
       )}
+
+      {isCoachStep(step) &&
+        (staged ? (
+          <StagedPlacard
+            step={step}
+            config={COACH_STEPS[step]}
+            primaryLabel={isLastStep ? 'Done' : 'Next'}
+            final={isLastStep}
+            onPrimary={goNext}
+            closing={closing}
+            onClosed={() => onFinish('completed')}
+          />
+        ) : (
+          <CoachOverlay
+            step={step}
+            config={COACH_STEPS[step]}
+            primaryLabel={isLastStep ? 'Done' : 'Next'}
+            onPrimary={goNext}
+          />
+        ))}
 
       {step === 'install' && (
         <InstallStep
@@ -217,7 +323,12 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
         />
       )}
 
-      <TourTopbar index={index} total={steps.length} onSkip={step === 'install' ? undefined : skip} />
+      <TourTopbar
+        index={index}
+        total={steps.length}
+        closing={closing}
+        onSkip={step === 'install' || closing ? undefined : skip}
+      />
     </>
   )
 }
@@ -225,12 +336,14 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
 interface TourTopbarProps {
   index: number
   total: number
+  /** Fades the bar out with the rest of the staged finale. */
+  closing?: boolean
   onSkip?: () => void
 }
 
-function TourTopbar({ index, total, onSkip }: TourTopbarProps) {
+function TourTopbar({ index, total, closing = false, onSkip }: TourTopbarProps) {
   return (
-    <div className="onboarding-topbar">
+    <div className={closing ? 'onboarding-topbar onboarding-closing' : 'onboarding-topbar'}>
       <div className="onboarding-dots" aria-hidden="true">
         {Array.from({ length: total }, (_, dotIndex) => (
           <span
@@ -251,6 +364,15 @@ function TourTopbar({ index, total, onSkip }: TourTopbarProps) {
 
 interface IntroStepProps {
   onPrimary: () => void
+  /**
+   * Staged presentation's exit beat: true while the intro's lines fade off
+   * the paper. onLeft fires when that fade's animation reports done --
+   * finished or cancelled -- and never needs a reduced-motion fallback here
+   * because the caller only ever sets leaving when the animation will play
+   * (see handleIntroPrimary).
+   */
+  leaving?: boolean
+  onLeft?: () => void
 }
 
 /**
@@ -267,7 +389,7 @@ interface IntroStepProps {
  * seen. The primary takes focus once its entrance settles (see
  * useEntranceSettled for the finished/cancelled/reduced-motion cases).
  */
-function IntroStep({ onPrimary }: IntroStepProps) {
+function IntroStep({ onPrimary, leaving = false, onLeft }: IntroStepProps) {
   const headingId = useId()
   const containerRef = useRef<HTMLDivElement>(null)
   const footerRef = useRef<HTMLDivElement>(null)
@@ -282,10 +404,34 @@ function IntroStep({ onPrimary }: IntroStepProps) {
     }
   }, [revealed])
 
+  // Native listeners for the same reason as useEntranceSettled: React has
+  // no onAnimationCancel, and a fade cancelled mid-flight (reduced motion
+  // flipping on) must still release the step.
+  useEffect(() => {
+    if (!leaving || !onLeft) {
+      return
+    }
+    const element = containerRef.current
+    if (!element) {
+      return
+    }
+    function handle(event: AnimationEvent) {
+      if (event.animationName === 'onboarding-intro-leave') {
+        onLeft?.()
+      }
+    }
+    element.addEventListener('animationend', handle)
+    element.addEventListener('animationcancel', handle)
+    return () => {
+      element.removeEventListener('animationend', handle)
+      element.removeEventListener('animationcancel', handle)
+    }
+  }, [leaving, onLeft])
+
   return (
     <div
       ref={containerRef}
-      className="onboarding-intro"
+      className={leaving ? 'onboarding-intro onboarding-intro-leaving' : 'onboarding-intro'}
       role="dialog"
       aria-modal="true"
       aria-labelledby={headingId}
@@ -420,6 +566,105 @@ function CoachCallout({ label, body, primaryLabel, onPrimary, style }: CoachCall
           {primaryLabel}
         </button>
       </div>
+    </div>
+  )
+}
+
+interface StagedPlacardProps {
+  step: CoachStepId
+  config: CoachStepConfig
+  primaryLabel: string
+  /**
+   * True only on the sequence's last step. The accent-filled treatment is
+   * reserved for the tour's bookends -- the intro's "Noted." and the final
+   * action here; intermediate Nexts wear the app's ordinary quiet surface
+   * button so the interface being demonstrated stays the loudest thing on
+   * screen.
+   */
+  final: boolean
+  onPrimary: () => void
+  /** True during the finale beat; onClosed fires when its exit animation reports done. */
+  closing: boolean
+  onClosed: () => void
+}
+
+/**
+ * The staged orientation's counterpart to CoachCallout: step copy set
+ * directly on the paper in a fixed placard at the bottom of the screen,
+ * not a floating card near a control -- the shell's own stage lighting
+ * (see OnboardingOrientation) is what carries attention to each subject.
+ *
+ * One placard persists across all four coach steps, unkeyed, so the
+ * primary action never moves or re-mounts: the button stays put under the
+ * user's thumb -- in the same spot the intro's own primary occupied -- and
+ * keeps focus while only the copy above it changes. The copy block is
+ * keyed per step so its small entrance re-runs, and it sits inside a
+ * persistent aria-live region so each step's words are announced without
+ * needing to move focus.
+ *
+ * The finale ('closing') plays as one CSS animation on this root; its
+ * animationend/animationcancel is what hands control back to the caller.
+ * The caller only ever sets closing when the animation will actually play
+ * (reduced motion finishes plainly instead), so no fallback timer is
+ * needed here.
+ */
+function StagedPlacard({ step, config, primaryLabel, final, onPrimary, closing, onClosed }: StagedPlacardProps) {
+  const labelId = useId()
+  const placardRef = useRef<HTMLDivElement>(null)
+  const primaryRef = useRef<HTMLButtonElement>(null)
+  const entered = useEntranceSettled(placardRef, 'onboarding-rise')
+
+  useEffect(() => {
+    if (entered) {
+      primaryRef.current?.focus()
+    }
+  }, [entered])
+
+  useEffect(() => {
+    if (!closing) {
+      return
+    }
+    const element = placardRef.current
+    if (!element) {
+      return
+    }
+    function handle(event: AnimationEvent) {
+      if (event.animationName === 'onboarding-close') {
+        onClosed()
+      }
+    }
+    element.addEventListener('animationend', handle)
+    element.addEventListener('animationcancel', handle)
+    return () => {
+      element.removeEventListener('animationend', handle)
+      element.removeEventListener('animationcancel', handle)
+    }
+  }, [closing, onClosed])
+
+  return (
+    <div
+      ref={placardRef}
+      className={closing ? 'onboarding-placard onboarding-closing' : 'onboarding-placard'}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={labelId}
+    >
+      <div className="onboarding-placard-text" aria-live="polite">
+        <div key={step} className="onboarding-placard-copy">
+          <p id={labelId} className="onboarding-placard-label">
+            {config.label}
+          </p>
+          <p className="onboarding-placard-body">{config.body}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        className={final ? 'onboarding-primary' : undefined}
+        ref={primaryRef}
+        onClick={onPrimary}
+      >
+        {primaryLabel}
+      </button>
     </div>
   )
 }

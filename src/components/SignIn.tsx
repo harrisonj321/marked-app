@@ -64,7 +64,7 @@ export function SignIn({ authError = null }: SignInProps) {
   }
 
   return (
-    <main className="screen screen-center">
+    <main className="screen screen-center signin-enter">
       <h1>Noted.</h1>
 
       <div className="signin-actions">

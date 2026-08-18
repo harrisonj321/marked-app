@@ -438,4 +438,143 @@ describe('OnboardingTour', () => {
 
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
   })
+
+  describe('staged presentation (the pre-auth orientation)', () => {
+    function renderStaged({ reducedMotion = false } = {}) {
+      mockPlatform({ reducedMotion })
+      const onFinish = vi.fn()
+      const onStageChange = vi.fn()
+      render(<OnboardingTour presentation="staged" onStageChange={onStageChange} onFinish={onFinish} />)
+      return { onFinish, onStageChange }
+    }
+
+    /** Advances past the welcome screen the way a motion-enabled browser would: press, then let the exit fade report done. */
+    function leaveIntro() {
+      fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+      fireAnimationEnd(document.querySelector('.onboarding-intro')!, 'onboarding-intro-leave')
+    }
+
+    it('holds the welcome screen while its exit fade plays, then advances when the fade reports done', () => {
+      renderStaged()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+
+      // Still the intro, now leaving -- no coach copy yet, no hard cut.
+      expect(document.querySelector('.onboarding-intro-leaving')).toBeInTheDocument()
+      expect(screen.queryByText(/flip today's mark/i)).not.toBeInTheDocument()
+
+      fireAnimationEnd(document.querySelector('.onboarding-intro')!, 'onboarding-intro-leave')
+
+      expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
+    })
+
+    it('advances from the welcome screen immediately under reduced motion, where the exit fade would never play', () => {
+      renderStaged({ reducedMotion: true })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+
+      expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
+    })
+
+    it('presents coach steps on a placard with no spotlight, backdrop, or callout card', () => {
+      renderStaged()
+      leaveIntro()
+
+      expect(document.querySelector('.onboarding-placard')).toBeInTheDocument()
+      expect(document.querySelector('.onboarding-coach')).not.toBeInTheDocument()
+      expect(document.querySelector('.tour-spotlight')).not.toBeInTheDocument()
+      expect(document.querySelector('.tour-callout')).not.toBeInTheDocument()
+    })
+
+    it('keeps one persistent primary across coach steps, holding position and focus while only the copy changes', () => {
+      renderStaged()
+      leaveIntro()
+
+      const primary = screen.getByRole('button', { name: 'Next' })
+      fireAnimationEnd(document.querySelector('.onboarding-placard')!, 'onboarding-rise')
+      expect(primary).toHaveFocus()
+
+      // Intermediate steps wear the quiet surface treatment; the accent
+      // fill is reserved for the sequence's bookends (intro and Done).
+      expect(primary).not.toHaveClass('onboarding-primary')
+
+      fireEvent.click(primary)
+
+      // Same DOM node, new words above it: a remounted button would lose
+      // both its place under the thumb and its focus.
+      expect(screen.getByRole('button', { name: 'Next' })).toBe(primary)
+      expect(primary).toHaveFocus()
+      expect(screen.getByText(/tap a past day to correct it/i)).toBeInTheDocument()
+    })
+
+    it('reports each scene to the host shell as the steps advance', () => {
+      const { onStageChange } = renderStaged({ reducedMotion: true })
+
+      clickNext() // welcome -> coach-today
+      clickNext() // coach-today -> coach-calendar
+      clickNext() // coach-calendar -> coach-customize
+      clickNext() // coach-customize -> coach-ledger
+
+      expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual([
+        'welcome',
+        'today',
+        'calendar',
+        'settings',
+        'ledger',
+      ])
+    })
+
+    it('plays a closing beat on Done -- reporting the closing scene -- and finishes only when it reports done', () => {
+      const { onFinish, onStageChange } = renderStaged()
+      leaveIntro()
+      clickNext() // coach-today -> coach-calendar
+      clickNext() // coach-calendar -> coach-customize
+      clickNext() // coach-customize -> coach-ledger
+
+      // The final action regains the accent-filled emphasis the
+      // intermediate Nexts deliberately gave up.
+      expect(screen.getByRole('button', { name: 'Done' })).toHaveClass('onboarding-primary')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+      expect(onFinish).not.toHaveBeenCalled()
+      expect(onStageChange).toHaveBeenLastCalledWith('closing')
+      expect(document.querySelector('.onboarding-placard')).toHaveClass('onboarding-closing')
+
+      fireAnimationEnd(document.querySelector('.onboarding-placard')!, 'onboarding-close')
+
+      expect(onFinish).toHaveBeenCalledWith('completed')
+      expect(onFinish).toHaveBeenCalledTimes(1)
+    })
+
+    it('finishes immediately from Done under reduced motion, with no closing beat', () => {
+      const { onFinish, onStageChange } = renderStaged({ reducedMotion: true })
+
+      clickNext() // welcome -> coach-today
+      clickNext() // coach-today -> coach-calendar
+      clickNext() // coach-calendar -> coach-customize
+      clickNext() // coach-customize -> coach-ledger
+      clickNext() // Done
+
+      expect(onFinish).toHaveBeenCalledWith('completed')
+      expect(onStageChange).not.toHaveBeenCalledWith('closing')
+    })
+
+    it('retires Skip and ignores Escape during the closing beat -- the finish is already committed', () => {
+      const { onFinish } = renderStaged()
+      leaveIntro()
+      clickNext() // coach-today -> coach-calendar
+      clickNext() // coach-calendar -> coach-customize
+      clickNext() // coach-customize -> coach-ledger
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+      expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(onFinish).not.toHaveBeenCalled()
+
+      fireAnimationEnd(document.querySelector('.onboarding-placard')!, 'onboarding-close')
+      expect(onFinish).toHaveBeenCalledWith('completed')
+      expect(onFinish).toHaveBeenCalledTimes(1)
+    })
+  })
 })
