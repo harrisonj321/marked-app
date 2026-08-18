@@ -44,3 +44,60 @@ export function saveOnboardingRecord(uid: string, status: OnboardingStatus): voi
     // Ignored -- see above.
   }
 }
+
+/**
+ * The pre-auth orientation screen (see App's OnboardingIntro) has no uid to
+ * key off yet, so its own completion lives at this fixed device-scoped key
+ * instead of storageKey's per-account one.
+ */
+const DEVICE_INTRO_STORAGE_KEY = 'noted:onboarding:device'
+
+/**
+ * Whether this device has already seen the pre-auth orientation screen.
+ * Also true if this device holds ANY per-account onboarding record: those
+ * predate the orientation screen being split out of the in-Home tour, so an
+ * account that already finished the full tour here has necessarily already
+ * seen this same welcome content once -- it must not reappear for them.
+ */
+export function hasSeenOnboardingIntro(): boolean {
+  try {
+    if (isOnboardingRecord(parseStoredRecord(window.localStorage.getItem(DEVICE_INTRO_STORAGE_KEY)))) {
+      return true
+    }
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (
+        key &&
+        key !== DEVICE_INTRO_STORAGE_KEY &&
+        key.startsWith('noted:onboarding:') &&
+        isOnboardingRecord(parseStoredRecord(window.localStorage.getItem(key)))
+      ) {
+        return true
+      }
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+/** Failure here just means the intro may show again later -- never worth surfacing, see saveOnboardingRecord. */
+export function saveOnboardingIntroSeen(status: OnboardingStatus): void {
+  try {
+    const record: OnboardingRecord = { version: ONBOARDING_VERSION, status }
+    window.localStorage.setItem(DEVICE_INTRO_STORAGE_KEY, JSON.stringify(record))
+  } catch {
+    // Ignored -- see above.
+  }
+}
+
+function parseStoredRecord(raw: string | null): unknown {
+  if (!raw) {
+    return null
+  }
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}

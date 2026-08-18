@@ -188,6 +188,8 @@ input:focus-visible {
 
 input[type='text'],
 input[type='number'],
+input[type='email'],
+input[type='password'],
 textarea {
   font: inherit;
   width: 100%;
@@ -254,6 +256,33 @@ fieldset label {
 
 .icon-button:hover {
   color: var(--color-text);
+}
+
+/* Sign-in */
+
+.signin-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 20rem;
+}
+
+/* Same quiet underlined-text treatment as .footer-link/.onboarding-skip,
+   reused here so a secondary auth action never competes with the primary
+   Google/submit button for visual weight. */
+.signin-secondary {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.signin-email-form {
+  width: 100%;
+  max-width: 20rem;
+  text-align: left;
 }
 
 /* Home */

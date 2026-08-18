@@ -43,19 +43,30 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
   // record for the current onboarding version sees the tour on next open,
   // established accounts included. Lazy initializer (not an effect) so
   // there is no frame where Home is visible before the tour is active.
-  const [tourActive, setTourActive] = useState(() => !hasCompletedOnboarding(uid))
+  //
+  // 'auto' vs 'replay' distinguishes *why* the tour is showing, which
+  // controls whether it includes the welcome screen: an auto-started tour
+  // means this is a brand-new account that already saw the pre-auth
+  // orientation screen before reaching Home at all (see App.tsx), so it
+  // starts straight at the first coach mark; a replay from Settings' "Tour
+  // Noted." is an explicit request to see the whole thing again, welcome
+  // included.
+  const [tourMode, setTourMode] = useState<'auto' | 'replay' | null>(() =>
+    hasCompletedOnboarding(uid) ? null : 'auto',
+  )
+  const tourActive = tourMode !== null
   const labels = resolveStateLabels(activeLedger.stateLabels)
   const accentColor = `var(--ledger-color-${resolveLedgerColor(activeLedger.color)})`
   const settingsLedger = ledgers.find((ledger) => ledger.id === settingsLedgerId) ?? null
 
   function handleTourFinish(status: OnboardingStatus) {
     saveOnboardingRecord(uid, status)
-    setTourActive(false)
+    setTourMode(null)
   }
 
   function handleTourNoted() {
     setSettingsLedgerId(null)
-    setTourActive(true)
+    setTourMode('replay')
   }
 
   function handleManageLedger(ledgerId: string) {
@@ -196,7 +207,9 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
         )}
       </main>
 
-      {tourActive && <OnboardingTour onFinish={handleTourFinish} />}
+      {tourActive && (
+        <OnboardingTour includeWelcome={tourMode === 'replay'} onFinish={handleTourFinish} />
+      )}
     </>
   )
 }

@@ -116,41 +116,8 @@ function isCoachStep(step: StepId): step is CoachStepId {
   return step in COACH_STEPS
 }
 
-interface OnboardingTourProps {
-  onFinish: (status: OnboardingStatus) => void
-}
-
-/**
- * Drives the first-run/replayable tour: one staged full-screen intro, four
- * coach marks anchored to the real Home controls, then an optional PWA
- * install step. Home stays mounted (and inert) underneath the whole time --
- * see Home's use of the `inert` attribute -- so this component only ever
- * needs to render whichever single step is current. The one exception to
- * "single step" thinking: all four coach steps share one persistent
- * CoachOverlay so the spotlight element survives step changes and its CSS
- * position transition glides it from control to control.
- */
-export function OnboardingTour({ onFinish }: OnboardingTourProps) {
-  const { canPromptInstall, promptInstall } = useInstallPrompt()
-  // Display mode and device class cannot meaningfully change while the tour
-  // is open, so these are read once rather than re-derived every render.
-  const [standalone] = useState(isStandaloneDisplay)
-  const [ios] = useState(isIOSDevice)
-  const showInstallStep = !standalone && (ios || canPromptInstall)
-
-  const steps = useMemo<StepId[]>(
-    () => (showInstallStep ? [...INTRO_AND_COACH_STEPS, 'install'] : [...INTRO_AND_COACH_STEPS]),
-    [showInstallStep],
-  )
-
-  const [index, setIndex] = useState(0)
-  // Clamped: the steps array can shrink under a live index in one rare case
-  // (`appinstalled` firing while the install step is open resets the install
-  // prompt, dropping that step), and a momentary out-of-range read would
-  // blank the whole overlay.
-  const step = steps[Math.min(index, steps.length - 1)]
-  const isLastStep = index >= steps.length - 1
-
+/** Exits the tour/intro as skipped on Escape, from any step. Shared so the pre-auth OnboardingIntro and the in-Home OnboardingTour can never drift on this behavior. */
+function useEscapeSkip(onFinish: (status: OnboardingStatus) => void) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
@@ -160,9 +127,10 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onFinish])
+}
 
-  // Background scroll would otherwise fight the fixed-position overlay on
-  // long-content phones; restored on unmount regardless of how the tour ends.
+/** Background scroll would otherwise fight the fixed-position overlay on long-content phones; restored on unmount regardless of how the tour/intro ends. */
+function useLockBodyScroll() {
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -170,6 +138,79 @@ export function OnboardingTour({ onFinish }: OnboardingTourProps) {
       document.body.style.overflow = previousOverflow
     }
   }, [])
+}
+
+interface OnboardingIntroProps {
+  onFinish: (status: OnboardingStatus) => void
+}
+
+/**
+ * The pre-auth orientation screen: a first-time visitor's very first view of
+ * the app, shown before any sign-in is requested -- see App.tsx and
+ * CLAUDE.md's boot-flow requirements. Reuses the exact same IntroStep the
+ * in-Home tour's own welcome step renders (see OnboardingTour's
+ * `includeWelcome`), so the two can never visually drift apart, and the same
+ * TourTopbar for a consistent Skip/Escape exit.
+ */
+export function OnboardingIntro({ onFinish }: OnboardingIntroProps) {
+  useEscapeSkip(onFinish)
+  useLockBodyScroll()
+
+  return (
+    <>
+      <IntroStep onPrimary={() => onFinish('completed')} />
+      <TourTopbar index={0} total={1} onSkip={() => onFinish('skipped')} />
+    </>
+  )
+}
+
+interface OnboardingTourProps {
+  onFinish: (status: OnboardingStatus) => void
+  /**
+   * False for the tour's auto-started first run, whose welcome/orientation
+   * content has already run pre-auth by then (see OnboardingIntro above and
+   * App.tsx) -- showing it again here would just repeat the same screen.
+   * True (the default) for every other entry point, in particular Settings'
+   * "Tour Noted." replay, which is meant to walk the whole experience again
+   * from the top.
+   */
+  includeWelcome?: boolean
+}
+
+/**
+ * Drives the first-run/replayable tour: optionally one staged full-screen
+ * intro (see `includeWelcome`), four coach marks anchored to the real Home
+ * controls, then an optional PWA install step. Home stays mounted (and
+ * inert) underneath the whole time -- see Home's use of the `inert`
+ * attribute -- so this component only ever needs to render whichever single
+ * step is current. The one exception to "single step" thinking: all four
+ * coach steps share one persistent CoachOverlay so the spotlight element
+ * survives step changes and its CSS position transition glides it from
+ * control to control.
+ */
+export function OnboardingTour({ onFinish, includeWelcome = true }: OnboardingTourProps) {
+  const { canPromptInstall, promptInstall } = useInstallPrompt()
+  // Display mode and device class cannot meaningfully change while the tour
+  // is open, so these are read once rather than re-derived every render.
+  const [standalone] = useState(isStandaloneDisplay)
+  const [ios] = useState(isIOSDevice)
+  const showInstallStep = !standalone && (ios || canPromptInstall)
+
+  const steps = useMemo<StepId[]>(() => {
+    const base: StepId[] = includeWelcome ? [...INTRO_AND_COACH_STEPS] : [...COACH_SEQUENCE]
+    return showInstallStep ? [...base, 'install'] : base
+  }, [includeWelcome, showInstallStep])
+
+  const [index, setIndex] = useState(0)
+  // Clamped: the steps array can shrink under a live index in one rare case
+  // (`appinstalled` firing while the install step is open resets the install
+  // prompt, dropping that step), and a momentary out-of-range read would
+  // blank the whole overlay.
+  const step = steps[Math.min(index, steps.length - 1)]
+  const isLastStep = index >= steps.length - 1
+
+  useEscapeSkip(onFinish)
+  useLockBodyScroll()
 
   function goNext() {
     if (isLastStep) {

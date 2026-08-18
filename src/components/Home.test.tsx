@@ -452,28 +452,35 @@ describe('Home', () => {
 
   describe('onboarding tour', () => {
     const WELCOME_TEXT = /not a habit tracker/i
+    // The auto-started tour skips the welcome screen entirely -- by the time
+    // a brand-new account reaches Home, it has already run pre-auth (see
+    // App's OnboardingIntro) -- so auto-start begins at the first coach mark.
+    const FIRST_COACH_TEXT = /flip today's mark/i
 
-    it('auto-starts for an established authenticated user with no current-version onboarding record', () => {
+    it('auto-starts at the first coach mark (not the welcome screen, already shown pre-auth) for an established authenticated user with no current-version onboarding record', () => {
       render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
-      expect(screen.getByText(WELCOME_TEXT)).toBeInTheDocument()
+      expect(screen.getByText(FIRST_COACH_TEXT)).toBeInTheDocument()
+      expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
     })
 
     it('does not auto-start when a completed record exists for this uid', () => {
       saveOnboardingRecord('u1', 'completed')
       render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
+      expect(screen.queryByText(FIRST_COACH_TEXT)).not.toBeInTheDocument()
     })
 
     it('does not auto-start when a skipped record exists for this uid', () => {
       saveOnboardingRecord('u1', 'skipped')
       render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
+      expect(screen.queryByText(FIRST_COACH_TEXT)).not.toBeInTheDocument()
     })
 
     it('auto-starts independently per uid, so one account having a record does not suppress another', () => {
       saveOnboardingRecord('u1', 'completed')
       render(<Home uid="u2" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
-      expect(screen.getByText(WELCOME_TEXT)).toBeInTheDocument()
+      expect(screen.getByText(FIRST_COACH_TEXT)).toBeInTheDocument()
     })
 
     it('makes the main content inert while the tour is active, so it cannot be interacted with underneath', () => {
