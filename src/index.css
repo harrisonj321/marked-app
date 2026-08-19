@@ -971,6 +971,21 @@ fieldset label {
   outline-offset: 2px;
 }
 
+/* First-ledger suggestions */
+
+.suggestion-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.suggestion-chip {
+  flex: 1 1 calc(50% - 0.3125rem);
+  min-width: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
 /* Count selector */
 
 .count-selector {
