@@ -1,13 +1,13 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent, type SyntheticEvent } from 'react'
 import { LEDGER_NAME_SUGGESTIONS } from '../domain/ledgerSuggestions'
 import {
-  STATE_LABEL_MAX_LENGTH,
   TRACKER_NAME_MAX_LENGTH,
   validateStateLabel,
   validateTrackerName,
   type DayState,
   type StateLabels,
 } from '../domain/tracker'
+import { StateLabelFields } from './StateLabelFields'
 import {
   DEFAULT_LEDGER_COLOR,
   LEDGER_COLORS,
@@ -34,9 +34,6 @@ interface LedgerSwitcherSheetProps {
   onDismiss: () => void
 }
 
-/** The creation form's own starting point -- edited before saving, never silently kept. */
-const STARTING_STATE_LABELS: StateLabels = { did: 'Yes', didnt: 'No' }
-
 /**
  * Noted.'s one surface for picking a ledger: primarily a list to select
  * from, plus creating a new one -- this is also the exact surface a
@@ -60,8 +57,8 @@ export function LedgerSwitcherSheet({
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const nameId = useId()
-  const didLabelId = useId()
-  const didntLabelId = useId()
+  const defaultLabelId = useId()
+  const notedLabelId = useId()
   const colorLabelId = useId()
 
   // A brand-new account has no ledgers at all, so Home renders this sheet
@@ -73,13 +70,12 @@ export function LedgerSwitcherSheet({
   const [creating, setCreating] = useState(isFirstLedger)
   const [newName, setNewName] = useState('')
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
-  const [customizeOpen, setCustomizeOpen] = useState(false)
-  const [newStateLabels, setNewStateLabels] = useState<StateLabels>(STARTING_STATE_LABELS)
-  const [newDefaultState, setNewDefaultState] = useState<DayState | null>(null)
+  const [newDefaultLabel, setNewDefaultLabel] = useState('')
+  const [newNotedLabel, setNewNotedLabel] = useState('')
   const [newColor, setNewColor] = useState<LedgerColor>(DEFAULT_LEDGER_COLOR)
   const [newNameError, setNewNameError] = useState<string | null>(null)
-  const [didLabelError, setDidLabelError] = useState<string | null>(null)
-  const [didntLabelError, setDidntLabelError] = useState<string | null>(null)
+  const [defaultLabelError, setDefaultLabelError] = useState<string | null>(null)
+  const [notedLabelError, setNotedLabelError] = useState<string | null>(null)
   const [newFormError, setNewFormError] = useState<string | null>(null)
   const [savingCreate, setSavingCreate] = useState(false)
 
@@ -121,13 +117,12 @@ export function LedgerSwitcherSheet({
   function startCreating() {
     setNewName('')
     setSuggestionsOpen(false)
-    setCustomizeOpen(false)
-    setNewStateLabels(STARTING_STATE_LABELS)
-    setNewDefaultState(null)
+    setNewDefaultLabel('')
+    setNewNotedLabel('')
     setNewColor(DEFAULT_LEDGER_COLOR)
     setNewNameError(null)
-    setDidLabelError(null)
-    setDidntLabelError(null)
+    setDefaultLabelError(null)
+    setNotedLabelError(null)
     setNewFormError(null)
     setCreating(true)
   }
@@ -142,19 +137,14 @@ export function LedgerSwitcherSheet({
     event.preventDefault()
 
     const nameValidation = validateTrackerName(newName)
-    const didValidation = validateStateLabel(newStateLabels.did)
-    const didntValidation = validateStateLabel(newStateLabels.didnt)
+    const defaultValidation = validateStateLabel(newDefaultLabel)
+    const notedValidation = validateStateLabel(newNotedLabel)
 
     setNewNameError(nameValidation.valid ? null : nameValidation.error)
-    setDidLabelError(didValidation.valid ? null : didValidation.error)
-    setDidntLabelError(didntValidation.valid ? null : didntValidation.error)
+    setDefaultLabelError(defaultValidation.valid ? null : defaultValidation.error)
+    setNotedLabelError(notedValidation.valid ? null : notedValidation.error)
 
-    if (!nameValidation.valid || !didValidation.valid || !didntValidation.valid) {
-      return
-    }
-
-    if (!newDefaultState) {
-      setNewFormError('Choose what an untouched day means.')
+    if (!nameValidation.valid || !defaultValidation.valid || !notedValidation.valid) {
       return
     }
 
@@ -163,8 +153,11 @@ export function LedgerSwitcherSheet({
     try {
       await onCreate({
         name: nameValidation.name,
-        defaultState: newDefaultState,
-        stateLabels: { did: didValidation.label, didnt: didntValidation.label },
+        // The "Default state" field is always what an untouched day
+        // resolves to -- there is no separate radio choosing it, so the
+        // underlying DayState key it's stored under is fixed here.
+        defaultState: 'didnt',
+        stateLabels: { didnt: defaultValidation.label, did: notedValidation.label },
         color: newColor,
       })
       setCreating(false)
@@ -272,77 +265,16 @@ export function LedgerSwitcherSheet({
             )}
           </div>
 
-          <fieldset>
-            <legend>If I don't log anything, count the day as:</legend>
-            <label>
-              <input
-                type="radio"
-                name={`${nameId}-default-state`}
-                checked={newDefaultState === 'did'}
-                onChange={() => setNewDefaultState('did')}
-              />
-              {newStateLabels.did || 'First state'}
-            </label>
-            <label>
-              <input
-                type="radio"
-                name={`${nameId}-default-state`}
-                checked={newDefaultState === 'didnt'}
-                onChange={() => setNewDefaultState('didnt')}
-              />
-              {newStateLabels.didnt || 'Second state'}
-            </label>
-          </fieldset>
-
-          <div className="ledger-disclosure">
-            <button
-              type="button"
-              className="footer-link disclosure-toggle"
-              aria-expanded={customizeOpen}
-              onClick={() => setCustomizeOpen((open) => !open)}
-            >
-              Customize states
-            </button>
-            {customizeOpen && (
-              <>
-                <div className="field">
-                  <label htmlFor={didLabelId}>First state</label>
-                  <input
-                    id={didLabelId}
-                    type="text"
-                    value={newStateLabels.did}
-                    onChange={(event) =>
-                      setNewStateLabels((current) => ({ ...current, did: event.target.value }))
-                    }
-                    maxLength={STATE_LABEL_MAX_LENGTH}
-                  />
-                  {didLabelError && (
-                    <p role="alert" className="message">
-                      {didLabelError}
-                    </p>
-                  )}
-                </div>
-
-                <div className="field">
-                  <label htmlFor={didntLabelId}>Second state</label>
-                  <input
-                    id={didntLabelId}
-                    type="text"
-                    value={newStateLabels.didnt}
-                    onChange={(event) =>
-                      setNewStateLabels((current) => ({ ...current, didnt: event.target.value }))
-                    }
-                    maxLength={STATE_LABEL_MAX_LENGTH}
-                  />
-                  {didntLabelError && (
-                    <p role="alert" className="message">
-                      {didntLabelError}
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+          <StateLabelFields
+            defaultLabelId={defaultLabelId}
+            notedLabelId={notedLabelId}
+            defaultValue={newDefaultLabel}
+            notedValue={newNotedLabel}
+            onDefaultChange={setNewDefaultLabel}
+            onNotedChange={setNewNotedLabel}
+            defaultError={defaultLabelError}
+            notedError={notedLabelError}
+          />
 
           <div className="field">
             <span id={colorLabelId}>Color</span>

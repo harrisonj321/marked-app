@@ -516,7 +516,8 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-    fireEvent.click(screen.getByRole('radio', { name: 'Yes' }))
+    fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
+    fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     const expectedTimezone = resolveDeviceTimezone()
@@ -525,8 +526,8 @@ describe('App', () => {
     await vi.waitFor(() => {
       expect(createLedgerMock).toHaveBeenCalledWith('u1', {
         name: 'Reading',
-        defaultState: 'did',
-        stateLabels: { did: 'Yes', didnt: 'No' },
+        defaultState: 'didnt',
+        stateLabels: { didnt: 'No', did: 'Yes' },
         timezone: expectedTimezone,
         startDate: expectedStartDate,
         color: 'espresso',

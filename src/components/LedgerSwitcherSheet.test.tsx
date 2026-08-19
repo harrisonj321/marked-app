@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { LedgerSwitcherSheet, type NewLedgerInput } from './LedgerSwitcherSheet'
 import type { Ledger } from '../domain/ledger'
 
@@ -43,10 +43,6 @@ function renderSheet(overrides: Partial<Parameters<typeof LedgerSwitcherSheet>[0
     />,
   )
   return { onSwitch, onCreate, onManage, onDismiss }
-}
-
-function openCustomize() {
-  fireEvent.click(screen.getByRole('button', { name: 'Customize states' }))
 }
 
 describe('LedgerSwitcherSheet', () => {
@@ -148,52 +144,92 @@ describe('LedgerSwitcherSheet', () => {
       expect(screen.getByLabelText(/what are you tracking/i)).toBeInTheDocument()
     })
 
-    it('shows a compact form by default: name, default-day choice (Yes/No), color, and Save -- no state-label inputs', () => {
+    it('shows a compact form: name, Default state, Noted state, color, and Save -- no Yes/No radios or a Customize disclosure', () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
 
       expect(screen.getByLabelText(/what are you tracking/i)).toBeInTheDocument()
-      expect(screen.getByRole('radio', { name: 'Yes' })).toBeInTheDocument()
-      expect(screen.getByRole('radio', { name: 'No' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Default state')).toBeInTheDocument()
+      expect(screen.getByLabelText('Noted state')).toBeInTheDocument()
       expect(screen.getByRole('group', { name: 'Color' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Customize states' })).not.toBeInTheDocument()
       expect(screen.queryByLabelText('First state')).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Second state')).not.toBeInTheDocument()
     })
 
-    it('offers a quiet "Customize states" disclosure, collapsed by default', () => {
+    it('both state-label fields start genuinely empty -- no initial value, just placeholder text', () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
 
-      const toggle = screen.getByRole('button', { name: 'Customize states' })
-      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.getByLabelText('Default state')).toHaveValue('')
+      expect(screen.getByLabelText('Noted state')).toHaveValue('')
     })
 
-    it('opening "Customize states" reveals both editable labels, starting at Yes/No', () => {
+    it('shows the helper copy explaining what the default field means', () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
-      openCustomize()
-
-      expect(screen.getByRole('button', { name: 'Customize states' })).toHaveAttribute('aria-expanded', 'true')
-      expect(screen.getByLabelText('First state')).toHaveValue('Yes')
-      expect(screen.getByLabelText('Second state')).toHaveValue('No')
+      expect(screen.getByText("If I don't log anything, count the day as:")).toBeInTheDocument()
     })
 
-    it('collapsing "Customize states" again hides the inputs but preserves the edits', () => {
+    it('the placeholder pair is synchronized and cycles together on a timer', () => {
+      vi.useFakeTimers()
+      try {
+        renderSheet()
+        fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+
+        const defaultField = screen.getByLabelText('Default state')
+        const notedField = screen.getByLabelText('Noted state')
+        const firstDefault = defaultField.getAttribute('placeholder')
+        const firstNoted = notedField.getAttribute('placeholder')
+
+        act(() => {
+          vi.advanceTimersByTime(3000)
+        })
+
+        const secondDefault = defaultField.getAttribute('placeholder')
+        const secondNoted = notedField.getAttribute('placeholder')
+
+        // The pair changed together, not independently.
+        expect(secondDefault).not.toBe(firstDefault)
+        expect(secondNoted).not.toBe(firstNoted)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('focusing a field clears its placeholder to a normal blank input, without animating', () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
-      openCustomize()
-      fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Good' } })
-      fireEvent.change(screen.getByLabelText('Second state'), { target: { value: 'Rough' } })
 
-      openCustomize() // collapse
-      expect(screen.queryByLabelText('First state')).not.toBeInTheDocument()
-      // The default-day choice still reflects the edit even while collapsed.
-      expect(screen.getByRole('radio', { name: 'Good' })).toBeInTheDocument()
+      const defaultField = screen.getByLabelText('Default state')
+      expect(defaultField.getAttribute('placeholder')).not.toBe('')
+      fireEvent.focus(defaultField)
+      expect(defaultField).toHaveAttribute('placeholder', '')
+    })
 
-      openCustomize() // reopen
-      expect(screen.getByLabelText('First state')).toHaveValue('Good')
-      expect(screen.getByLabelText('Second state')).toHaveValue('Rough')
+    it('blurring an empty field resumes the cycling placeholder', () => {
+      renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+
+      const defaultField = screen.getByLabelText('Default state')
+      fireEvent.focus(defaultField)
+      expect(defaultField).toHaveAttribute('placeholder', '')
+      fireEvent.blur(defaultField)
+      expect(defaultField.getAttribute('placeholder')).not.toBe('')
+    })
+
+    it('typing a value keeps it after blur -- it is never silently replaced by the placeholder', () => {
+      renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+
+      const defaultField = screen.getByLabelText('Default state')
+      fireEvent.focus(defaultField)
+      fireEvent.change(defaultField, { target: { value: 'Rest day' } })
+      fireEvent.blur(defaultField)
+
+      expect(defaultField).toHaveValue('Rest day')
     })
 
     it('does not show the first-time suggestions helper once the account already has a ledger', () => {
@@ -222,32 +258,15 @@ describe('LedgerSwitcherSheet', () => {
       expect(screen.queryByLabelText(/what are you tracking/i)).not.toBeInTheDocument()
     })
 
-    it('re-opening after Cancel starts fresh: labels back to Yes/No and customize collapsed', () => {
+    it('re-opening after Cancel starts fresh: both state-label fields empty again', () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
-      openCustomize()
-      fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Good' } })
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'Rough' } })
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
-      expect(screen.getByRole('button', { name: 'Customize states' })).toHaveAttribute('aria-expanded', 'false')
-      expect(screen.getByRole('radio', { name: 'Yes' })).toBeInTheDocument()
-    })
-
-    it('the "if I don\'t log anything" choices live-reflect the two state-label inputs', () => {
-      renderSheet()
-      fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
-
-      expect(screen.getByRole('radio', { name: 'Yes' })).toBeInTheDocument()
-      expect(screen.getByRole('radio', { name: 'No' })).toBeInTheDocument()
-
-      openCustomize()
-      fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Good' } })
-      fireEvent.change(screen.getByLabelText('Second state'), { target: { value: 'Rough' } })
-
-      expect(screen.getByRole('radio', { name: 'Good' })).toBeInTheDocument()
-      expect(screen.getByRole('radio', { name: 'Rough' })).toBeInTheDocument()
-      expect(screen.queryByRole('radio', { name: 'Yes' })).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Default state')).toHaveValue('')
+      expect(screen.getByLabelText('Noted state')).toHaveValue('')
     })
 
     it('there are no hardcoded "I did it"/"I didn\'t do it" choices', () => {
@@ -261,87 +280,78 @@ describe('LedgerSwitcherSheet', () => {
     it('rejects an empty name', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
-      fireEvent.click(screen.getByRole('radio', { name: 'Yes' }))
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent(/enter a name/i)
       expect(onCreate).not.toHaveBeenCalled()
     })
 
-    it('rejects an emptied state label', async () => {
+    it('requires an actual value in the Default state field -- placeholder text alone does not count', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-      openCustomize()
-      fireEvent.change(screen.getByLabelText('First state'), { target: { value: '   ' } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent(/enter a label/i)
       expect(onCreate).not.toHaveBeenCalled()
     })
 
-    it('requires a default-state selection', async () => {
+    it('requires an actual value in the Noted state field', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-      expect(await screen.findByRole('alert')).toHaveTextContent(/choose what an untouched day means/i)
+      expect(await screen.findByRole('alert')).toHaveTextContent(/enter a label/i)
       expect(onCreate).not.toHaveBeenCalled()
     })
 
-    it('creates with the collapsed defaults (Yes/No) without ever opening customize', async () => {
+    it('rejects a whitespace-only state label', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
-      expect(screen.getByRole('button', { name: 'Espresso' })).toHaveAttribute('aria-pressed', 'true')
-
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-      fireEvent.click(screen.getByRole('radio', { name: 'No' }))
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: '   ' } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-      await vi.waitFor(() => {
-        expect(onCreate).toHaveBeenCalledWith({
-          name: 'Reading',
-          defaultState: 'didnt',
-          stateLabels: { did: 'Yes', didnt: 'No' },
-          color: 'espresso',
-        })
-      })
+      expect(await screen.findByRole('alert')).toHaveTextContent(/enter a label/i)
+      expect(onCreate).not.toHaveBeenCalled()
     })
 
-    it('creates with edited state labels, the chosen default, and a chosen color', async () => {
+    it('persists the Default state field as the ledger default and the Noted state field as the other state, with a chosen color', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-      openCustomize()
-      fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Good' } })
-      fireEvent.change(screen.getByLabelText('Second state'), { target: { value: 'Rough' } })
-      fireEvent.click(screen.getByRole('radio', { name: 'Good' }))
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'Rough' } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Good' } })
       fireEvent.click(screen.getByRole('button', { name: 'Moss' }))
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
         expect(onCreate).toHaveBeenCalledWith({
           name: 'Reading',
-          defaultState: 'did',
-          stateLabels: { did: 'Good', didnt: 'Rough' },
+          defaultState: 'didnt',
+          stateLabels: { didnt: 'Rough', did: 'Good' },
           color: 'moss',
         })
       })
     })
 
-    it('trims whitespace from edited state labels before saving', async () => {
+    it('trims whitespace from entered state labels before saving', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-      openCustomize()
-      fireEvent.change(screen.getByLabelText('First state'), { target: { value: '  Good  ' } })
-      fireEvent.click(screen.getByRole('radio', { name: 'Good' }))
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: '  Rough  ' } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: '  Good  ' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
         expect(onCreate).toHaveBeenCalledWith(
-          expect.objectContaining({ stateLabels: { did: 'Good', didnt: 'No' } }),
+          expect.objectContaining({ stateLabels: { didnt: 'Rough', did: 'Good' } }),
         )
       })
     })
@@ -356,7 +366,8 @@ describe('LedgerSwitcherSheet', () => {
       const { onDismiss } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-      fireEvent.click(screen.getByRole('radio', { name: 'Yes' }))
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
@@ -370,7 +381,8 @@ describe('LedgerSwitcherSheet', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-      fireEvent.click(screen.getByRole('radio', { name: 'Yes' }))
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent('Could not save. Try again.')
@@ -413,13 +425,13 @@ describe('LedgerSwitcherSheet', () => {
       expect(screen.queryAllByRole('listitem')).toHaveLength(0)
     })
 
-    it('shows the same compact form as adding any later ledger -- Yes/No default choices, no state-label inputs', () => {
+    it('shows the same compact form as adding any later ledger -- Default state and Noted state fields, no radios or a Customize disclosure', () => {
       renderFirstLedgerSheet()
 
-      expect(screen.getByRole('radio', { name: 'Yes' })).toBeInTheDocument()
-      expect(screen.getByRole('radio', { name: 'No' })).toBeInTheDocument()
-      expect(screen.queryByLabelText('First state')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Customize states' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Default state')).toBeInTheDocument()
+      expect(screen.getByLabelText('Noted state')).toBeInTheDocument()
+      expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Customize states' })).not.toBeInTheDocument()
     })
 
     it('offers no Cancel -- there is nothing to browse back to', () => {
@@ -455,7 +467,8 @@ describe('LedgerSwitcherSheet', () => {
     it('the only way out is creating a ledger, which does close it', async () => {
       const { onCreate, onDismiss } = renderFirstLedgerSheet()
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-      fireEvent.click(screen.getByRole('radio', { name: 'Yes' }))
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
@@ -498,7 +511,8 @@ describe('LedgerSwitcherSheet', () => {
       fireEvent.click(screen.getByRole('button', { name: /not sure what to note/i }))
       fireEvent.click(screen.getByRole('button', { name: 'Good day' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Meditated' } })
-      fireEvent.click(screen.getByRole('radio', { name: 'Yes' }))
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
@@ -509,20 +523,18 @@ describe('LedgerSwitcherSheet', () => {
       expect(onCreate.mock.calls[0][0]).not.toHaveProperty('category')
     })
 
-    it('still requires and persists editable state labels and a default choice for the first ledger, once customized', async () => {
+    it('requires and persists real entered state labels for the first ledger too', async () => {
       const { onCreate } = renderFirstLedgerSheet()
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Headache' } })
-      openCustomize()
-      fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Had one' } })
-      fireEvent.change(screen.getByLabelText('Second state'), { target: { value: "Didn't" } })
-      fireEvent.click(screen.getByRole('radio', { name: "Didn't" }))
+      fireEvent.change(screen.getByLabelText('Default state'), { target: { value: "Didn't" } })
+      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Had one' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
         expect(onCreate).toHaveBeenCalledWith({
           name: 'Headache',
           defaultState: 'didnt',
-          stateLabels: { did: 'Had one', didnt: "Didn't" },
+          stateLabels: { didnt: "Didn't", did: 'Had one' },
           color: 'espresso',
         })
       })
