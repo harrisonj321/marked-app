@@ -3,10 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { getTodayKey, resolveDeviceTimezone } from './domain/date'
 import { hasCompletedOnboarding, saveOnboardingCompletion } from './data/onboarding'
 
-const { useAuthUserMock, useLedgersMock, createLedgerMock } = vi.hoisted(() => ({
+const { useAuthUserMock, useLedgersMock, createLedgerMock, consumeGoogleRedirectPendingMock } = vi.hoisted(() => ({
   useAuthUserMock: vi.fn(),
   useLedgersMock: vi.fn(),
   createLedgerMock: vi.fn(),
+  consumeGoogleRedirectPendingMock: vi.fn(),
 }))
 
 vi.mock('./hooks/useAuthUser', () => ({ useAuthUser: useAuthUserMock }))
@@ -40,6 +41,7 @@ vi.mock('./lib/auth', () => ({
   signInWithEmail: vi.fn(),
   signUpWithEmail: vi.fn(),
   signOutUser: vi.fn(),
+  consumeGoogleRedirectPending: consumeGoogleRedirectPendingMock,
 }))
 
 const { default: App } = await import('./App')
@@ -55,6 +57,10 @@ const ledger = {
 beforeEach(() => {
   window.localStorage.clear()
   createLedgerMock.mockReset().mockResolvedValue(undefined)
+  // Every test is a genuine fresh open/reload, not a Google-redirect
+  // return, unless a test explicitly says otherwise -- see the "returning
+  // from a Google redirect" tests below.
+  consumeGoogleRedirectPendingMock.mockReset().mockReturnValue(false)
   // Every test outside the "pre-auth onboarding orientation" block is
   // exercising ordinary boot behavior that has nothing to do with the
   // orientation itself, so it renders as a device that has already
@@ -256,6 +262,68 @@ describe('App', () => {
   describe('VITE_FORCE_ONBOARDING', () => {
     afterEach(() => {
       vi.unstubAllEnvs()
+    })
+
+    // signInWithRedirect is a full navigation away and back -- a fresh page
+    // load with no in-memory trace of the onboarding this same visitor sat
+    // through moments earlier. consumeGoogleRedirectPending (see lib/auth)
+    // is what lets this one boot tell itself apart from a genuinely fresh
+    // open, so it must not be re-forced into onboarding just because it
+    // returned from Google.
+    describe('returning from a Google redirect', () => {
+      it('does not restart onboarding when the boot is a Google-redirect return, even though the flag is enabled', () => {
+        vi.stubEnv('VITE_FORCE_ONBOARDING', 'true')
+        consumeGoogleRedirectPendingMock.mockReturnValue(true)
+        saveOnboardingCompletion('completed')
+        useAuthUserMock.mockReturnValue({ user: null, loading: false })
+        useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: true, error: null, switchLedger: vi.fn() })
+
+        render(<App />)
+
+        expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
+      })
+
+      it('completing Google auth on that same boot continues straight into the app -- no onboarding/sign-in loop', () => {
+        vi.stubEnv('VITE_FORCE_ONBOARDING', 'true')
+        consumeGoogleRedirectPendingMock.mockReturnValue(true)
+        saveOnboardingCompletion('completed')
+        useAuthUserMock.mockReturnValue({ user: { uid: 'u1' }, loading: false })
+        useLedgersMock.mockReturnValue({
+          ledgers: [ledger],
+          activeLedger: ledger,
+          loading: false,
+          error: null,
+          switchLedger: vi.fn(),
+        })
+
+        render(<App />)
+
+        expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument()
+        expect(screen.getByText('Worked out')).toBeInTheDocument()
+      })
+
+      it('a subsequent genuinely fresh reload/open still shows onboarding again while the flag remains enabled', () => {
+        vi.stubEnv('VITE_FORCE_ONBOARDING', 'true')
+        // The redirect-return boot above already consumed its one-shot
+        // marker; this boot is a separate, ordinary fresh load.
+        consumeGoogleRedirectPendingMock.mockReturnValue(false)
+        saveOnboardingCompletion('completed')
+        useAuthUserMock.mockReturnValue({ user: { uid: 'u1' }, loading: false })
+        useLedgersMock.mockReturnValue({
+          ledgers: [ledger],
+          activeLedger: ledger,
+          loading: false,
+          error: null,
+          switchLedger: vi.fn(),
+        })
+
+        render(<App />)
+
+        expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
+        expect(screen.queryByText('Worked out')).not.toBeInTheDocument()
+      })
     })
 
     it('shows the orientation even though this device already completed it, when the flag is enabled', () => {

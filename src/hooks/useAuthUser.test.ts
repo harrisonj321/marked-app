@@ -75,6 +75,31 @@ describe('useAuthUser', () => {
     })
   })
 
+  /**
+   * The exact real-device shape of the post-Google-sign-in hang: the
+   * redirect just completed and the user IS now authenticated, but
+   * getRedirectResult itself never settles (was hanging indefinitely on
+   * iOS -- see the service-worker fix in vite.config.ts, which was
+   * intercepting the redirect navigation before this hook's code ever ran
+   * meaningfully). onAuthStateChanged reporting the signed-in user, on its
+   * own, must still be enough to clear loading and hand back that user --
+   * "the splash must clear and the app must continue" is not just "loading
+   * becomes false", it's specifically "with the authenticated user
+   * attached", since that is what lets App proceed past SignIn.
+   */
+  it('resolves loading to false with the authenticated user even when resolving the Google redirect never settles', async () => {
+    resolveGoogleRedirectMock.mockReturnValue(new Promise(() => {})) // never resolves
+    subscribeAuthUserMock.mockReturnValue(vi.fn())
+    const user = { uid: 'u1' }
+
+    const { result } = renderHook(() => useAuthUser())
+    latestAuthStateChangeCallback()?.(user)
+
+    await waitFor(() => {
+      expect(result.current).toEqual({ user, loading: false, authError: null })
+    })
+  })
+
   it('resolves loading to false and surfaces the mapped error when the Google redirect failed', async () => {
     resolveGoogleRedirectMock.mockRejectedValue({ code: 'auth/network-request-failed' })
     subscribeAuthUserMock.mockReturnValue(vi.fn())

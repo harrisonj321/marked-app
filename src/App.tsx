@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createLedger } from './data/ledger'
 import { hasCompletedOnboarding, saveOnboardingCompletion } from './data/onboarding'
 import { getTodayKey, resolveDeviceTimezone } from './domain/date'
+import { consumeGoogleRedirectPending } from './lib/auth'
 import { useAuthUser } from './hooks/useAuthUser'
 import { useLedgers } from './hooks/useLedgers'
 import { LoadingScreen } from './components/LoadingScreen'
@@ -28,9 +29,25 @@ function App() {
   // completing/skipping never loops back until the next fresh reload/open.
   // Off (the default), behavior is untouched.
   const forceOnboarding = import.meta.env.VITE_FORCE_ONBOARDING === 'true'
-  const [orientationDone, setOrientationDone] = useState(() =>
-    forceOnboarding ? false : hasCompletedOnboarding(),
-  )
+  const [orientationDone, setOrientationDone] = useState(() => {
+    // signInWithGoogle's redirect is a full navigation away and back -- a
+    // fresh page load and fresh mount, indistinguishable from a genuine
+    // fresh open by anything kept in memory. consumeGoogleRedirectPending
+    // is the one thing that survives it (see lib/auth): when it reports
+    // this boot IS that redirect return, it is a continuation of the same
+    // sign-in journey the user was already on (already past onboarding, or
+    // it would not have reached SignIn to click Google in the first place)
+    // -- never a fresh open, so it must never re-trigger forced onboarding
+    // or the user gets bounced back into onboarding instead of finishing
+    // sign-in. Always consumed (even with the flag off) so a stale marker
+    // never lingers into a later boot where the flag has since been turned
+    // on.
+    const returningFromGoogleRedirect = consumeGoogleRedirectPending()
+    if (!forceOnboarding) {
+      return hasCompletedOnboarding()
+    }
+    return returningFromGoogleRedirect
+  })
 
   if (authLoading) {
     return <LoadingScreen />

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   createUserWithEmailAndPasswordMock,
@@ -39,9 +39,14 @@ const {
   signUpWithEmail,
   signOutUser,
   subscribeAuthUser,
+  consumeGoogleRedirectPending,
 } = await import('./auth')
 
 describe('lib/auth', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear()
+  })
+
   it('signs in with Google via redirect, not popup', async () => {
     signInWithRedirectMock.mockResolvedValue(undefined)
 
@@ -51,6 +56,44 @@ describe('lib/auth', () => {
     const [authArg, providerArg] = signInWithRedirectMock.mock.calls[0]
     expect(authArg).toEqual({ __stubAuthInstance: true })
     expect(providerArg).toBeInstanceOf(Object)
+  })
+
+  describe('the Google redirect marker', () => {
+    // signInWithRedirect performs a full top-level navigation away and
+    // back, so there is no in-memory way for the next page load to tell
+    // "this boot is that redirect returning" apart from a genuinely fresh
+    // open/reload -- see App's use of consumeGoogleRedirectPending under
+    // VITE_FORCE_ONBOARDING. sessionStorage is what survives that
+    // navigation; signInWithRedirect resolving is what this test can
+    // observe in its place, since the real navigation itself can't happen
+    // under jsdom.
+    it('marks a redirect pending before attempting the navigation, so a later boot can tell it apart from a fresh open', async () => {
+      signInWithRedirectMock.mockResolvedValue(undefined)
+
+      await signInWithGoogle()
+
+      expect(consumeGoogleRedirectPending()).toBe(true)
+    })
+
+    it('consuming the marker clears it, so it only ever applies to the one boot right after the redirect', async () => {
+      signInWithRedirectMock.mockResolvedValue(undefined)
+      await signInWithGoogle()
+
+      expect(consumeGoogleRedirectPending()).toBe(true)
+      expect(consumeGoogleRedirectPending()).toBe(false)
+    })
+
+    it('reports no pending redirect when none was ever started', () => {
+      expect(consumeGoogleRedirectPending()).toBe(false)
+    })
+
+    it('clears the marker if the redirect attempt itself fails before navigating away, so a later fresh load is not mistaken for a redirect return', async () => {
+      signInWithRedirectMock.mockRejectedValue({ code: 'auth/network-request-failed' })
+
+      await expect(signInWithGoogle()).rejects.toBeTruthy()
+
+      expect(consumeGoogleRedirectPending()).toBe(false)
+    })
   })
 
   it('resolves a pending Google redirect result', async () => {

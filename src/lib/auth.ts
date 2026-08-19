@@ -37,7 +37,63 @@ export function subscribeAuthUser(onChange: (user: User | null) => void): Unsubs
  * smooth for mobile users").
  */
 export async function signInWithGoogle(): Promise<void> {
-  await signInWithRedirect(auth, new GoogleAuthProvider())
+  markGoogleRedirectPending()
+  try {
+    await signInWithRedirect(auth, new GoogleAuthProvider())
+  } catch (err) {
+    // The redirect navigation never happened -- the marker would otherwise
+    // wrongly persist and be read as a real redirect return on some later,
+    // genuinely fresh load. See consumeGoogleRedirectPending.
+    clearGoogleRedirectPending()
+    throw err
+  }
+}
+
+const GOOGLE_REDIRECT_PENDING_KEY = 'noted:auth:google-redirect-pending'
+
+/**
+ * signInWithRedirect performs a full top-level navigation away from the app
+ * and back -- a fresh page load, fresh JS context, no in-memory state
+ * survives. sessionStorage does survive it (scoped to the tab, not the
+ * origin or page), so it is the one reliable way for the next boot to tell
+ * "the user just came back from the Google OAuth redirect" apart from "the
+ * user freshly opened or reloaded the app" -- see App's use of
+ * consumeGoogleRedirectPending, which needs that distinction so a Google
+ * redirect return is never mistaken for a fresh open under
+ * VITE_FORCE_ONBOARDING.
+ */
+function markGoogleRedirectPending(): void {
+  try {
+    window.sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1')
+  } catch {
+    // Ignored -- worst case, a later forced-onboarding boot treats the
+    // redirect return as a fresh open and shows onboarding once more than
+    // strictly necessary. Never worth surfacing to the user.
+  }
+}
+
+function clearGoogleRedirectPending(): void {
+  try {
+    window.sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY)
+  } catch {
+    // Ignored -- see markGoogleRedirectPending.
+  }
+}
+
+/**
+ * Reads and clears the marker in one step -- it must apply to exactly the
+ * one boot that is the redirect return, never to any boot after it, or a
+ * later genuinely fresh reload/open would wrongly keep skipping forced
+ * onboarding for the rest of the tab's session.
+ */
+export function consumeGoogleRedirectPending(): boolean {
+  try {
+    const pending = window.sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_KEY) === '1'
+    window.sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY)
+    return pending
+  } catch {
+    return false
+  }
 }
 
 /**
