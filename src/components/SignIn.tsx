@@ -64,60 +64,70 @@ export function SignIn({ authError = null }: SignInProps) {
   }
 
   return (
-    <main className="screen screen-center signin-enter">
-      <h1>Noted.</h1>
+    <main className="screen home signin-enter">
+      <header className="home-header">
+        <p className="brand">Noted.</p>
+      </header>
 
-      <div className="signin-actions">
-        <button type="button" onClick={() => void handleGoogleClick()} disabled={pending}>
-          Continue with Google
-        </button>
+      <div className="home-main">
+        <h1>Sign in to create and note your first thing.</h1>
 
-        {!emailFormOpen && (
-          <button
-            type="button"
-            className="signin-secondary"
-            onClick={openEmailForm}
-            disabled={pending}
-          >
-            Continue with email
+        <div className="signin-actions">
+          <button type="button" onClick={() => void handleGoogleClick()} disabled={pending}>
+            Continue with Google
           </button>
+
+          {!emailFormOpen && (
+            <button
+              type="button"
+              className="signin-secondary"
+              onClick={openEmailForm}
+              disabled={pending}
+            >
+              Continue with email
+            </button>
+          )}
+        </div>
+
+        {emailFormOpen && (
+          <form className="signin-email-form" onSubmit={(event) => void handleEmailSubmit(event)} noValidate>
+            <label htmlFor={emailId}>Email</label>
+            <input
+              id={emailId}
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+
+            <label htmlFor={passwordId}>Password</label>
+            <input
+              id={passwordId}
+              type="password"
+              autoComplete={emailMode === 'signup' ? 'new-password' : 'current-password'}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+
+            <button type="submit" disabled={pending}>
+              {emailMode === 'signup' ? 'Create account' : 'Sign in'}
+            </button>
+            <button type="button" className="signin-secondary" onClick={toggleEmailMode} disabled={pending}>
+              {emailMode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account'}
+            </button>
+          </form>
+        )}
+
+        {error && (
+          <p role="alert" className="message">
+            {error}
+          </p>
         )}
       </div>
 
-      {emailFormOpen && (
-        <form className="signin-email-form" onSubmit={(event) => void handleEmailSubmit(event)} noValidate>
-          <label htmlFor={emailId}>Email</label>
-          <input
-            id={emailId}
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-
-          <label htmlFor={passwordId}>Password</label>
-          <input
-            id={passwordId}
-            type="password"
-            autoComplete={emailMode === 'signup' ? 'new-password' : 'current-password'}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-
-          <button type="submit" disabled={pending}>
-            {emailMode === 'signup' ? 'Create account' : 'Sign in'}
-          </button>
-          <button type="button" className="signin-secondary" onClick={toggleEmailMode} disabled={pending}>
-            {emailMode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account'}
-          </button>
-        </form>
-      )}
-
-      {error && (
-        <p role="alert" className="message">
-          {error}
-        </p>
-      )}
+      <footer className="home-footer">
+        <p className="maker-mark">{`Made with ❤️ by Maker 428 · v${__APP_VERSION__}`}</p>
+      </footer>
     </main>
   )
 }

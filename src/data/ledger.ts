@@ -4,6 +4,7 @@ import {
   deleteField,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -141,6 +142,12 @@ export async function deleteLedger(uid: string, ledgerId: string): Promise<void>
   }
   await deleteLedgerDays(uid, ledgerId)
   await deleteDoc(ledgerRef(uid, ledgerId))
+}
+
+/** One-shot read of every ledger id this account owns -- see data/account.ts's deleteAllUserData, the one caller that needs the full set rather than a live subscription. */
+export async function listLedgerIds(uid: string): Promise<string[]> {
+  const snapshot = await getDocs(ledgersCollection(uid))
+  return snapshot.docs.map((docSnapshot) => docSnapshot.id)
 }
 
 export function subscribeLedgers(

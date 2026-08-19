@@ -1148,6 +1148,31 @@ describe('settings/app', () => {
     )
   })
 
+  it('owner can delete their own settings/app doc -- the last step of full account deletion', async () => {
+    const db = dbAs(OWNER_UID)
+    await setDoc(doc(db, `users/${OWNER_UID}/settings/app`), {
+      activeLedgerId: 'ledger-1',
+      updatedAt: serverTimestamp(),
+    })
+    await assertSucceeds(deleteDoc(doc(db, `users/${OWNER_UID}/settings/app`)))
+  })
+
+  it('another authenticated user cannot delete someone else\'s settings/app doc', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/${OWNER_UID}/settings/app`), {
+        activeLedgerId: 'ledger-1',
+        updatedAt: new Date(),
+      })
+    })
+    const db = dbAs(OTHER_UID)
+    await assertFails(deleteDoc(doc(db, `users/${OWNER_UID}/settings/app`)))
+  })
+
+  it('unauthenticated user cannot delete a settings/app doc', async () => {
+    const db = dbAs(null)
+    await assertFails(deleteDoc(doc(db, `users/${OWNER_UID}/settings/app`)))
+  })
+
   it('denies any document under settings/ other than app', async () => {
     const db = dbAs(OWNER_UID)
     await assertFails(

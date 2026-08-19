@@ -9,6 +9,10 @@ const {
   updateLedgerColorMock,
   updateLedgerDefaultStateMock,
   updateLedgerNameMock,
+  deleteAllUserDataMock,
+  reauthenticateWithGoogleMock,
+  reauthenticateWithPasswordMock,
+  deleteAuthAccountMock,
 } = vi.hoisted(() => ({
   reportSaveError: vi.fn(),
   createLedgerMock: vi.fn(),
@@ -16,6 +20,10 @@ const {
   updateLedgerColorMock: vi.fn(),
   updateLedgerDefaultStateMock: vi.fn(),
   updateLedgerNameMock: vi.fn(),
+  deleteAllUserDataMock: vi.fn(),
+  reauthenticateWithGoogleMock: vi.fn(),
+  reauthenticateWithPasswordMock: vi.fn(),
+  deleteAuthAccountMock: vi.fn(),
 }))
 
 vi.mock('./TodaySection', () => ({
@@ -56,6 +64,8 @@ vi.mock('./SettingsSheet', () => ({
     onDelete,
     onTourNoted,
     onDismiss,
+    authProviderId,
+    onDeleteAccount,
   }: {
     name: string
     defaultState: string
@@ -66,9 +76,11 @@ vi.mock('./SettingsSheet', () => ({
     onDelete: () => Promise<void>
     onTourNoted: () => void
     onDismiss: () => void
+    authProviderId: string
+    onDeleteAccount: (password?: string) => Promise<void>
   }) => (
     <div data-testid="settings-sheet">
-      settings-sheet:{name}:{defaultState}:{color}
+      settings-sheet:{name}:{defaultState}:{color}:{authProviderId}
       <button type="button" onClick={() => void onSaveName('Renamed').catch(reportSaveError)}>
         Save name
       </button>
@@ -80,6 +92,9 @@ vi.mock('./SettingsSheet', () => ({
       </button>
       <button type="button" onClick={() => void onDelete().catch(reportSaveError)}>
         Delete this ledger
+      </button>
+      <button type="button" onClick={() => void onDeleteAccount('hunter2').catch(reportSaveError)}>
+        Delete my account
       </button>
       <button type="button" onClick={onTourNoted}>
         Tour Noted.
@@ -154,7 +169,15 @@ vi.mock('../data/ledger', () => ({
   updateLedgerName: (...args: unknown[]) => updateLedgerNameMock(...args),
   updateLedgerStateLabels: vi.fn(),
 }))
-vi.mock('../lib/auth', () => ({ signOutUser: vi.fn() }))
+vi.mock('../data/account', () => ({
+  deleteAllUserData: (...args: unknown[]) => deleteAllUserDataMock(...args),
+}))
+vi.mock('../lib/auth', () => ({
+  signOutUser: vi.fn(),
+  reauthenticateWithGoogle: (...args: unknown[]) => reauthenticateWithGoogleMock(...args),
+  reauthenticateWithPassword: (...args: unknown[]) => reauthenticateWithPasswordMock(...args),
+  deleteAuthAccount: (...args: unknown[]) => deleteAuthAccountMock(...args),
+}))
 
 beforeEach(() => {
   reportSaveError.mockReset()
@@ -163,6 +186,10 @@ beforeEach(() => {
   updateLedgerColorMock.mockReset().mockResolvedValue(undefined)
   updateLedgerDefaultStateMock.mockReset().mockResolvedValue(undefined)
   updateLedgerNameMock.mockReset().mockResolvedValue(undefined)
+  deleteAllUserDataMock.mockReset().mockResolvedValue(undefined)
+  reauthenticateWithGoogleMock.mockReset().mockResolvedValue(undefined)
+  reauthenticateWithPasswordMock.mockReset().mockResolvedValue(undefined)
+  deleteAuthAccountMock.mockReset().mockResolvedValue(undefined)
   window.localStorage.clear()
 })
 
@@ -185,6 +212,7 @@ function renderSettledHome(overrides: Partial<Parameters<typeof Home>[0]> = {}) 
       ledgers={[ledger]}
       activeLedger={ledger}
       onSwitchLedger={onSwitchLedger}
+      authProviderId="password"
       {...overrides}
     />,
   )
@@ -439,6 +467,81 @@ describe('Home', () => {
         })
       })
     })
+
+    describe('account deletion', () => {
+      it('passes the auth provider id through to Settings', () => {
+        renderSettledHome({ authProviderId: 'google.com' })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+
+        expect(screen.getByTestId('settings-sheet')).toHaveTextContent('google.com')
+      })
+
+      it('reauthenticates with a password, then deletes all data, then deletes the Auth account, in that order', async () => {
+        renderSettledHome({ authProviderId: 'password' })
+        const order: string[] = []
+        reauthenticateWithPasswordMock.mockImplementation(async () => {
+          order.push('reauth')
+        })
+        deleteAllUserDataMock.mockImplementation(async () => {
+          order.push('data')
+        })
+        deleteAuthAccountMock.mockImplementation(async () => {
+          order.push('auth')
+        })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }))
+
+        await vi.waitFor(() => {
+          expect(order).toEqual(['reauth', 'data', 'auth'])
+        })
+        expect(reauthenticateWithPasswordMock).toHaveBeenCalledWith('hunter2')
+        expect(deleteAllUserDataMock).toHaveBeenCalledWith('u1')
+        expect(reauthenticateWithGoogleMock).not.toHaveBeenCalled()
+      })
+
+      it('reauthenticates with Google, not a password, for a Google-provider account', async () => {
+        renderSettledHome({ authProviderId: 'google.com' })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }))
+
+        await vi.waitFor(() => {
+          expect(deleteAuthAccountMock).toHaveBeenCalled()
+        })
+        expect(reauthenticateWithGoogleMock).toHaveBeenCalled()
+        expect(reauthenticateWithPasswordMock).not.toHaveBeenCalled()
+        expect(deleteAllUserDataMock).toHaveBeenCalledWith('u1')
+      })
+
+      it('does not delete Auth data when reauthentication fails, leaving Firestore data untouched', async () => {
+        renderSettledHome({ authProviderId: 'password' })
+        reauthenticateWithPasswordMock.mockRejectedValue({ code: 'auth/requires-recent-login' })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }))
+
+        await vi.waitFor(() => {
+          expect(reportSaveError).toHaveBeenCalled()
+        })
+        expect(deleteAllUserDataMock).not.toHaveBeenCalled()
+        expect(deleteAuthAccountMock).not.toHaveBeenCalled()
+      })
+
+      it('does not delete the Auth account when Firestore data deletion fails', async () => {
+        renderSettledHome({ authProviderId: 'password' })
+        deleteAllUserDataMock.mockRejectedValue(new Error('offline'))
+
+        fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }))
+
+        await vi.waitFor(() => {
+          expect(reportSaveError).toHaveBeenCalled()
+        })
+        expect(deleteAuthAccountMock).not.toHaveBeenCalled()
+      })
+    })
   })
 
   describe('onboarding tour replay', () => {
@@ -449,7 +552,7 @@ describe('Home', () => {
     // exists -- Home itself never auto-starts a tour, regardless of uid or
     // any stored record. See App.test.tsx for that pre-auth coverage.
     it('never auto-starts, for any account', () => {
-      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />)
+      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} authProviderId="password" />)
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
     })
 
@@ -465,7 +568,7 @@ describe('Home', () => {
 
     it('makes the main content inert while replaying, so it cannot be interacted with underneath', () => {
       const { container } = render(
-        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />,
+        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} authProviderId="password" />,
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -476,7 +579,7 @@ describe('Home', () => {
 
     it('closes on Skip and leaves the main content interactive again, without writing or touching any onboarding record', () => {
       const { container } = render(
-        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} />,
+        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} authProviderId="password" />,
       )
       const storageWrites = vi.spyOn(Storage.prototype, 'setItem')
 

@@ -281,7 +281,10 @@ service cloud.firestore {
           && request.resource.data.activeLedgerId.size() > 0
           && request.resource.data.updatedAt == request.time;
 
-        allow delete: if false;
+        // The client deletes this doc as the last step of deleting the
+        // whole account (see data/account.ts's deleteAllUserData) -- after
+        // every ledger and its days are already gone.
+        allow delete: if isOwner(uid);
       }
 
       // No other documents are permitted under settings/.

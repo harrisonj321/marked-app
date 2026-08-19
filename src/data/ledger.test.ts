@@ -4,6 +4,7 @@ const setDocMock = vi.fn()
 const updateDocMock = vi.fn()
 const deleteDocMock = vi.fn()
 const getDocMock = vi.fn()
+const getDocsMock = vi.fn()
 const getLegacyTrackerMock = vi.fn()
 const deleteLegacyTrackerMock = vi.fn()
 const deleteLedgerDaysMock = vi.fn()
@@ -25,6 +26,7 @@ vi.mock('firebase/firestore', () => ({
   deleteDoc: (...args: unknown[]) => deleteDocMock(...args),
   deleteField: () => DELETE_FIELD_SENTINEL,
   getDoc: (...args: unknown[]) => getDocMock(...args),
+  getDocs: (...args: unknown[]) => getDocsMock(...args),
   onSnapshot: vi.fn(),
   orderBy: vi.fn(),
   query: (...args: unknown[]) => args[0],
@@ -42,7 +44,7 @@ vi.mock('./day', () => ({
   pinImplicitDayStates: (...args: unknown[]) => pinImplicitDayStatesMock(...args),
 }))
 
-const { createLedger, deleteLedger, migrateLegacyTrackerIfNeeded, updateLedgerColor, updateLedgerDefaultState, updateLedgerName, updateLedgerStateLabels } =
+const { createLedger, deleteLedger, listLedgerIds, migrateLegacyTrackerIfNeeded, updateLedgerColor, updateLedgerDefaultState, updateLedgerName, updateLedgerStateLabels } =
   await import('./ledger')
 const { LEGACY_LEDGER_ID } = await import('../domain/ledger')
 
@@ -54,6 +56,7 @@ beforeEach(() => {
   updateDocMock.mockReset().mockResolvedValue(undefined)
   deleteDocMock.mockReset().mockResolvedValue(undefined)
   getDocMock.mockReset()
+  getDocsMock.mockReset()
   getLegacyTrackerMock.mockReset()
   deleteLegacyTrackerMock.mockReset().mockResolvedValue(undefined)
   deleteLedgerDaysMock.mockReset().mockResolvedValue(undefined)
@@ -116,6 +119,22 @@ describe('createLedger', () => {
     // daysCollection, which routes every id other than LEGACY_LEDGER_ID to
     // users/{uid}/ledgers/{id}/days.
     expect(setDocMock.mock.calls[0][0].id).not.toBe(LEGACY_LEDGER_ID)
+  })
+})
+
+describe('listLedgerIds', () => {
+  it('returns the id of every ledger doc in the collection', async () => {
+    getDocsMock.mockResolvedValue({ docs: [{ id: 'ledger-1' }, { id: 'ledger-2' }] })
+
+    const ids = await listLedgerIds(UID)
+
+    expect(ids).toEqual(['ledger-1', 'ledger-2'])
+  })
+
+  it('returns an empty list for an account with no ledgers', async () => {
+    getDocsMock.mockResolvedValue({ docs: [] })
+
+    expect(await listLedgerIds(UID)).toEqual([])
   })
 })
 

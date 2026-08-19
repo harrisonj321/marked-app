@@ -817,7 +817,8 @@ fieldset label {
 
 .day-detail .field,
 .settings-sheet .field,
-.ledger-sheet .field {
+.ledger-sheet .field,
+.screen .field {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
@@ -971,7 +972,19 @@ fieldset label {
   outline-offset: 2px;
 }
 
-/* First-ledger suggestions */
+/* First-ledger suggestions: a quiet disclosure inside the name field,
+   collapsed by default so the input reads as freeform, not a picker. */
+
+.ledger-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ledger-suggestions-toggle {
+  align-self: flex-start;
+  padding-left: 0;
+}
 
 .suggestion-grid {
   display: flex;
@@ -984,6 +997,14 @@ fieldset label {
   min-width: 0;
   font-size: 0.9375rem;
   color: var(--color-text-muted);
+}
+
+/* Deliberately smaller and quieter than .message (used for errors/status):
+   this is a passive aside, not something the user needs to act on. */
+.field-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
 }
 
 /* Count selector */

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { deleteAllUserData } from '../data/account'
 import {
   createLedger,
   deleteLedger,
@@ -7,7 +8,12 @@ import {
   updateLedgerName,
   updateLedgerStateLabels,
 } from '../data/ledger'
-import { signOutUser } from '../lib/auth'
+import {
+  deleteAuthAccount,
+  reauthenticateWithGoogle,
+  reauthenticateWithPassword,
+  signOutUser,
+} from '../lib/auth'
 import { formatDisplayDate, getTodayKey, resolveDeviceTimezone } from '../domain/date'
 import { resolveLedgerColor, type Ledger, type LedgerColor } from '../domain/ledger'
 import { useLocalDateKey } from '../hooks/useLocalDateKey'
@@ -24,9 +30,11 @@ interface HomeProps {
   ledgers: Ledger[]
   activeLedger: Ledger
   onSwitchLedger: (ledgerId: string) => void
+  /** The signed-in account's auth provider -- see lib/auth.ts's primaryProviderId. */
+  authProviderId: string
 }
 
-export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) {
+export function Home({ uid, ledgers, activeLedger, onSwitchLedger, authProviderId }: HomeProps) {
   const todayKey = useLocalDateKey(activeLedger.timezone)
   const [calendarOpen, setCalendarOpen] = useState(false)
   // Which ledger's Settings is open, if any -- not necessarily the active
@@ -94,6 +102,28 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
 
   async function handleDeleteLedger(ledgerId: string) {
     await deleteLedger(uid, ledgerId)
+  }
+
+  /**
+   * Reauthenticates first, then deletes every piece of Firestore data this
+   * account owns, then deletes the Auth identity itself -- in that order,
+   * deliberately: reauthenticating before any destructive Firestore write
+   * means a cancelled/failed reauth leaves nothing touched, and deleting
+   * data before the Auth user means the client is still signed in (and so
+   * still passes Firestore's isOwner check) for every one of those deletes.
+   * See data/account.ts's deleteAllUserData and lib/auth.ts's
+   * deleteAuthAccount. On success the Auth SDK signs the user out on its
+   * own; App reacts to that and returns to the signed-out entry state, so
+   * there is nothing further to do here.
+   */
+  async function handleDeleteAccount(password?: string) {
+    if (authProviderId === 'password') {
+      await reauthenticateWithPassword(password ?? '')
+    } else {
+      await reauthenticateWithGoogle()
+    }
+    await deleteAllUserData(uid)
+    await deleteAuthAccount()
   }
 
   return (
@@ -179,6 +209,8 @@ export function Home({ uid, ledgers, activeLedger, onSwitchLedger }: HomeProps) 
             onDelete={() => handleDeleteLedger(settingsLedger.id)}
             onTourNoted={handleTourNoted}
             onDismiss={() => setSettingsLedgerId(null)}
+            authProviderId={authProviderId}
+            onDeleteAccount={handleDeleteAccount}
           />
         )}
 

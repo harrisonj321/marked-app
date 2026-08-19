@@ -1,22 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const setDocMock = vi.fn()
+const deleteDocMock = vi.fn()
 const onSnapshotMock = vi.fn()
 
 vi.mock('firebase/firestore', () => ({
   doc: (...path: string[]) => ({ path: path.slice(1).join('/') }),
+  deleteDoc: (...args: unknown[]) => deleteDocMock(...args),
   onSnapshot: (...args: unknown[]) => onSnapshotMock(...args),
   serverTimestamp: () => 'server-time',
   setDoc: (...args: unknown[]) => setDocMock(...args),
 }))
 vi.mock('../lib/firebase', () => ({ db: {} }))
 
-const { setActiveLedgerId, subscribeActiveLedgerId } = await import('./appSettings')
+const { deleteAppSettings, setActiveLedgerId, subscribeActiveLedgerId } = await import('./appSettings')
 
 const UID = 'user-1'
 
 beforeEach(() => {
   setDocMock.mockReset().mockResolvedValue(undefined)
+  deleteDocMock.mockReset().mockResolvedValue(undefined)
   onSnapshotMock.mockReset()
 })
 
@@ -27,6 +30,13 @@ describe('setActiveLedgerId', () => {
       activeLedgerId: 'ledger-1',
       updatedAt: 'server-time',
     })
+  })
+})
+
+describe('deleteAppSettings', () => {
+  it('deletes the settings/app doc', async () => {
+    await deleteAppSettings(UID)
+    expect(deleteDocMock).toHaveBeenCalledWith(expect.anything())
   })
 })
 

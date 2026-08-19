@@ -1,4 +1,12 @@
-import { doc, onSnapshot, serverTimestamp, setDoc, type FirestoreError, type Unsubscribe } from 'firebase/firestore'
+import {
+  deleteDoc,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  type FirestoreError,
+  type Unsubscribe,
+} from 'firebase/firestore'
 import { db } from '../lib/firebase'
 
 /**
@@ -31,4 +39,9 @@ export function subscribeActiveLedgerId(
 /** Full overwrite rather than a partial update: this doc's entire shape is just these two fields. */
 export async function setActiveLedgerId(uid: string, ledgerId: string): Promise<void> {
   await setDoc(appSettingsRef(uid), { activeLedgerId: ledgerId, updatedAt: serverTimestamp() })
+}
+
+/** Only meaningful as part of full account deletion -- see data/account.ts's deleteAllUserData. */
+export async function deleteAppSettings(uid: string): Promise<void> {
+  await deleteDoc(appSettingsRef(uid))
 }

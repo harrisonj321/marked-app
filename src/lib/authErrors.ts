@@ -23,6 +23,13 @@ export function describeAuthError(error: unknown): string {
       return 'Network error. Check your connection and try again.'
     case 'auth/user-disabled':
       return 'This account has been disabled.'
+    case 'auth/requires-recent-login':
+      return 'Please confirm your sign-in again to continue.'
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return 'Sign-in was cancelled.'
+    case 'auth/popup-blocked':
+      return 'Your browser blocked the sign-in popup. Allow popups and try again.'
     default:
       return 'Sign-in did not complete. Try again.'
   }

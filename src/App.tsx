@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createLedger } from './data/ledger'
 import { hasCompletedOnboarding, saveOnboardingCompletion } from './data/onboarding'
 import { getTodayKey, resolveDeviceTimezone } from './domain/date'
-import { consumeGoogleRedirectPending } from './lib/auth'
+import { consumeGoogleRedirectPending, primaryProviderId } from './lib/auth'
 import { useAuthUser } from './hooks/useAuthUser'
 import { useLedgers } from './hooks/useLedgers'
 import { LoadingScreen } from './components/LoadingScreen'
@@ -109,7 +109,13 @@ function App() {
   }
 
   return (
-    <Home uid={user.uid} ledgers={ledgers} activeLedger={activeLedger} onSwitchLedger={switchLedger} />
+    <Home
+      uid={user.uid}
+      ledgers={ledgers}
+      activeLedger={activeLedger}
+      onSwitchLedger={switchLedger}
+      authProviderId={primaryProviderId(user)}
+    />
   )
 }
 

@@ -36,12 +36,20 @@ vi.mock('./data/ledger', () => ({
 vi.mock('./data/day', () => ({
   saveDailyRecord: vi.fn(),
 }))
+vi.mock('./data/account', () => ({
+  deleteAllUserData: vi.fn(),
+}))
 vi.mock('./lib/auth', () => ({
   signInWithGoogle: vi.fn(),
   signInWithEmail: vi.fn(),
   signUpWithEmail: vi.fn(),
   signOutUser: vi.fn(),
   consumeGoogleRedirectPending: consumeGoogleRedirectPendingMock,
+  primaryProviderId: (user: { providerData?: { providerId: string }[] }) =>
+    user.providerData?.[0]?.providerId ?? 'password',
+  reauthenticateWithGoogle: vi.fn(),
+  reauthenticateWithPassword: vi.fn(),
+  deleteAuthAccount: vi.fn(),
 }))
 
 const { default: App } = await import('./App')
@@ -228,7 +236,7 @@ describe('App', () => {
       render(<App />)
 
       expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
-      expect(screen.getByText(/what could you track/i)).toBeInTheDocument()
+      expect(screen.getByText(/what are you tracking/i)).toBeInTheDocument()
     })
 
     it('a new account reaches first-ledger creation after completing orientation and then authenticating', () => {
@@ -242,7 +250,7 @@ describe('App', () => {
       useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: false, error: null, switchLedger: vi.fn() })
       rerender(<App />)
 
-      expect(screen.getByText(/what could you track/i)).toBeInTheDocument()
+      expect(screen.getByText(/what are you tracking/i)).toBeInTheDocument()
     })
 
     it('does not replay any part of onboarding after authenticating, for someone who just completed the pre-auth orientation', () => {
@@ -484,7 +492,7 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByText(/what could you track/i)).toBeInTheDocument()
+    expect(screen.getByText(/what are you tracking/i)).toBeInTheDocument()
   })
 
   it("a brand-new account's first ledger, created through Setup, never uses the legacy default id -- it enters the new per-ledger schema", async () => {
@@ -493,7 +501,6 @@ describe('App', () => {
 
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Something else' }))
     fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
     fireEvent.click(screen.getByRole('radio', { name: 'I did it' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))

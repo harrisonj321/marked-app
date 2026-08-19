@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react'
-import { TRACKER_NAME_MAX_LENGTH, validateTrackerName, type DayState } from '../domain/tracker'
+import { validateTrackerName, type DayState } from '../domain/tracker'
 import {
   DEFAULT_LEDGER_COLOR,
   LEDGER_COLORS,
@@ -9,6 +9,7 @@ import {
   type LedgerColor,
 } from '../domain/ledger'
 import { CloseIcon, EditIcon } from './icons'
+import { LedgerBasicsFields } from './LedgerBasicsFields'
 
 export interface NewLedgerInput {
   name: string
@@ -216,50 +217,18 @@ function NewLedgerFields({
   color,
   onColorChange,
 }: NewLedgerFieldsProps) {
-  const nameId = useId()
   const colorLabelId = useId()
 
   return (
     <>
-      <div className="field">
-        <label htmlFor={nameId}>What are you tracking?</label>
-        <input
-          id={nameId}
-          type="text"
-          value={name}
-          onChange={(event) => onNameChange(event.target.value)}
-          maxLength={TRACKER_NAME_MAX_LENGTH}
-          autoComplete="off"
-          autoFocus
-        />
-        {nameError && (
-          <p role="alert" className="message">
-            {nameError}
-          </p>
-        )}
-      </div>
-
-      <fieldset>
-        <legend>If I don't log anything, count the day as:</legend>
-        <label>
-          <input
-            type="radio"
-            name={`${nameId}-default-state`}
-            checked={defaultState === 'did'}
-            onChange={() => onDefaultStateChange('did')}
-          />
-          I did it
-        </label>
-        <label>
-          <input
-            type="radio"
-            name={`${nameId}-default-state`}
-            checked={defaultState === 'didnt'}
-            onChange={() => onDefaultStateChange('didnt')}
-          />
-          I didn't do it
-        </label>
-      </fieldset>
+      <LedgerBasicsFields
+        name={name}
+        onNameChange={onNameChange}
+        nameError={nameError}
+        nameAutoFocus
+        defaultState={defaultState}
+        onDefaultStateChange={onDefaultStateChange}
+      />
 
       <div className="field">
         <span id={colorLabelId}>Color</span>

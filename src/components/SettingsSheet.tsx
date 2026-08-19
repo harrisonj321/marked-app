@@ -9,6 +9,7 @@ import {
   type StateLabels,
 } from '../domain/tracker'
 import { LEDGER_COLORS, LEDGER_COLOR_LABELS, type LedgerColor } from '../domain/ledger'
+import { describeAuthError } from '../lib/authErrors'
 import { CloseIcon, SwapIcon } from './icons'
 
 interface SettingsSheetProps {
@@ -24,6 +25,10 @@ interface SettingsSheetProps {
   onDelete: () => Promise<void>
   onTourNoted: () => void
   onDismiss: () => void
+  /** The signed-in account's auth provider -- 'password' or 'google.com' -- decides which reauthentication step account deletion asks for. */
+  authProviderId: string
+  /** Reauthenticates, deletes every piece of this account's data, then deletes the Auth identity itself -- see Home's handleDeleteAccount. `password` is required and used only for a 'password'-provider account. */
+  onDeleteAccount: (password?: string) => Promise<void>
 }
 
 /**
@@ -47,6 +52,8 @@ export function SettingsSheet({
   onDelete,
   onTourNoted,
   onDismiss,
+  authProviderId,
+  onDeleteAccount,
 }: SettingsSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [nameDraft, setNameDraft] = useState(name)
@@ -63,7 +70,13 @@ export function SettingsSheet({
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  const [confirmingDeleteAccount, setConfirmingDeleteAccount] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null)
+  const [accountPassword, setAccountPassword] = useState('')
+
   const titleId = useId()
+  const accountPasswordId = useId()
   const nameId = useId()
   const defaultLabelId = useId()
   const notedLabelId = useId()
@@ -192,6 +205,37 @@ export function SettingsSheet({
     }
   }
 
+  function startConfirmingDeleteAccount() {
+    setDeleteAccountError(null)
+    setAccountPassword('')
+    setConfirmingDeleteAccount(true)
+  }
+
+  function cancelConfirmingDeleteAccount() {
+    setConfirmingDeleteAccount(false)
+    setDeleteAccountError(null)
+    setAccountPassword('')
+  }
+
+  async function handleConfirmDeleteAccount() {
+    if (authProviderId === 'password' && !accountPassword) {
+      setDeleteAccountError('Enter your password to confirm.')
+      return
+    }
+
+    setDeleteAccountError(null)
+    setDeletingAccount(true)
+    try {
+      await onDeleteAccount(authProviderId === 'password' ? accountPassword : undefined)
+      // On success the account is fully deleted and signed out; App reacts
+      // to the auth state change and unmounts this whole tree, so there is
+      // nothing further to close/reset here.
+    } catch (err) {
+      setDeleteAccountError(describeAuthError(err))
+      setDeletingAccount(false)
+    }
+  }
+
   return (
     <dialog
       ref={dialogRef}
@@ -230,6 +274,42 @@ export function SettingsSheet({
               Delete
             </button>
             <button type="button" onClick={cancelConfirmingDelete} disabled={deleting}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : confirmingDeleteAccount ? (
+        <div className="delete-confirm">
+          <p>Permanently delete your account, every ledger, and all of their history? This cannot be undone.</p>
+          {authProviderId === 'password' ? (
+            <div className="field">
+              <label htmlFor={accountPasswordId}>Password</label>
+              <input
+                id={accountPasswordId}
+                type="password"
+                autoComplete="current-password"
+                value={accountPassword}
+                onChange={(event) => setAccountPassword(event.target.value)}
+              />
+            </div>
+          ) : (
+            <p className="field-hint">You'll be asked to confirm with Google.</p>
+          )}
+          {deleteAccountError && (
+            <p role="alert" className="message">
+              {deleteAccountError}
+            </p>
+          )}
+          <div className="delete-confirm-actions">
+            <button
+              type="button"
+              aria-label="Delete account forever"
+              onClick={() => void handleConfirmDeleteAccount()}
+              disabled={deletingAccount}
+            >
+              Delete account
+            </button>
+            <button type="button" onClick={cancelConfirmingDeleteAccount} disabled={deletingAccount}>
               Cancel
             </button>
           </div>
@@ -344,6 +424,12 @@ export function SettingsSheet({
           <div className="settings-danger">
             <button type="button" className="footer-link" onClick={startConfirmingDelete}>
               Delete ledger
+            </button>
+          </div>
+
+          <div className="settings-danger">
+            <button type="button" className="footer-link" onClick={startConfirmingDeleteAccount}>
+              Delete account
             </button>
           </div>
         </>

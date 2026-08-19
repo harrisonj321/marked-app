@@ -24,6 +24,7 @@ function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {
   const onDelete = vi.fn().mockResolvedValue(undefined)
   const onTourNoted = vi.fn()
   const onDismiss = vi.fn()
+  const onDeleteAccount = vi.fn().mockResolvedValue(undefined)
   render(
     <SettingsSheet
       name="Worked out"
@@ -37,10 +38,12 @@ function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {
       onDelete={onDelete}
       onTourNoted={onTourNoted}
       onDismiss={onDismiss}
+      authProviderId="password"
+      onDeleteAccount={onDeleteAccount}
       {...overrides}
     />,
   )
-  return { onSaveName, onSaveDefaultState, onSaveStateLabels, onSaveColor, onDelete, onTourNoted, onDismiss }
+  return { onSaveName, onSaveDefaultState, onSaveStateLabels, onSaveColor, onDelete, onTourNoted, onDismiss, onDeleteAccount }
 }
 
 describe('SettingsSheet', () => {
@@ -138,6 +141,8 @@ describe('SettingsSheet', () => {
         onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={onDismiss}
+        authProviderId="password"
+        onDeleteAccount={vi.fn()}
       />,
     )
 
@@ -154,6 +159,8 @@ describe('SettingsSheet', () => {
         onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={onDismiss}
+        authProviderId="password"
+        onDeleteAccount={vi.fn()}
       />,
     )
 
@@ -180,6 +187,8 @@ describe('SettingsSheet', () => {
         onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
+        authProviderId="password"
+        onDeleteAccount={vi.fn()}
       />,
     )
 
@@ -196,6 +205,8 @@ describe('SettingsSheet', () => {
         onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
+        authProviderId="password"
+        onDeleteAccount={vi.fn()}
       />,
     )
 
@@ -382,6 +393,8 @@ describe('SettingsSheet', () => {
         onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
+        authProviderId="password"
+        onDeleteAccount={vi.fn()}
       />,
     )
 
@@ -398,6 +411,8 @@ describe('SettingsSheet', () => {
         onDelete={vi.fn()}
         onTourNoted={vi.fn()}
         onDismiss={vi.fn()}
+        authProviderId="password"
+        onDeleteAccount={vi.fn()}
       />,
     )
 
@@ -497,6 +512,8 @@ describe('SettingsSheet', () => {
           onDelete={vi.fn()}
           onTourNoted={vi.fn()}
           onDismiss={vi.fn()}
+          authProviderId="password"
+          onDeleteAccount={vi.fn()}
         />,
       )
 
@@ -513,6 +530,8 @@ describe('SettingsSheet', () => {
           onDelete={vi.fn()}
           onTourNoted={vi.fn()}
           onDismiss={vi.fn()}
+          authProviderId="password"
+          onDeleteAccount={vi.fn()}
         />,
       )
 
@@ -617,6 +636,122 @@ describe('SettingsSheet', () => {
       expect(onSaveDefaultState).not.toHaveBeenCalled()
       expect(onSaveStateLabels).not.toHaveBeenCalled()
       expect(onSaveColor).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('delete account', () => {
+    it('offers a quiet Delete account action, separate from Delete ledger', () => {
+      renderSheet()
+
+      const deleteLedgerButton = screen.getByRole('button', { name: 'Delete ledger' })
+      const deleteAccountButton = screen.getByRole('button', { name: 'Delete account' })
+      expect(deleteAccountButton).toBeInTheDocument()
+      expect(deleteAccountButton.parentElement).not.toBe(deleteLedgerButton.parentElement)
+    })
+
+    it('requires a confirm tap before deleting, and warns the deletion is permanent', () => {
+      const { onDeleteAccount } = renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+      expect(onDeleteAccount).not.toHaveBeenCalled()
+      expect(screen.getByText(/permanently delete your account, every ledger/i)).toBeInTheDocument()
+      expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument()
+    })
+
+    it('replaces the whole form with the confirm prompt, hiding normal configuration while pending', () => {
+      renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+      expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Delete ledger' })).not.toBeInTheDocument()
+    })
+
+    it('cancel reverts to the normal settings form without deleting', () => {
+      const { onDeleteAccount } = renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(onDeleteAccount).not.toHaveBeenCalled()
+      expect(screen.queryByText(/cannot be undone/i)).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Name')).toBeInTheDocument()
+    })
+
+    describe('password-provider account', () => {
+      it('asks for the password and requires it before confirming', () => {
+        const { onDeleteAccount } = renderSheet({ authProviderId: 'password' })
+        fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+        expect(screen.getByLabelText('Password')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Delete account forever' }))
+
+        expect(onDeleteAccount).not.toHaveBeenCalled()
+        expect(screen.getByRole('alert')).toHaveTextContent(/enter your password/i)
+      })
+
+      it('confirming with a password calls onDeleteAccount with it', async () => {
+        const { onDeleteAccount } = renderSheet({ authProviderId: 'password' })
+        fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+        fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'hunter2' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Delete account forever' }))
+
+        await vi.waitFor(() => {
+          expect(onDeleteAccount).toHaveBeenCalledWith('hunter2')
+        })
+      })
+    })
+
+    describe('google-provider account', () => {
+      it('shows no password field, just a note that Google will confirm', () => {
+        renderSheet({ authProviderId: 'google.com' })
+        fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+        expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
+        expect(screen.getByText(/confirm with google/i)).toBeInTheDocument()
+      })
+
+      it('confirming calls onDeleteAccount with no password', async () => {
+        const { onDeleteAccount } = renderSheet({ authProviderId: 'google.com' })
+        fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Delete account forever' }))
+
+        await vi.waitFor(() => {
+          expect(onDeleteAccount).toHaveBeenCalledWith(undefined)
+        })
+      })
+    })
+
+    it('shows a specific reauthentication message and stays in the confirm state when reauthentication is required', async () => {
+      const onDeleteAccount = vi.fn().mockRejectedValue({ code: 'auth/requires-recent-login' })
+      renderSheet({ onDeleteAccount, authProviderId: 'google.com' })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account forever' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/confirm your sign-in again/i)
+      expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument()
+    })
+
+    it('shows a specific message and stays in the confirm state when data deletion fails', async () => {
+      const onDeleteAccount = vi.fn().mockRejectedValue(new Error('offline'))
+      renderSheet({ onDeleteAccount, authProviderId: 'google.com' })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account forever' }))
+
+      expect(await screen.findByRole('alert')).toBeInTheDocument()
+      expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument()
+    })
+
+    it('does not touch ledger deletion or normal saving when deleting the account', async () => {
+      const { onDeleteAccount, onDelete, onSaveName } = renderSheet({ authProviderId: 'google.com' })
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete account forever' }))
+
+      await vi.waitFor(() => {
+        expect(onDeleteAccount).toHaveBeenCalled()
+      })
+      expect(onDelete).not.toHaveBeenCalled()
+      expect(onSaveName).not.toHaveBeenCalled()
     })
   })
 })

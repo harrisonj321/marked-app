@@ -2,15 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   createUserWithEmailAndPasswordMock,
+  deleteUserMock,
   getRedirectResultMock,
   onAuthStateChangedMock,
+  reauthenticateWithCredentialMock,
+  reauthenticateWithPopupMock,
   signInWithEmailAndPasswordMock,
   signInWithRedirectMock,
   signOutMock,
 } = vi.hoisted(() => ({
   createUserWithEmailAndPasswordMock: vi.fn(),
+  deleteUserMock: vi.fn(),
   getRedirectResultMock: vi.fn(),
   onAuthStateChangedMock: vi.fn(),
+  reauthenticateWithCredentialMock: vi.fn(),
+  reauthenticateWithPopupMock: vi.fn(),
   signInWithEmailAndPasswordMock: vi.fn(),
   signInWithRedirectMock: vi.fn(),
   signOutMock: vi.fn(),
@@ -18,9 +24,15 @@ const {
 
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class GoogleAuthProvider {},
+  EmailAuthProvider: {
+    credential: (email: string, password: string) => ({ __credential: true, email, password }),
+  },
   createUserWithEmailAndPassword: createUserWithEmailAndPasswordMock,
+  deleteUser: deleteUserMock,
   getRedirectResult: getRedirectResultMock,
   onAuthStateChanged: onAuthStateChangedMock,
+  reauthenticateWithCredential: reauthenticateWithCredentialMock,
+  reauthenticateWithPopup: reauthenticateWithPopupMock,
   signInWithEmailAndPassword: signInWithEmailAndPasswordMock,
   signInWithRedirect: signInWithRedirectMock,
   signOut: signOutMock,
@@ -30,7 +42,12 @@ vi.mock('firebase/auth', () => ({
 // import time (see assertFirebaseConfig) -- stubbed here so this test can
 // run anywhere without a .env file, same convention as every component test
 // that mocks './lib/auth' wholesale instead of importing it for real.
-vi.mock('./firebase', () => ({ auth: { __stubAuthInstance: true } }))
+// currentUser is mutable so reauth/delete tests can set it per case.
+const authStub: { __stubAuthInstance: true; currentUser: unknown } = {
+  __stubAuthInstance: true,
+  currentUser: null,
+}
+vi.mock('./firebase', () => ({ auth: authStub }))
 
 const {
   signInWithGoogle,
@@ -40,11 +57,17 @@ const {
   signOutUser,
   subscribeAuthUser,
   consumeGoogleRedirectPending,
+  primaryProviderId,
+  reauthenticateWithGoogle,
+  reauthenticateWithPassword,
+  deleteAuthAccount,
 } = await import('./auth')
 
 describe('lib/auth', () => {
   beforeEach(() => {
     window.sessionStorage.clear()
+    authStub.currentUser = null
+    vi.clearAllMocks()
   })
 
   it('signs in with Google via redirect, not popup', async () => {
@@ -54,7 +77,7 @@ describe('lib/auth', () => {
 
     expect(signInWithRedirectMock).toHaveBeenCalledTimes(1)
     const [authArg, providerArg] = signInWithRedirectMock.mock.calls[0]
-    expect(authArg).toEqual({ __stubAuthInstance: true })
+    expect(authArg).toEqual(authStub)
     expect(providerArg).toBeInstanceOf(Object)
   })
 
@@ -101,7 +124,7 @@ describe('lib/auth', () => {
 
     await resolveGoogleRedirect()
 
-    expect(getRedirectResultMock).toHaveBeenCalledWith({ __stubAuthInstance: true })
+    expect(getRedirectResultMock).toHaveBeenCalledWith(authStub)
   })
 
   it('propagates a redirect-result error to the caller rather than swallowing it', async () => {
@@ -117,7 +140,7 @@ describe('lib/auth', () => {
     await signInWithEmail('person@example.com', 'hunter2')
 
     expect(signInWithEmailAndPasswordMock).toHaveBeenCalledWith(
-      { __stubAuthInstance: true },
+      authStub,
       'person@example.com',
       'hunter2',
     )
@@ -129,7 +152,7 @@ describe('lib/auth', () => {
     await signUpWithEmail('person@example.com', 'hunter2')
 
     expect(createUserWithEmailAndPasswordMock).toHaveBeenCalledWith(
-      { __stubAuthInstance: true },
+      authStub,
       'person@example.com',
       'hunter2',
     )
@@ -140,7 +163,7 @@ describe('lib/auth', () => {
 
     await signOutUser()
 
-    expect(signOutMock).toHaveBeenCalledWith({ __stubAuthInstance: true })
+    expect(signOutMock).toHaveBeenCalledWith(authStub)
   })
 
   it('subscribes to auth state changes', () => {
@@ -150,7 +173,81 @@ describe('lib/auth', () => {
 
     const result = subscribeAuthUser(onChange)
 
-    expect(onAuthStateChangedMock).toHaveBeenCalledWith({ __stubAuthInstance: true }, onChange)
+    expect(onAuthStateChangedMock).toHaveBeenCalledWith(authStub, onChange)
     expect(result).toBe(unsubscribe)
+  })
+
+  describe('primaryProviderId', () => {
+    it('reads the first provider entry', () => {
+      const user = { providerData: [{ providerId: 'google.com' }] }
+      expect(primaryProviderId(user as never)).toBe('google.com')
+    })
+
+    it('falls back to password when providerData is empty', () => {
+      const user = { providerData: [] }
+      expect(primaryProviderId(user as never)).toBe('password')
+    })
+  })
+
+  describe('reauthenticateWithGoogle', () => {
+    it('reauthenticates via popup, not redirect', async () => {
+      authStub.currentUser = { uid: 'u1' }
+      reauthenticateWithPopupMock.mockResolvedValue(undefined)
+
+      await reauthenticateWithGoogle()
+
+      expect(reauthenticateWithPopupMock).toHaveBeenCalledTimes(1)
+      const [userArg, providerArg] = reauthenticateWithPopupMock.mock.calls[0]
+      expect(userArg).toBe(authStub.currentUser)
+      expect(providerArg).toBeInstanceOf(Object)
+      expect(signInWithRedirectMock).not.toHaveBeenCalled()
+    })
+
+    it('throws without attempting anything when signed out', async () => {
+      authStub.currentUser = null
+
+      await expect(reauthenticateWithGoogle()).rejects.toThrow()
+      expect(reauthenticateWithPopupMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('reauthenticateWithPassword', () => {
+    it('builds a credential from the current user\'s email and the given password', async () => {
+      authStub.currentUser = { uid: 'u1', email: 'person@example.com' }
+      reauthenticateWithCredentialMock.mockResolvedValue(undefined)
+
+      await reauthenticateWithPassword('hunter2')
+
+      expect(reauthenticateWithCredentialMock).toHaveBeenCalledWith(authStub.currentUser, {
+        __credential: true,
+        email: 'person@example.com',
+        password: 'hunter2',
+      })
+    })
+
+    it('throws without calling Firebase when there is no email on the account', async () => {
+      authStub.currentUser = { uid: 'u1', email: null }
+
+      await expect(reauthenticateWithPassword('hunter2')).rejects.toThrow()
+      expect(reauthenticateWithCredentialMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('deleteAuthAccount', () => {
+    it('deletes the current Firebase Auth user', async () => {
+      authStub.currentUser = { uid: 'u1' }
+      deleteUserMock.mockResolvedValue(undefined)
+
+      await deleteAuthAccount()
+
+      expect(deleteUserMock).toHaveBeenCalledWith(authStub.currentUser)
+    })
+
+    it('throws without attempting anything when signed out', async () => {
+      authStub.currentUser = null
+
+      await expect(deleteAuthAccount()).rejects.toThrow()
+      expect(deleteUserMock).not.toHaveBeenCalled()
+    })
   })
 })

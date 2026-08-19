@@ -22,6 +22,18 @@ beforeEach(() => {
 })
 
 describe('SignIn', () => {
+  it('renders as the real Home shell (header + centered main + footer), not a standalone auth page', () => {
+    const { container } = render(<SignIn />)
+
+    const main = container.querySelector('main.screen.home')
+    expect(main).toBeInTheDocument()
+    expect(main?.querySelector('.home-header .brand')).toHaveTextContent('Noted.')
+    expect(main?.querySelector('.home-main')).toContainElement(
+      screen.getByRole('button', { name: 'Continue with Google' }),
+    )
+    expect(screen.getByText(/sign in to create and note your first thing/i)).toBeInTheDocument()
+  })
+
   it('offers both Google and email as entry points', () => {
     render(<SignIn />)
 

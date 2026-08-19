@@ -1,8 +1,12 @@
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
   getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
   signInWithEmailAndPassword,
   signInWithRedirect,
   signOut,
@@ -12,6 +16,11 @@ import {
 import { auth } from './firebase'
 
 export type { User }
+
+/** The provider a signed-in user authenticated with -- 'password' or 'google.com', the only two V1 supports. */
+export function primaryProviderId(user: User): string {
+  return user.providerData?.[0]?.providerId ?? 'password'
+}
 
 export function subscribeAuthUser(onChange: (user: User | null) => void): Unsubscribe {
   return onAuthStateChanged(auth, onChange)
@@ -116,4 +125,41 @@ export async function signUpWithEmail(email: string, password: string): Promise<
 
 export async function signOutUser(): Promise<void> {
   await signOut(auth)
+}
+
+/**
+ * Popup, not redirect, unlike signInWithGoogle above: this reauthenticates
+ * an already-signed-in session from one button press inside Settings, not
+ * the app's main sign-in funnel -- losing the in-memory account-deletion
+ * confirmation (and its typed password field, for the other provider) to a
+ * full page navigation would be worse than popup's own known downsides
+ * (occasionally blocked, less smooth on mobile). The iOS hang that ruled
+ * popup out for the main flow (see signInWithGoogle's comment) was traced
+ * to authDomain being cross-origin, which is now fixed for popup and
+ * redirect alike by vercel.json's /__/auth/* proxy -- so that specific risk
+ * no longer favors redirect here.
+ */
+export async function reauthenticateWithGoogle(): Promise<void> {
+  const user = auth.currentUser
+  if (!user) throw new Error('Not signed in.')
+  await reauthenticateWithPopup(user, new GoogleAuthProvider())
+}
+
+export async function reauthenticateWithPassword(password: string): Promise<void> {
+  const user = auth.currentUser
+  if (!user?.email) throw new Error('Not signed in with an email account.')
+  await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password))
+}
+
+/**
+ * Deletes the signed-in Firebase Auth identity itself. Must only ever be
+ * called after every piece of that user's Firestore data is already gone
+ * (see data/account.ts's deleteAllUserData) -- once this succeeds, the
+ * client is signed out and can no longer pass Firestore's isOwner check to
+ * clean anything up.
+ */
+export async function deleteAuthAccount(): Promise<void> {
+  const user = auth.currentUser
+  if (!user) throw new Error('Not signed in.')
+  await deleteUser(user)
 }
