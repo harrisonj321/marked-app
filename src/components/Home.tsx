@@ -199,30 +199,44 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
               <h1>Sign in to create and note your first thing.</h1>
               <SignInActions authError={authError ?? null} />
             </>
+          ) : activeLedger ? (
+            <>
+              {todayKey && <p className="today-date">{`Today · ${formatDisplayDate(todayKey)}`}</p>}
+              <h1 className="tracker-title">
+                <button
+                  type="button"
+                  className="tracker-title-button"
+                  data-tour-id="ledger-title"
+                  aria-label={`Switch ledger, current: ${activeLedger.name}`}
+                  onClick={() => setSwitcherOpen(true)}
+                >
+                  <span className="tracker-title-name">{activeLedger.name}</span>
+                  <ChevronDownIcon />
+                </button>
+              </h1>
+              <TodaySection
+                uid={user.uid}
+                ledgerId={activeLedger.id}
+                defaultState={activeLedger.defaultState}
+                timezone={activeLedger.timezone}
+                labels={resolveStateLabels(activeLedger.stateLabels)}
+                accentColor={`var(--ledger-color-${resolveLedgerColor(activeLedger.color)})`}
+              />
+            </>
           ) : (
-            activeLedger && (
+            hasNoLedgersYet &&
+            !switcherOpen && (
+              // Defensive fallback only -- the normal first-run path is the
+              // auto-opened LedgerSwitcherSheet (see hasNoLedgersYet above),
+              // which for a first ledger cannot be dismissed without
+              // creating one. This exists so Home can never render as an
+              // empty beige screen if that sheet is ever closed some other
+              // way; Sign out stays reachable from the footer regardless.
               <>
-                {todayKey && <p className="today-date">{`Today · ${formatDisplayDate(todayKey)}`}</p>}
-                <h1 className="tracker-title">
-                  <button
-                    type="button"
-                    className="tracker-title-button"
-                    data-tour-id="ledger-title"
-                    aria-label={`Switch ledger, current: ${activeLedger.name}`}
-                    onClick={() => setSwitcherOpen(true)}
-                  >
-                    <span className="tracker-title-name">{activeLedger.name}</span>
-                    <ChevronDownIcon />
-                  </button>
-                </h1>
-                <TodaySection
-                  uid={user.uid}
-                  ledgerId={activeLedger.id}
-                  defaultState={activeLedger.defaultState}
-                  timezone={activeLedger.timezone}
-                  labels={resolveStateLabels(activeLedger.stateLabels)}
-                  accentColor={`var(--ledger-color-${resolveLedgerColor(activeLedger.color)})`}
-                />
+                <h1>Nothing noted yet.</h1>
+                <button type="button" onClick={() => setSwitcherOpen(true)}>
+                  Create your first ledger
+                </button>
               </>
             )
           )}

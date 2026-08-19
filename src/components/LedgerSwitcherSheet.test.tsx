@@ -45,6 +45,10 @@ function renderSheet(overrides: Partial<Parameters<typeof LedgerSwitcherSheet>[0
   return { onSwitch, onCreate, onManage, onDismiss }
 }
 
+function openCustomize() {
+  fireEvent.click(screen.getByRole('button', { name: 'Customize states' }))
+}
+
 describe('LedgerSwitcherSheet', () => {
   it('opens as a modal listing every ledger', () => {
     renderSheet()
@@ -144,12 +148,52 @@ describe('LedgerSwitcherSheet', () => {
       expect(screen.getByLabelText(/what are you tracking/i)).toBeInTheDocument()
     })
 
-    it('starts both state labels at Yes/No, editable', () => {
+    it('shows a compact form by default: name, default-day choice (Yes/No), color, and Save -- no state-label inputs', () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
 
+      expect(screen.getByLabelText(/what are you tracking/i)).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: 'Yes' })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: 'No' })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: 'Color' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.queryByLabelText('First state')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Second state')).not.toBeInTheDocument()
+    })
+
+    it('offers a quiet "Customize states" disclosure, collapsed by default', () => {
+      renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+
+      const toggle = screen.getByRole('button', { name: 'Customize states' })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('opening "Customize states" reveals both editable labels, starting at Yes/No', () => {
+      renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+      openCustomize()
+
+      expect(screen.getByRole('button', { name: 'Customize states' })).toHaveAttribute('aria-expanded', 'true')
       expect(screen.getByLabelText('First state')).toHaveValue('Yes')
       expect(screen.getByLabelText('Second state')).toHaveValue('No')
+    })
+
+    it('collapsing "Customize states" again hides the inputs but preserves the edits', () => {
+      renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+      openCustomize()
+      fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Good' } })
+      fireEvent.change(screen.getByLabelText('Second state'), { target: { value: 'Rough' } })
+
+      openCustomize() // collapse
+      expect(screen.queryByLabelText('First state')).not.toBeInTheDocument()
+      // The default-day choice still reflects the edit even while collapsed.
+      expect(screen.getByRole('radio', { name: 'Good' })).toBeInTheDocument()
+
+      openCustomize() // reopen
+      expect(screen.getByLabelText('First state')).toHaveValue('Good')
+      expect(screen.getByLabelText('Second state')).toHaveValue('Rough')
     })
 
     it('does not show the first-time suggestions helper once the account already has a ledger', () => {
@@ -178,6 +222,18 @@ describe('LedgerSwitcherSheet', () => {
       expect(screen.queryByLabelText(/what are you tracking/i)).not.toBeInTheDocument()
     })
 
+    it('re-opening after Cancel starts fresh: labels back to Yes/No and customize collapsed', () => {
+      renderSheet()
+      fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+      openCustomize()
+      fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Good' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
+      expect(screen.getByRole('button', { name: 'Customize states' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.getByRole('radio', { name: 'Yes' })).toBeInTheDocument()
+    })
+
     it('the "if I don\'t log anything" choices live-reflect the two state-label inputs', () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
@@ -185,6 +241,7 @@ describe('LedgerSwitcherSheet', () => {
       expect(screen.getByRole('radio', { name: 'Yes' })).toBeInTheDocument()
       expect(screen.getByRole('radio', { name: 'No' })).toBeInTheDocument()
 
+      openCustomize()
       fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Good' } })
       fireEvent.change(screen.getByLabelText('Second state'), { target: { value: 'Rough' } })
 
@@ -215,6 +272,7 @@ describe('LedgerSwitcherSheet', () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
+      openCustomize()
       fireEvent.change(screen.getByLabelText('First state'), { target: { value: '   ' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -232,7 +290,7 @@ describe('LedgerSwitcherSheet', () => {
       expect(onCreate).not.toHaveBeenCalled()
     })
 
-    it('pre-selects Espresso, the canonical default color, without requiring a color choice', async () => {
+    it('creates with the collapsed defaults (Yes/No) without ever opening customize', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       expect(screen.getByRole('button', { name: 'Espresso' })).toHaveAttribute('aria-pressed', 'true')
@@ -255,6 +313,7 @@ describe('LedgerSwitcherSheet', () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
+      openCustomize()
       fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Good' } })
       fireEvent.change(screen.getByLabelText('Second state'), { target: { value: 'Rough' } })
       fireEvent.click(screen.getByRole('radio', { name: 'Good' }))
@@ -275,6 +334,7 @@ describe('LedgerSwitcherSheet', () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
+      openCustomize()
       fireEvent.change(screen.getByLabelText('First state'), { target: { value: '  Good  ' } })
       fireEvent.click(screen.getByRole('radio', { name: 'Good' }))
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -316,6 +376,29 @@ describe('LedgerSwitcherSheet', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('Could not save. Try again.')
       expect(screen.getByLabelText(/what are you tracking/i)).toBeInTheDocument()
     })
+
+    describe('normal dismissal, once at least one ledger exists', () => {
+      it('shows the X close control', () => {
+        renderSheet()
+        expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+      })
+
+      it('backdrop click closes the sheet', () => {
+        const { onDismiss } = renderSheet()
+        const dialog = document.querySelector('dialog')!
+        fireEvent.click(dialog)
+        expect(HTMLDialogElement.prototype.close).toHaveBeenCalled()
+        expect(onDismiss).toHaveBeenCalled()
+      })
+
+      it('does not block the native Escape/cancel dismissal', () => {
+        renderSheet()
+        const dialog = document.querySelector('dialog')!
+        const event = new Event('cancel', { cancelable: true })
+        dialog.dispatchEvent(event)
+        expect(event.defaultPrevented).toBe(false)
+      })
+    })
   })
 
   describe('creating the first ledger', () => {
@@ -330,9 +413,55 @@ describe('LedgerSwitcherSheet', () => {
       expect(screen.queryAllByRole('listitem')).toHaveLength(0)
     })
 
+    it('shows the same compact form as adding any later ledger -- Yes/No default choices, no state-label inputs', () => {
+      renderFirstLedgerSheet()
+
+      expect(screen.getByRole('radio', { name: 'Yes' })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: 'No' })).toBeInTheDocument()
+      expect(screen.queryByLabelText('First state')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Customize states' })).toBeInTheDocument()
+    })
+
     it('offers no Cancel -- there is nothing to browse back to', () => {
       renderFirstLedgerSheet()
       expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    })
+
+    it('offers no X close control', () => {
+      renderFirstLedgerSheet()
+      expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+    })
+
+    it('a backdrop click does not close the sheet', () => {
+      const { onDismiss } = renderFirstLedgerSheet()
+      const dialog = document.querySelector('dialog')!
+      fireEvent.click(dialog)
+
+      expect(HTMLDialogElement.prototype.close).not.toHaveBeenCalled()
+      expect(onDismiss).not.toHaveBeenCalled()
+      expect(screen.getByLabelText(/what are you tracking/i)).toBeInTheDocument()
+    })
+
+    it('Escape/the native cancel event is prevented, so it cannot dismiss the sheet', () => {
+      renderFirstLedgerSheet()
+      const dialog = document.querySelector('dialog')!
+      const event = new Event('cancel', { cancelable: true })
+      dialog.dispatchEvent(event)
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(HTMLDialogElement.prototype.close).not.toHaveBeenCalled()
+    })
+
+    it('the only way out is creating a ledger, which does close it', async () => {
+      const { onCreate, onDismiss } = renderFirstLedgerSheet()
+      fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
+      fireEvent.click(screen.getByRole('radio', { name: 'Yes' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await vi.waitFor(() => {
+        expect(onCreate).toHaveBeenCalled()
+        expect(onDismiss).toHaveBeenCalled()
+      })
     })
 
     it('shows the collapsed first-time suggestions helper', () => {
@@ -380,9 +509,10 @@ describe('LedgerSwitcherSheet', () => {
       expect(onCreate.mock.calls[0][0]).not.toHaveProperty('category')
     })
 
-    it('still requires and persists editable state labels and a default choice for the first ledger', async () => {
+    it('still requires and persists editable state labels and a default choice for the first ledger, once customized', async () => {
       const { onCreate } = renderFirstLedgerSheet()
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Headache' } })
+      openCustomize()
       fireEvent.change(screen.getByLabelText('First state'), { target: { value: 'Had one' } })
       fireEvent.change(screen.getByLabelText('Second state'), { target: { value: "Didn't" } })
       fireEvent.click(screen.getByRole('radio', { name: "Didn't" }))

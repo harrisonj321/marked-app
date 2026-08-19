@@ -338,6 +338,53 @@ describe('Home', () => {
       expect(screen.getByText('Reading')).toBeInTheDocument()
       expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
     })
+
+    describe('defensive empty-state fallback', () => {
+      // Not the normal path -- the real LedgerSwitcherSheet cannot be
+      // dismissed for a first ledger (see its own tests) -- but Home must
+      // still never render as an empty beige screen if the sheet is ever
+      // closed some other way, so this drives that closure through the
+      // mocked sheet's onDismiss directly.
+      it('shows a restrained empty state with a CTA when the sheet is closed while still at zero ledgers', () => {
+        render(
+          <Home user={makeUser()} ledgers={[]} activeLedger={null} ledgersLoading={false} onSwitchLedger={vi.fn()} />,
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close switcher' }))
+
+        expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
+        expect(screen.getByText('Nothing noted yet.')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Create your first ledger' })).toBeInTheDocument()
+      })
+
+      it('the fallback CTA reopens the real ledger-creation sheet', () => {
+        render(
+          <Home user={makeUser()} ledgers={[]} activeLedger={null} ledgersLoading={false} onSwitchLedger={vi.fn()} />,
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Close switcher' }))
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create your first ledger' }))
+
+        expect(screen.getByTestId('ledger-switcher-sheet')).toBeInTheDocument()
+        expect(screen.queryByText('Nothing noted yet.')).not.toBeInTheDocument()
+      })
+
+      it('still offers Sign out from the fallback state -- the user is never trapped', () => {
+        render(
+          <Home user={makeUser()} ledgers={[]} activeLedger={null} ledgersLoading={false} onSwitchLedger={vi.fn()} />,
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Close switcher' }))
+
+        expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+      })
+
+      it('does not show the fallback while ledgers are still loading', () => {
+        render(
+          <Home user={makeUser()} ledgers={[]} activeLedger={null} ledgersLoading={true} onSwitchLedger={vi.fn()} />,
+        )
+        expect(screen.queryByText('Nothing noted yet.')).not.toBeInTheDocument()
+      })
+    })
   })
 
   it('renders the brand, date, ledger name, and today section without the calendar', () => {

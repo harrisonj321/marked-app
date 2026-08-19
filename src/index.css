@@ -973,16 +973,18 @@ fieldset label {
   outline-offset: 2px;
 }
 
-/* First-ledger suggestions: a quiet disclosure inside the name field,
-   collapsed by default so the input reads as freeform, not a picker. */
+/* Ledger-creation disclosures -- the first-ledger name suggestions and the
+   state-label customization, both collapsed by default so the compact
+   form (name, default-day choice, color, Save) stays the primary reading,
+   with either aside available a tap away. */
 
-.ledger-suggestions {
+.ledger-disclosure {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
 }
 
-.ledger-suggestions-toggle {
+.disclosure-toggle {
   align-self: flex-start;
   padding-left: 0;
 }

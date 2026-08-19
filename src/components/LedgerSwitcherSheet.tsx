@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent, type SyntheticEvent } from 'react'
 import { LEDGER_NAME_SUGGESTIONS } from '../domain/ledgerSuggestions'
 import {
   STATE_LABEL_MAX_LENGTH,
@@ -73,6 +73,7 @@ export function LedgerSwitcherSheet({
   const [creating, setCreating] = useState(isFirstLedger)
   const [newName, setNewName] = useState('')
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
   const [newStateLabels, setNewStateLabels] = useState<StateLabels>(STARTING_STATE_LABELS)
   const [newDefaultState, setNewDefaultState] = useState<DayState | null>(null)
   const [newColor, setNewColor] = useState<LedgerColor>(DEFAULT_LEDGER_COLOR)
@@ -86,9 +87,22 @@ export function LedgerSwitcherSheet({
     dialogRef.current?.showModal()
   }, [])
 
+  // A brand-new account has nothing to fall back to if this sheet closes
+  // without creating a ledger -- see Home's own defensive empty-state
+  // fallback for the case where it somehow does anyway. So for the first
+  // ledger, every normal dismiss path (X, backdrop click, Escape) is
+  // disabled; only actually creating a ledger closes it. Once there is at
+  // least one real ledger, every one of these behaves exactly as before.
   function handleBackdropClick(event: MouseEvent<HTMLDialogElement>) {
+    if (isFirstLedger) return
     if (event.target === dialogRef.current) {
       dialogRef.current?.close()
+    }
+  }
+
+  function handleCancel(event: SyntheticEvent<HTMLDialogElement>) {
+    if (isFirstLedger) {
+      event.preventDefault()
     }
   }
 
@@ -107,6 +121,7 @@ export function LedgerSwitcherSheet({
   function startCreating() {
     setNewName('')
     setSuggestionsOpen(false)
+    setCustomizeOpen(false)
     setNewStateLabels(STARTING_STATE_LABELS)
     setNewDefaultState(null)
     setNewColor(DEFAULT_LEDGER_COLOR)
@@ -167,17 +182,20 @@ export function LedgerSwitcherSheet({
       aria-labelledby={titleId}
       onClose={onDismiss}
       onClick={handleBackdropClick}
+      onCancel={handleCancel}
     >
       <div className="settings-sheet-header">
         <h2 id={titleId}>Ledgers</h2>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Close"
-          onClick={() => dialogRef.current?.close()}
-        >
-          <CloseIcon />
-        </button>
+        {!isFirstLedger && (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close"
+            onClick={() => dialogRef.current?.close()}
+          >
+            <CloseIcon />
+          </button>
+        )}
       </div>
 
       <ul className="ledger-list">
@@ -227,10 +245,10 @@ export function LedgerSwitcherSheet({
               </p>
             )}
             {isFirstLedger && (
-              <div className="ledger-suggestions">
+              <div className="ledger-disclosure">
                 <button
                   type="button"
-                  className="footer-link ledger-suggestions-toggle"
+                  className="footer-link disclosure-toggle"
                   aria-expanded={suggestionsOpen}
                   onClick={() => setSuggestionsOpen((open) => !open)}
                 >
@@ -251,42 +269,6 @@ export function LedgerSwitcherSheet({
                   </div>
                 )}
               </div>
-            )}
-          </div>
-
-          <div className="field">
-            <label htmlFor={didLabelId}>First state</label>
-            <input
-              id={didLabelId}
-              type="text"
-              value={newStateLabels.did}
-              onChange={(event) =>
-                setNewStateLabels((current) => ({ ...current, did: event.target.value }))
-              }
-              maxLength={STATE_LABEL_MAX_LENGTH}
-            />
-            {didLabelError && (
-              <p role="alert" className="message">
-                {didLabelError}
-              </p>
-            )}
-          </div>
-
-          <div className="field">
-            <label htmlFor={didntLabelId}>Second state</label>
-            <input
-              id={didntLabelId}
-              type="text"
-              value={newStateLabels.didnt}
-              onChange={(event) =>
-                setNewStateLabels((current) => ({ ...current, didnt: event.target.value }))
-              }
-              maxLength={STATE_LABEL_MAX_LENGTH}
-            />
-            {didntLabelError && (
-              <p role="alert" className="message">
-                {didntLabelError}
-              </p>
             )}
           </div>
 
@@ -311,6 +293,56 @@ export function LedgerSwitcherSheet({
               {newStateLabels.didnt || 'Second state'}
             </label>
           </fieldset>
+
+          <div className="ledger-disclosure">
+            <button
+              type="button"
+              className="footer-link disclosure-toggle"
+              aria-expanded={customizeOpen}
+              onClick={() => setCustomizeOpen((open) => !open)}
+            >
+              Customize states
+            </button>
+            {customizeOpen && (
+              <>
+                <div className="field">
+                  <label htmlFor={didLabelId}>First state</label>
+                  <input
+                    id={didLabelId}
+                    type="text"
+                    value={newStateLabels.did}
+                    onChange={(event) =>
+                      setNewStateLabels((current) => ({ ...current, did: event.target.value }))
+                    }
+                    maxLength={STATE_LABEL_MAX_LENGTH}
+                  />
+                  {didLabelError && (
+                    <p role="alert" className="message">
+                      {didLabelError}
+                    </p>
+                  )}
+                </div>
+
+                <div className="field">
+                  <label htmlFor={didntLabelId}>Second state</label>
+                  <input
+                    id={didntLabelId}
+                    type="text"
+                    value={newStateLabels.didnt}
+                    onChange={(event) =>
+                      setNewStateLabels((current) => ({ ...current, didnt: event.target.value }))
+                    }
+                    maxLength={STATE_LABEL_MAX_LENGTH}
+                  />
+                  {didntLabelError && (
+                    <p role="alert" className="message">
+                      {didntLabelError}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="field">
             <span id={colorLabelId}>Color</span>
