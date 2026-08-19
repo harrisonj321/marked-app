@@ -43,12 +43,18 @@ function toLedger(id: string, data: Record<string, unknown>): Ledger {
 export interface NewLedger {
   name: string
   defaultState: DayState
+  stateLabels?: StateLabels
   timezone: string
   startDate: string
   color?: LedgerColor
 }
 
-/** Creates a new ledger with a fresh id and returns it. */
+/**
+ * Creates a new ledger with a fresh id and returns it. stateLabels is
+ * always provided by the creation form (see LedgerSwitcherSheet), so the
+ * ledger starts with the labels the user actually saw and edited rather
+ * than falling back to DEFAULT_STATE_LABELS the first time it's read.
+ */
 export async function createLedger(uid: string, input: NewLedger): Promise<Ledger> {
   const ref = doc(ledgersCollection(uid))
   const data: Record<string, unknown> = {
@@ -60,6 +66,7 @@ export async function createLedger(uid: string, input: NewLedger): Promise<Ledge
     updatedAt: serverTimestamp(),
   }
   if (input.color) data.color = input.color
+  if (input.stateLabels) data.stateLabels = input.stateLabels
 
   await setDoc(ref, data)
 
@@ -70,6 +77,7 @@ export async function createLedger(uid: string, input: NewLedger): Promise<Ledge
     timezone: input.timezone,
     startDate: input.startDate,
     color: input.color,
+    stateLabels: input.stateLabels,
   }
 }
 

@@ -261,10 +261,12 @@ fieldset label {
 /* Sign-in */
 
 /* A quiet arrival, so the hand-off from the orientation's closing exhale
-   never lands as a hard cut. Plays whenever sign-in appears (skip,
-   sign-out too) -- one consistent entrance, nothing conditional. */
+   never lands as a hard cut. Applied to Home's own <main> -- the one
+   moment that element is mounted fresh, whether or not the visitor is
+   already signed in. Auth/ledger-state changes afterward re-render the
+   same instance and never retrigger this. */
 @media (prefers-reduced-motion: no-preference) {
-  .signin-enter {
+  .home-enter {
     animation: onboarding-rise 400ms ease-out both;
   }
 }
@@ -817,8 +819,7 @@ fieldset label {
 
 .day-detail .field,
 .settings-sheet .field,
-.ledger-sheet .field,
-.screen .field {
+.ledger-sheet .field {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;

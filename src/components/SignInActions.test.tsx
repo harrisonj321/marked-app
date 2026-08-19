@@ -13,7 +13,7 @@ vi.mock('../lib/auth', () => ({
   signUpWithEmail: signUpWithEmailMock,
 }))
 
-const { SignIn } = await import('./SignIn')
+const { SignInActions } = await import('./SignInActions')
 
 beforeEach(() => {
   signInWithGoogleMock.mockReset()
@@ -21,21 +21,16 @@ beforeEach(() => {
   signUpWithEmailMock.mockReset()
 })
 
-describe('SignIn', () => {
-  it('renders as the real Home shell (header + centered main + footer), not a standalone auth page', () => {
-    const { container } = render(<SignIn />)
+describe('SignInActions', () => {
+  it('renders as a plain fragment, not a screen -- no <main>, header, or brand of its own', () => {
+    const { container } = render(<SignInActions />)
 
-    const main = container.querySelector('main.screen.home')
-    expect(main).toBeInTheDocument()
-    expect(main?.querySelector('.home-header .brand')).toHaveTextContent('Noted.')
-    expect(main?.querySelector('.home-main')).toContainElement(
-      screen.getByRole('button', { name: 'Continue with Google' }),
-    )
-    expect(screen.getByText(/sign in to create and note your first thing/i)).toBeInTheDocument()
+    expect(container.querySelector('main')).not.toBeInTheDocument()
+    expect(container.querySelector('.home-header')).not.toBeInTheDocument()
   })
 
   it('offers both Google and email as entry points', () => {
-    render(<SignIn />)
+    render(<SignInActions />)
 
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue with email' })).toBeInTheDocument()
@@ -44,7 +39,7 @@ describe('SignIn', () => {
 
   it('signs in with Google on click', async () => {
     signInWithGoogleMock.mockResolvedValue(undefined)
-    render(<SignIn />)
+    render(<SignInActions />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue with Google' }))
 
@@ -55,7 +50,7 @@ describe('SignIn', () => {
 
   it('shows a neutral message and recovers the button if the Google redirect fails to even start', async () => {
     signInWithGoogleMock.mockRejectedValue({ code: 'auth/network-request-failed' })
-    render(<SignIn />)
+    render(<SignInActions />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue with Google' }))
 
@@ -64,13 +59,13 @@ describe('SignIn', () => {
   })
 
   it('shows a Google redirect error passed in from boot immediately, without requiring another click', () => {
-    render(<SignIn authError="Sign-in did not complete. Try again." />)
+    render(<SignInActions authError="Sign-in did not complete. Try again." />)
 
     expect(screen.getByRole('alert')).toHaveTextContent(/sign-in did not complete/i)
   })
 
   it('reveals the email form on "Continue with email", defaulting to sign-in', () => {
-    render(<SignIn />)
+    render(<SignInActions />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue with email' }))
 
@@ -81,7 +76,7 @@ describe('SignIn', () => {
   })
 
   it('requires both fields before attempting an email sign-in', () => {
-    render(<SignIn />)
+    render(<SignInActions />)
     fireEvent.click(screen.getByRole('button', { name: 'Continue with email' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
@@ -92,7 +87,7 @@ describe('SignIn', () => {
 
   it('signs in with an existing email/password account', async () => {
     signInWithEmailMock.mockResolvedValue(undefined)
-    render(<SignIn />)
+    render(<SignInActions />)
     fireEvent.click(screen.getByRole('button', { name: 'Continue with email' }))
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
@@ -107,7 +102,7 @@ describe('SignIn', () => {
 
   it('switches to create-account mode and signs up instead', async () => {
     signUpWithEmailMock.mockResolvedValue(undefined)
-    render(<SignIn />)
+    render(<SignInActions />)
     fireEvent.click(screen.getByRole('button', { name: 'Continue with email' }))
 
     fireEvent.click(screen.getByRole('button', { name: /new here\? create an account/i }))
@@ -124,7 +119,7 @@ describe('SignIn', () => {
   })
 
   it('toggles back from create-account to sign-in mode', () => {
-    render(<SignIn />)
+    render(<SignInActions />)
     fireEvent.click(screen.getByRole('button', { name: 'Continue with email' }))
     fireEvent.click(screen.getByRole('button', { name: /new here\? create an account/i }))
 
@@ -135,7 +130,7 @@ describe('SignIn', () => {
 
   it('hints at Google for an email already registered with a different provider', async () => {
     signUpWithEmailMock.mockRejectedValue({ code: 'auth/email-already-in-use' })
-    render(<SignIn />)
+    render(<SignInActions />)
     fireEvent.click(screen.getByRole('button', { name: 'Continue with email' }))
     fireEvent.click(screen.getByRole('button', { name: /new here\? create an account/i }))
 
@@ -148,7 +143,7 @@ describe('SignIn', () => {
 
   it('hints at Google for a wrong-password attempt that may actually be a Google-only account', async () => {
     signInWithEmailMock.mockRejectedValue({ code: 'auth/invalid-credential' })
-    render(<SignIn />)
+    render(<SignInActions />)
     fireEvent.click(screen.getByRole('button', { name: 'Continue with email' }))
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })

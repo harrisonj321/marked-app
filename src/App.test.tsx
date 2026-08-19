@@ -63,6 +63,16 @@ const ledger = {
 }
 
 beforeEach(() => {
+  // jsdom has no real <dialog> support -- LedgerSwitcherSheet can now
+  // render for real here (a zero-ledger authenticated user auto-opens it),
+  // same stub every other test file that renders it directly already uses.
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = true
+  })
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+    this.open = false
+    this.dispatchEvent(new Event('close'))
+  })
   window.localStorage.clear()
   createLedgerMock.mockReset().mockResolvedValue(undefined)
   // Every test is a genuine fresh open/reload, not a Google-redirect
@@ -486,23 +496,27 @@ describe('App', () => {
     })
   })
 
-  it('shows setup when authenticated with no ledger yet', () => {
+  it('automatically opens the real in-app ledger-creation sheet when authenticated with no ledger yet -- no standalone setup page', () => {
     useAuthUserMock.mockReturnValue({ user: { uid: 'u1' }, loading: false })
     useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: false, error: null, switchLedger: vi.fn() })
 
     render(<App />)
 
+    // The real Home shell is present underneath (brand still shows),
+    // not swapped out for a different screen.
+    expect(screen.getByText('Noted.')).toBeInTheDocument()
     expect(screen.getByText(/what are you tracking/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ledgers' })).toBeInTheDocument()
   })
 
-  it("a brand-new account's first ledger, created through Setup, never uses the legacy default id -- it enters the new per-ledger schema", async () => {
+  it("a brand-new account's first ledger, created through the auto-opened sheet, never uses the legacy default id -- it enters the new per-ledger schema", async () => {
     useAuthUserMock.mockReturnValue({ user: { uid: 'u1' }, loading: false })
     useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: false, error: null, switchLedger: vi.fn() })
 
     render(<App />)
 
     fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-    fireEvent.click(screen.getByRole('radio', { name: 'I did it' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Yes' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     const expectedTimezone = resolveDeviceTimezone()
@@ -512,8 +526,10 @@ describe('App', () => {
       expect(createLedgerMock).toHaveBeenCalledWith('u1', {
         name: 'Reading',
         defaultState: 'did',
+        stateLabels: { did: 'Yes', didnt: 'No' },
         timezone: expectedTimezone,
         startDate: expectedStartDate,
+        color: 'espresso',
       })
     })
     // NewLedger has no id field at all -- creation always relies on

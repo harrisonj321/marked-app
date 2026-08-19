@@ -1,24 +1,20 @@
 import { useState } from 'react'
-import { createLedger } from './data/ledger'
 import { hasCompletedOnboarding, saveOnboardingCompletion } from './data/onboarding'
-import { getTodayKey, resolveDeviceTimezone } from './domain/date'
-import { consumeGoogleRedirectPending, primaryProviderId } from './lib/auth'
+import { consumeGoogleRedirectPending } from './lib/auth'
 import { useAuthUser } from './hooks/useAuthUser'
 import { useLedgers } from './hooks/useLedgers'
 import { LoadingScreen } from './components/LoadingScreen'
 import { OnboardingOrientation } from './components/OnboardingOrientation'
-import { SignIn } from './components/SignIn'
-import { Setup } from './components/Setup'
 import { Home } from './components/Home'
 
 function App() {
   const { user, loading: authLoading, authError } = useAuthUser()
   const uid = user?.uid ?? null
   const { ledgers, activeLedger, loading: ledgersLoading, error, switchLedger } = useLedgers(uid)
-  // Lazy initializer (not an effect) so there is no frame where SignIn is
-  // visible before the orientation is. Read once at mount: whether this
-  // visitor finishes it later this session is tracked separately below, not
-  // by re-reading storage on every render.
+  // Lazy initializer (not an effect) so there is no frame where the guest
+  // Home state is visible before the orientation is. Read once at mount:
+  // whether this visitor finishes it later this session is tracked
+  // separately below, not by re-reading storage on every render.
   // VITE_FORCE_ONBOARDING is a temporary escape hatch -- usable in any
   // environment, including Production, while testing the onboarding flow --
   // for repeatedly seeing the full pre-auth orientation without clearing
@@ -36,12 +32,12 @@ function App() {
     // is the one thing that survives it (see lib/auth): when it reports
     // this boot IS that redirect return, it is a continuation of the same
     // sign-in journey the user was already on (already past onboarding, or
-    // it would not have reached SignIn to click Google in the first place)
-    // -- never a fresh open, so it must never re-trigger forced onboarding
-    // or the user gets bounced back into onboarding instead of finishing
-    // sign-in. Always consumed (even with the flag off) so a stale marker
-    // never lingers into a later boot where the flag has since been turned
-    // on.
+    // it would not have reached Home's sign-in state to click Google in
+    // the first place) -- never a fresh open, so it must never re-trigger
+    // forced onboarding or the user gets bounced back into onboarding
+    // instead of finishing sign-in. Always consumed (even with the flag
+    // off) so a stale marker never lingers into a later boot where the
+    // flag has since been turned on.
     const returningFromGoogleRedirect = consumeGoogleRedirectPending()
     if (!forceOnboarding) {
       return hasCompletedOnboarding()
@@ -73,14 +69,6 @@ function App() {
     )
   }
 
-  if (!user) {
-    return <SignIn authError={authError} />
-  }
-
-  if (ledgersLoading) {
-    return <LoadingScreen />
-  }
-
   if (error) {
     return (
       <main className="screen screen-center">
@@ -92,29 +80,18 @@ function App() {
     )
   }
 
-  if (!activeLedger) {
-    return (
-      <Setup
-        onComplete={async ({ name, defaultState }) => {
-          const timezone = resolveDeviceTimezone()
-          await createLedger(user.uid, {
-            name,
-            defaultState,
-            timezone,
-            startDate: getTodayKey(timezone),
-          })
-        }}
-      />
-    )
-  }
-
+  // From here on, Home is the one continuously-mounted app shell for every
+  // remaining state -- signed out, signed in with no ledgers yet, and the
+  // full experience -- see Home's own doc comment. There is no separate
+  // sign-in or first-ledger-setup screen to route to.
   return (
     <Home
-      uid={user.uid}
+      user={user}
+      authError={authError}
       ledgers={ledgers}
       activeLedger={activeLedger}
+      ledgersLoading={ledgersLoading}
       onSwitchLedger={switchLedger}
-      authProviderId={primaryProviderId(user)}
     />
   )
 }

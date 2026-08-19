@@ -53,6 +53,13 @@ vi.mock('./CalendarSheet', () => ({
     </div>
   ),
 }))
+vi.mock('./SignInActions', () => ({
+  SignInActions: ({ authError }: { authError?: string | null }) => (
+    <div data-testid="signin-actions">
+      signin-actions{authError ? `:${authError}` : ''}
+    </div>
+  ),
+}))
 vi.mock('./SettingsSheet', () => ({
   SettingsSheet: ({
     name,
@@ -115,21 +122,33 @@ vi.mock('./LedgerSwitcherSheet', () => ({
     onDismiss,
   }: {
     ledgers: { id: string; name: string }[]
-    activeLedgerId: string
+    activeLedgerId: string | null
     onSwitch: (id: string) => void
-    onCreate: (input: { name: string; defaultState: 'did' | 'didnt'; color: string }) => Promise<void>
+    onCreate: (input: {
+      name: string
+      defaultState: 'did' | 'didnt'
+      stateLabels: { did: string; didnt: string }
+      color: string
+    }) => Promise<void>
     onManage: (id: string) => void
     onDismiss: () => void
   }) => (
     <div data-testid="ledger-switcher-sheet">
-      ledger-switcher-sheet:{activeLedgerId}:{ledgers.map((l) => l.name).join(',')}
+      ledger-switcher-sheet:{activeLedgerId ?? 'none'}:{ledgers.map((l) => l.name).join(',')}
       <button type="button" onClick={() => onSwitch('ledger-2')}>
         Switch to ledger-2
       </button>
       <button
         type="button"
         onClick={() =>
-          void onCreate({ name: 'Reading', defaultState: 'did', color: 'clay' }).catch(reportSaveError)
+          void onCreate({
+            name: 'Reading',
+            defaultState: 'did',
+            stateLabels: { did: 'Yes', didnt: 'No' },
+            color: 'clay',
+          })
+            .then(onDismiss)
+            .catch(reportSaveError)
         }
       >
         Create ledger
@@ -174,6 +193,8 @@ vi.mock('../data/account', () => ({
 }))
 vi.mock('../lib/auth', () => ({
   signOutUser: vi.fn(),
+  primaryProviderId: (user: { providerData?: { providerId: string }[] }) =>
+    user.providerData?.[0]?.providerId ?? 'password',
   reauthenticateWithGoogle: (...args: unknown[]) => reauthenticateWithGoogleMock(...args),
   reauthenticateWithPassword: (...args: unknown[]) => reauthenticateWithPasswordMock(...args),
   deleteAuthAccount: (...args: unknown[]) => deleteAuthAccountMock(...args),
@@ -203,23 +224,122 @@ const ledger = {
   startDate: '2026-08-01',
 }
 
+function makeUser(overrides: { providerId?: string } = {}) {
+  return { uid: 'u1', providerData: [{ providerId: overrides.providerId ?? 'password' }] } as never
+}
+
 function renderSettledHome(overrides: Partial<Parameters<typeof Home>[0]> = {}) {
-  const uid = overrides.uid ?? 'u1'
   const onSwitchLedger = vi.fn()
-  render(
+  const result = render(
     <Home
-      uid={uid}
+      user={makeUser()}
       ledgers={[ledger]}
       activeLedger={ledger}
+      ledgersLoading={false}
       onSwitchLedger={onSwitchLedger}
-      authProviderId="password"
       {...overrides}
     />,
   )
-  return { onSwitchLedger }
+  return { onSwitchLedger, ...result }
 }
 
 describe('Home', () => {
+  describe('guest state (signed out)', () => {
+    it('renders the real Home shell (header + centered main + footer) with sign-in actions, not a separate page', () => {
+      const { container } = render(
+        <Home user={null} ledgers={[]} activeLedger={null} ledgersLoading={false} onSwitchLedger={vi.fn()} />,
+      )
+
+      const main = container.querySelector('main.screen.home')
+      expect(main).toBeInTheDocument()
+      expect(main?.querySelector('.home-header .brand')).toHaveTextContent('Noted.')
+      expect(screen.getByTestId('signin-actions')).toBeInTheDocument()
+      expect(screen.getByText(/sign in to create and note your first thing/i)).toBeInTheDocument()
+    })
+
+    it('shows no calendar, settings, or sign-out control while signed out', () => {
+      render(<Home user={null} ledgers={[]} activeLedger={null} ledgersLoading={false} onSwitchLedger={vi.fn()} />)
+
+      expect(screen.queryByRole('button', { name: 'Open calendar' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument()
+    })
+
+    it('never auto-opens the ledger-creation sheet while signed out', () => {
+      render(<Home user={null} ledgers={[]} activeLedger={null} ledgersLoading={false} onSwitchLedger={vi.fn()} />)
+      expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
+    })
+
+    it('passes a Google-redirect auth error through to the sign-in actions', () => {
+      render(
+        <Home
+          user={null}
+          authError="Sign-in did not complete. Try again."
+          ledgers={[]}
+          activeLedger={null}
+          ledgersLoading={false}
+          onSwitchLedger={vi.fn()}
+        />,
+      )
+      expect(screen.getByTestId('signin-actions')).toHaveTextContent('Sign-in did not complete. Try again.')
+    })
+  })
+
+  describe('signed in with zero ledgers', () => {
+    it('automatically opens the ledger-creation sheet once loading settles', () => {
+      render(
+        <Home user={makeUser()} ledgers={[]} activeLedger={null} ledgersLoading={false} onSwitchLedger={vi.fn()} />,
+      )
+      expect(screen.getByTestId('ledger-switcher-sheet')).toBeInTheDocument()
+    })
+
+    it('does not open the sheet while ledgers are still loading -- avoids flashing it open for an account that actually has ledgers', () => {
+      render(
+        <Home user={makeUser()} ledgers={[]} activeLedger={null} ledgersLoading={true} onSwitchLedger={vi.fn()} />,
+      )
+      expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
+    })
+
+    it('shows no calendar or ledger title, but still offers sign-out', () => {
+      render(
+        <Home user={makeUser()} ledgers={[]} activeLedger={null} ledgersLoading={false} onSwitchLedger={vi.fn()} />,
+      )
+      expect(screen.queryByRole('button', { name: 'Open calendar' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /switch ledger/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+    })
+
+    it('reveals the newly created ledger in the same Home instance once creation succeeds, without an intermediate screen', async () => {
+      const onSwitchLedger = vi.fn()
+      const { rerender } = render(
+        <Home user={makeUser()} ledgers={[]} activeLedger={null} ledgersLoading={false} onSwitchLedger={onSwitchLedger} />,
+      )
+      expect(screen.getByTestId('ledger-switcher-sheet')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Create ledger' }))
+      await vi.waitFor(() => {
+        expect(onSwitchLedger).toHaveBeenCalledWith('ledger-new')
+      })
+
+      // Simulate the parent's ledgers subscription echoing the created
+      // ledger back and switching to it -- the same Home instance, not a
+      // remount, is what reveals it.
+      const created = { id: 'ledger-new', name: 'Reading', defaultState: 'did' as const, timezone: 'UTC', startDate: '2026-08-10' }
+      rerender(
+        <Home
+          user={makeUser()}
+          ledgers={[created]}
+          activeLedger={created}
+          ledgersLoading={false}
+          onSwitchLedger={onSwitchLedger}
+        />,
+      )
+
+      expect(screen.getByText('Reading')).toBeInTheDocument()
+      expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
+    })
+  })
+
   it('renders the brand, date, ledger name, and today section without the calendar', () => {
     renderSettledHome()
 
@@ -377,7 +497,7 @@ describe('Home', () => {
       expect(onSwitchLedger).toHaveBeenCalledWith('ledger-2')
     })
 
-    it('creates a new ledger and switches to it', async () => {
+    it('creates a new ledger (with its state labels) and switches to it', async () => {
       const { onSwitchLedger } = renderSettledHome()
       const expectedTimezone = resolveDeviceTimezone()
       const expectedStartDate = getTodayKey(expectedTimezone)
@@ -389,6 +509,7 @@ describe('Home', () => {
         expect(createLedgerMock).toHaveBeenCalledWith('u1', {
           name: 'Reading',
           defaultState: 'did',
+          stateLabels: { did: 'Yes', didnt: 'No' },
           timezone: expectedTimezone,
           startDate: expectedStartDate,
           color: 'clay',
@@ -470,7 +591,7 @@ describe('Home', () => {
 
     describe('account deletion', () => {
       it('passes the auth provider id through to Settings', () => {
-        renderSettledHome({ authProviderId: 'google.com' })
+        renderSettledHome({ user: makeUser({ providerId: 'google.com' }) })
 
         fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
 
@@ -478,7 +599,7 @@ describe('Home', () => {
       })
 
       it('reauthenticates with a password, then deletes all data, then deletes the Auth account, in that order', async () => {
-        renderSettledHome({ authProviderId: 'password' })
+        renderSettledHome({ user: makeUser({ providerId: 'password' }) })
         const order: string[] = []
         reauthenticateWithPasswordMock.mockImplementation(async () => {
           order.push('reauth')
@@ -502,7 +623,7 @@ describe('Home', () => {
       })
 
       it('reauthenticates with Google, not a password, for a Google-provider account', async () => {
-        renderSettledHome({ authProviderId: 'google.com' })
+        renderSettledHome({ user: makeUser({ providerId: 'google.com' }) })
 
         fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
         fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }))
@@ -516,7 +637,7 @@ describe('Home', () => {
       })
 
       it('does not delete Auth data when reauthentication fails, leaving Firestore data untouched', async () => {
-        renderSettledHome({ authProviderId: 'password' })
+        renderSettledHome({ user: makeUser({ providerId: 'password' }) })
         reauthenticateWithPasswordMock.mockRejectedValue({ code: 'auth/requires-recent-login' })
 
         fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -530,7 +651,7 @@ describe('Home', () => {
       })
 
       it('does not delete the Auth account when Firestore data deletion fails', async () => {
-        renderSettledHome({ authProviderId: 'password' })
+        renderSettledHome({ user: makeUser({ providerId: 'password' }) })
         deleteAllUserDataMock.mockRejectedValue(new Error('offline'))
 
         fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -549,10 +670,10 @@ describe('Home', () => {
 
     // The full onboarding/orientation experience now always runs pre-auth
     // (see App's OnboardingOrientation), before any account or ledger
-    // exists -- Home itself never auto-starts a tour, regardless of uid or
+    // exists -- Home itself never auto-starts a tour, regardless of user or
     // any stored record. See App.test.tsx for that pre-auth coverage.
     it('never auto-starts, for any account', () => {
-      render(<Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} authProviderId="password" />)
+      renderSettledHome()
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
     })
 
@@ -567,9 +688,7 @@ describe('Home', () => {
     })
 
     it('makes the main content inert while replaying, so it cannot be interacted with underneath', () => {
-      const { container } = render(
-        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} authProviderId="password" />,
-      )
+      const { container } = renderSettledHome()
 
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
       fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
@@ -578,9 +697,7 @@ describe('Home', () => {
     })
 
     it('closes on Skip and leaves the main content interactive again, without writing or touching any onboarding record', () => {
-      const { container } = render(
-        <Home uid="u1" ledgers={[ledger]} activeLedger={ledger} onSwitchLedger={vi.fn()} authProviderId="password" />,
-      )
+      const { container } = renderSettledHome()
       const storageWrites = vi.spyOn(Storage.prototype, 'setItem')
 
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))

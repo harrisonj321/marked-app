@@ -87,7 +87,26 @@ describe('createLedger', () => {
       timezone: 'UTC',
       startDate: '2026-08-10',
       color: undefined,
+      stateLabels: undefined,
     })
+  })
+
+  it('includes and returns stateLabels when provided by the creation form', async () => {
+    const created = await createLedger(UID, {
+      name: 'Reading',
+      defaultState: 'did',
+      stateLabels: { did: 'Yes', didnt: 'No' },
+      timezone: 'UTC',
+      startDate: '2026-08-10',
+    })
+
+    expect(setDocMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ stateLabels: { did: 'Yes', didnt: 'No' } }),
+    )
+    expect(created).toEqual(
+      expect.objectContaining({ stateLabels: { did: 'Yes', didnt: 'No' } }),
+    )
   })
 
   it('includes color only when provided', async () => {
