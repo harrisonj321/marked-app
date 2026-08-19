@@ -18,29 +18,45 @@ function App() {
   // visible before the orientation is. Read once at mount: whether this
   // visitor finishes it later this session is tracked separately below, not
   // by re-reading storage on every render.
-  const [orientationDone, setOrientationDone] = useState(() => hasCompletedOnboarding())
+  // VITE_FORCE_ONBOARDING is a temporary escape hatch -- usable in any
+  // environment, including Production, while testing the onboarding flow --
+  // for repeatedly seeing the full pre-auth orientation without clearing
+  // site data: when set, this device's stored completion is ignored on
+  // load, so the orientation always starts fresh. It still writes the
+  // normal completion record on finish (below), and once set,
+  // orientationDone still only flips true within this loaded session -- so
+  // completing/skipping never loops back until the next fresh reload/open.
+  // Off (the default), behavior is untouched.
+  const forceOnboarding = import.meta.env.VITE_FORCE_ONBOARDING === 'true'
+  const [orientationDone, setOrientationDone] = useState(() =>
+    forceOnboarding ? false : hasCompletedOnboarding(),
+  )
 
   if (authLoading) {
     return <LoadingScreen />
   }
 
+  // Boot order: the full onboarding/orientation experience before sign-in --
+  // never split across the auth boundary, never reversed. See CLAUDE.md's
+  // desired new-user sequence. Ordinarily (forceOnboarding off) an
+  // already-authenticated session always skips straight past this,
+  // regardless of orientationDone -- restoring an existing session is not a
+  // first-time visit. Under forceOnboarding, though, "every fresh load"
+  // means every fresh load, including one that restores an authenticated
+  // session, so the gate applies to both signed-in and signed-out visitors
+  // there.
+  if (!orientationDone && (forceOnboarding || !user)) {
+    return (
+      <OnboardingOrientation
+        onFinish={(status) => {
+          saveOnboardingCompletion(status)
+          setOrientationDone(true)
+        }}
+      />
+    )
+  }
+
   if (!user) {
-    // Boot order: the full onboarding/orientation experience before sign-in
-    // -- never split across the auth boundary, never reversed. See
-    // CLAUDE.md's desired new-user sequence. An already-authenticated
-    // session always skips straight past this, regardless of
-    // orientationDone; this branch only ever applies to a signed-out
-    // visitor.
-    if (!orientationDone) {
-      return (
-        <OnboardingOrientation
-          onFinish={(status) => {
-            saveOnboardingCompletion(status)
-            setOrientationDone(true)
-          }}
-        />
-      )
-    }
     return <SignIn authError={authError} />
   }
 

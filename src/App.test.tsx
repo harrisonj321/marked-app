@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { getTodayKey, resolveDeviceTimezone } from './domain/date'
 import { hasCompletedOnboarding, saveOnboardingCompletion } from './data/onboarding'
@@ -250,6 +250,163 @@ describe('App', () => {
       expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/flip today's mark/i)).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('VITE_FORCE_ONBOARDING', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
+    it('shows the orientation even though this device already completed it, when the flag is enabled', () => {
+      vi.stubEnv('VITE_FORCE_ONBOARDING', 'true')
+      saveOnboardingCompletion('completed')
+      useAuthUserMock.mockReturnValue({ user: null, loading: false })
+      useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: true, error: null, switchLedger: vi.fn() })
+
+      render(<App />)
+
+      expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
+    })
+
+    it('completing the orientation under the flag still proceeds to sign-in for this session, without looping back', () => {
+      vi.stubEnv('VITE_FORCE_ONBOARDING', 'true')
+      saveOnboardingCompletion('completed')
+      useAuthUserMock.mockReturnValue({ user: null, loading: false })
+      useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: true, error: null, switchLedger: vi.fn() })
+
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: /^Noted\.$/ }))
+      fireEvent(document.querySelector('.onboarding-intro')!, (() => {
+        const event = new Event('animationend', { bubbles: true }) as Event & { animationName: string }
+        event.animationName = 'onboarding-intro-leave'
+        return event
+      })())
+      fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+
+      expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
+      expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
+    })
+
+    it('a simulated fresh reload (fresh mount) shows the orientation again while the flag remains enabled', () => {
+      vi.stubEnv('VITE_FORCE_ONBOARDING', 'true')
+      saveOnboardingCompletion('completed')
+      useAuthUserMock.mockReturnValue({ user: null, loading: false })
+      useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: true, error: null, switchLedger: vi.fn() })
+
+      const first = render(<App />)
+      fireEvent.click(first.getByRole('button', { name: 'Skip' }))
+      expect(first.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
+      first.unmount()
+
+      // hasCompletedOnboarding() is true here (skip persisted it normally),
+      // but a fresh mount under the flag still ignores that stored record.
+      expect(hasCompletedOnboarding()).toBe(true)
+      const second = render(<App />)
+      expect(second.getByText(/not a habit tracker/i)).toBeInTheDocument()
+    })
+
+    it('leaves normal persisted behavior unchanged when the flag is disabled', () => {
+      saveOnboardingCompletion('completed')
+      useAuthUserMock.mockReturnValue({ user: null, loading: false })
+      useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: true, error: null, switchLedger: vi.fn() })
+
+      render(<App />)
+
+      expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument()
+    })
+
+    // "Every fresh load" is literal: it must also apply to a load that
+    // restores an already-authenticated session, not just a signed-out
+    // visitor -- unlike the ordinary (flag-off) boot order, where an
+    // authenticated session always skips the pre-auth orientation outright.
+    describe('with an already-authenticated session', () => {
+      function skipOrientation() {
+        fireEvent.click(screen.getByRole('button', { name: /^Noted\.$/ }))
+        const event = new Event('animationend', { bubbles: true }) as Event & { animationName: string }
+        event.animationName = 'onboarding-intro-leave'
+        fireEvent(document.querySelector('.onboarding-intro')!, event)
+        fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+      }
+
+      it('shows the orientation first, even though this device already completed it and the session restores as signed in', () => {
+        vi.stubEnv('VITE_FORCE_ONBOARDING', 'true')
+        saveOnboardingCompletion('completed')
+        useAuthUserMock.mockReturnValue({ user: { uid: 'u1' }, loading: false })
+        useLedgersMock.mockReturnValue({
+          ledgers: [ledger],
+          activeLedger: ledger,
+          loading: false,
+          error: null,
+          switchLedger: vi.fn(),
+        })
+
+        render(<App />)
+
+        expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
+        expect(screen.queryByText('Worked out')).not.toBeInTheDocument()
+      })
+
+      it('completing/skipping the orientation continues the already-authenticated session straight to Home, not SignIn', () => {
+        vi.stubEnv('VITE_FORCE_ONBOARDING', 'true')
+        saveOnboardingCompletion('completed')
+        useAuthUserMock.mockReturnValue({ user: { uid: 'u1' }, loading: false })
+        useLedgersMock.mockReturnValue({
+          ledgers: [ledger],
+          activeLedger: ledger,
+          loading: false,
+          error: null,
+          switchLedger: vi.fn(),
+        })
+
+        render(<App />)
+        skipOrientation()
+
+        expect(screen.getByText('Worked out')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument()
+        expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
+      })
+
+      it('a fresh reload with the same authenticated session shows the orientation again while the flag remains enabled', () => {
+        vi.stubEnv('VITE_FORCE_ONBOARDING', 'true')
+        saveOnboardingCompletion('completed')
+        useAuthUserMock.mockReturnValue({ user: { uid: 'u1' }, loading: false })
+        useLedgersMock.mockReturnValue({
+          ledgers: [ledger],
+          activeLedger: ledger,
+          loading: false,
+          error: null,
+          switchLedger: vi.fn(),
+        })
+
+        const first = render(<App />)
+        skipOrientation()
+        expect(first.getByText('Worked out')).toBeInTheDocument()
+        first.unmount()
+
+        const second = render(<App />)
+        expect(second.getByText(/not a habit tracker/i)).toBeInTheDocument()
+        expect(second.queryByText('Worked out')).not.toBeInTheDocument()
+      })
+
+      it('leaves normal already-authenticated behavior unchanged when the flag is disabled -- straight to Home, no orientation', () => {
+        saveOnboardingCompletion('completed')
+        useAuthUserMock.mockReturnValue({ user: { uid: 'u1' }, loading: false })
+        useLedgersMock.mockReturnValue({
+          ledgers: [ledger],
+          activeLedger: ledger,
+          loading: false,
+          error: null,
+          switchLedger: vi.fn(),
+        })
+
+        render(<App />)
+
+        expect(screen.queryByText(/not a habit tracker/i)).not.toBeInTheDocument()
+        expect(screen.getByText('Worked out')).toBeInTheDocument()
+      })
     })
   })
 
