@@ -11,7 +11,10 @@
     "test:run": "vitest run",
     "test:rules": "firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.ts\"",
     "lint": "eslint .",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "verify:firebase-target": "bash scripts/verify-firebase-target.sh",
+    "predeploy:rules": "npm run verify:firebase-target",
+    "deploy:rules": "firebase deploy --only firestore:rules --project marked-app-733c0"
   },
   "dependencies": {
     "firebase": "^12.17.1",

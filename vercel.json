@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/__/auth/:path*",
-      "destination": "https://noted-app-c7d53.firebaseapp.com/__/auth/:path*"
+      "destination": "https://marked-app-733c0.firebaseapp.com/__/auth/:path*"
     }
   ]
 }
