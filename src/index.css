@@ -394,7 +394,7 @@ fieldset label {
    or dragging the ink there and releasing, moves it.
 
    The untouched-day default always renders on the left (--x: 0) and the
-   actively-Noted state on the right (--x: 1); TodayToggle sets
+   actively-Marked state on the right (--x: 1); TodayToggle sets
    data-position from which underlying DayState is current relative to the
    tracker's default, not from a fixed did/didnt order. touch-action is
    pan-y, not none or manipulation: this is a horizontal-only control, so
@@ -826,7 +826,7 @@ fieldset label {
 }
 
 /* The two fixed roles: Default (what an untouched day resolves to) and
-   Noted. (what the user actively marks). Each is just a labeled text
+   Marked. (what the user actively marks). Each is just a labeled text
    field for its wording; the swap control between them is the only way
    to change which underlying state is currently the default. */
 .state-roles {
@@ -1168,7 +1168,7 @@ fieldset label {
   flex: 1;
 }
 
-/* The one accent-filled treatment already established elsewhere in Noted.
+/* The one accent-filled treatment already established elsewhere in Marked.
    (the update banner's Reload, the active count chip) -- reused here so the
    forward/progression action in the tour reads as clearly primary without
    inventing a new visual language. */
@@ -1275,7 +1275,7 @@ fieldset label {
   white-space: pre-line;
 }
 
-/* The turn: what Noted. isn't stays muted; what it is lands in full ink.
+/* The turn: what Marked. isn't stays muted; what it is lands in full ink.
    Position and wording carry the shift too, so it never depends on the
    color difference alone. */
 .onboarding-line-turn {
@@ -1393,7 +1393,7 @@ fieldset label {
   }
 
   /* Fill-mode both hides the period (its own keyframe start) while the
-     wordmark rises, so "Noted" lands first and the period stamps onto it
+     wordmark rises, so "Marked" lands first and the period stamps onto it
      a beat later -- the product's whole gesture, performed by the brand. */
   .onboarding-wordmark-period {
     animation: onboarding-stamp 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;

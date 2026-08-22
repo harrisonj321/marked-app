@@ -72,7 +72,7 @@ function App() {
   if (error) {
     return (
       <main className="screen screen-center">
-        <p className="brand">Noted.</p>
+        <p className="brand">Marked.</p>
         <p role="alert" className="message">
           {error}
         </p>

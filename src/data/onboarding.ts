@@ -16,16 +16,25 @@ import {
  * OnboardingOrientation -- so there is no account yet to key this by. One
  * fixed, device-scoped key covers every visitor to this device/browser.
  */
-const STORAGE_KEY = 'noted:onboarding:device'
+const STORAGE_KEY = 'marked:onboarding:device'
+
+/**
+ * Prefix this app stored onboarding completion under while it was still
+ * called Noted. -- kept only so a device that already sat through the full
+ * experience under the old name isn't made to redo it just because the
+ * storage key changed underneath it during the Marked rename.
+ */
+const LEGACY_NOTED_STORAGE_KEY_PREFIX = 'noted:onboarding:'
 
 /**
  * Whether this device has already completed or skipped the full
  * onboarding/orientation experience. Also true if this device holds a
- * *legacy* per-account record (keys of the form `noted:onboarding:<uid>`,
+ * *legacy* per-account record (keys of the form `marked:onboarding:<uid>`,
  * from before the orientation ran entirely pre-auth) -- an account that
  * already sat through the full experience once under the old architecture
  * must not be made to redo it just because the storage model changed
- * underneath it.
+ * underneath it. The same applies to any pre-rename `noted:onboarding:*`
+ * key, device- or account-scoped -- see LEGACY_NOTED_STORAGE_KEY_PREFIX.
  */
 export function hasCompletedOnboarding(): boolean {
   try {
@@ -37,7 +46,7 @@ export function hasCompletedOnboarding(): boolean {
       if (
         key &&
         key !== STORAGE_KEY &&
-        key.startsWith('noted:onboarding:') &&
+        (key.startsWith('marked:onboarding:') || key.startsWith(LEGACY_NOTED_STORAGE_KEY_PREFIX)) &&
         isOnboardingRecord(parseStoredRecord(window.localStorage.getItem(key)))
       ) {
         return true

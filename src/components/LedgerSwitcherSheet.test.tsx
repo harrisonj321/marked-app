@@ -144,13 +144,13 @@ describe('LedgerSwitcherSheet', () => {
       expect(screen.getByLabelText(/what are you tracking/i)).toBeInTheDocument()
     })
 
-    it('shows a compact form: name, Default state, Noted state, color, and Save -- no Yes/No radios or a Customize disclosure', () => {
+    it('shows a compact form: name, Default state, Marked state, color, and Save -- no Yes/No radios or a Customize disclosure', () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
 
       expect(screen.getByLabelText(/what are you tracking/i)).toBeInTheDocument()
       expect(screen.getByLabelText('Default state')).toBeInTheDocument()
-      expect(screen.getByLabelText('Noted state')).toBeInTheDocument()
+      expect(screen.getByLabelText('Marked state')).toBeInTheDocument()
       expect(screen.getByRole('group', { name: 'Color' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
       expect(screen.queryByRole('radio')).not.toBeInTheDocument()
@@ -164,7 +164,7 @@ describe('LedgerSwitcherSheet', () => {
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
 
       expect(screen.getByLabelText('Default state')).toHaveValue('')
-      expect(screen.getByLabelText('Noted state')).toHaveValue('')
+      expect(screen.getByLabelText('Marked state')).toHaveValue('')
     })
 
     it('shows the helper copy explaining what the default field means', () => {
@@ -180,20 +180,20 @@ describe('LedgerSwitcherSheet', () => {
         fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
 
         const defaultField = screen.getByLabelText('Default state')
-        const notedField = screen.getByLabelText('Noted state')
+        const markedField = screen.getByLabelText('Marked state')
         const firstDefault = defaultField.getAttribute('placeholder')
-        const firstNoted = notedField.getAttribute('placeholder')
+        const firstMarked = markedField.getAttribute('placeholder')
 
         act(() => {
           vi.advanceTimersByTime(3000)
         })
 
         const secondDefault = defaultField.getAttribute('placeholder')
-        const secondNoted = notedField.getAttribute('placeholder')
+        const secondMarked = markedField.getAttribute('placeholder')
 
         // The pair changed together, not independently.
         expect(secondDefault).not.toBe(firstDefault)
-        expect(secondNoted).not.toBe(firstNoted)
+        expect(secondMarked).not.toBe(firstMarked)
       } finally {
         vi.useRealTimers()
       }
@@ -236,7 +236,7 @@ describe('LedgerSwitcherSheet', () => {
       renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
 
-      expect(screen.queryByText(/not sure what to note/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/not sure what to mark/i)).not.toBeInTheDocument()
       // A suggestion chip, not the existing "Worked out" ledger row (which
       // is legitimately in the list already).
       expect(screen.queryByRole('button', { name: 'Ate out' })).not.toBeInTheDocument()
@@ -266,7 +266,7 @@ describe('LedgerSwitcherSheet', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       expect(screen.getByLabelText('Default state')).toHaveValue('')
-      expect(screen.getByLabelText('Noted state')).toHaveValue('')
+      expect(screen.getByLabelText('Marked state')).toHaveValue('')
     })
 
     it('there are no hardcoded "I did it"/"I didn\'t do it" choices', () => {
@@ -281,7 +281,7 @@ describe('LedgerSwitcherSheet', () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent(/enter a name/i)
@@ -292,14 +292,14 @@ describe('LedgerSwitcherSheet', () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent(/enter a label/i)
       expect(onCreate).not.toHaveBeenCalled()
     })
 
-    it('requires an actual value in the Noted state field', async () => {
+    it('requires an actual value in the Marked state field', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
@@ -315,19 +315,19 @@ describe('LedgerSwitcherSheet', () => {
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: '   ' } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent(/enter a label/i)
       expect(onCreate).not.toHaveBeenCalled()
     })
 
-    it('persists the Default state field as the ledger default and the Noted state field as the other state, with a chosen color', async () => {
+    it('persists the Default state field as the ledger default and the Marked state field as the other state, with a chosen color', async () => {
       const { onCreate } = renderSheet()
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'Rough' } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Good' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Good' } })
       fireEvent.click(screen.getByRole('button', { name: 'Moss' }))
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -346,7 +346,7 @@ describe('LedgerSwitcherSheet', () => {
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: '  Rough  ' } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: '  Good  ' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: '  Good  ' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
@@ -367,7 +367,7 @@ describe('LedgerSwitcherSheet', () => {
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
@@ -382,7 +382,7 @@ describe('LedgerSwitcherSheet', () => {
       fireEvent.click(screen.getByRole('button', { name: 'New ledger' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent('Could not save. Try again.')
@@ -425,11 +425,11 @@ describe('LedgerSwitcherSheet', () => {
       expect(screen.queryAllByRole('listitem')).toHaveLength(0)
     })
 
-    it('shows the same compact form as adding any later ledger -- Default state and Noted state fields, no radios or a Customize disclosure', () => {
+    it('shows the same compact form as adding any later ledger -- Default state and Marked state fields, no radios or a Customize disclosure', () => {
       renderFirstLedgerSheet()
 
       expect(screen.getByLabelText('Default state')).toBeInTheDocument()
-      expect(screen.getByLabelText('Noted state')).toBeInTheDocument()
+      expect(screen.getByLabelText('Marked state')).toBeInTheDocument()
       expect(screen.queryByRole('radio')).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Customize states' })).not.toBeInTheDocument()
     })
@@ -468,7 +468,7 @@ describe('LedgerSwitcherSheet', () => {
       const { onCreate, onDismiss } = renderFirstLedgerSheet()
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
@@ -480,14 +480,14 @@ describe('LedgerSwitcherSheet', () => {
     it('shows the collapsed first-time suggestions helper', () => {
       renderFirstLedgerSheet()
 
-      const toggle = screen.getByRole('button', { name: /not sure what to note/i })
+      const toggle = screen.getByRole('button', { name: /not sure what to mark/i })
       expect(toggle).toHaveAttribute('aria-expanded', 'false')
       expect(screen.queryByRole('button', { name: 'Worked out' })).not.toBeInTheDocument()
     })
 
     it('expands to show all six suggestions', () => {
       renderFirstLedgerSheet()
-      fireEvent.click(screen.getByRole('button', { name: /not sure what to note/i }))
+      fireEvent.click(screen.getByRole('button', { name: /not sure what to mark/i }))
 
       expect(screen.getByRole('button', { name: 'Worked out' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Ate out' })).toBeInTheDocument()
@@ -499,7 +499,7 @@ describe('LedgerSwitcherSheet', () => {
 
     it('selecting a suggestion only fills the name field and collapses the helper', () => {
       renderFirstLedgerSheet()
-      fireEvent.click(screen.getByRole('button', { name: /not sure what to note/i }))
+      fireEvent.click(screen.getByRole('button', { name: /not sure what to mark/i }))
       fireEvent.click(screen.getByRole('button', { name: 'Headache' }))
 
       expect(screen.getByLabelText(/what are you tracking/i)).toHaveValue('Headache')
@@ -508,11 +508,11 @@ describe('LedgerSwitcherSheet', () => {
 
     it('a selected suggestion remains freely editable, not a locked template', async () => {
       const { onCreate } = renderFirstLedgerSheet()
-      fireEvent.click(screen.getByRole('button', { name: /not sure what to note/i }))
+      fireEvent.click(screen.getByRole('button', { name: /not sure what to mark/i }))
       fireEvent.click(screen.getByRole('button', { name: 'Good day' }))
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Meditated' } })
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Yes' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {
@@ -527,7 +527,7 @@ describe('LedgerSwitcherSheet', () => {
       const { onCreate } = renderFirstLedgerSheet()
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Headache' } })
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: "Didn't" } })
-      fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Had one' } })
+      fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Had one' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {

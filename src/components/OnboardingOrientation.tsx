@@ -112,7 +112,7 @@ function DemoShell({ stage }: DemoShellProps) {
     <main className="screen home demo-home" data-stage={stage} inert>
       <header className="home-header">
         <p className="brand" data-demo="brand">
-          Noted.
+          Marked.
         </p>
         <div className="home-header-actions">
           <button

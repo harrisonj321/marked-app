@@ -139,7 +139,7 @@ interface OnboardingTourProps {
   /**
    * How the coach steps present themselves.
    *
-   * 'spotlight' (the default, used by Settings' "Tour Noted." replay over
+   * 'spotlight' (the default, used by Settings' "Tour Marked." replay over
    * the real Home): a dimming backdrop with a cutout gliding between the
    * actual controls, and a callout card near each one -- annotation of a
    * real screen the user already lives in.
@@ -162,7 +162,7 @@ interface OnboardingTourProps {
  * Drives the first-run/replayable tour: one staged full-screen intro, four
  * coach marks anchored to real, on-screen controls, then an optional PWA
  * install step. Always runs over a screen that stays mounted (and inert)
- * underneath the whole time -- the real Home for Settings' "Tour Noted."
+ * underneath the whole time -- the real Home for Settings' "Tour Marked."
  * replay, or the neutral demo shell for the pre-auth orientation (see
  * OnboardingOrientation) -- so this component only ever needs to render
  * whichever single step is current. The one exception to "single step"
@@ -366,10 +366,10 @@ interface IntroStepProps {
 }
 
 /**
- * The one brand moment Noted. allows itself. The wordmark rises, its period
+ * The one brand moment Marked. allows itself. The wordmark rises, its period
  * stamps in with the same spring the today-toggle settles with, and the
  * five lines land one at a time -- what it isn't in muted ink, what it is
- * in full ink. The primary action reads "Noted." because pressing it is the
+ * in full ink. The primary action reads "Marked." because pressing it is the
  * product's whole gesture: acknowledge, move on.
  *
  * Focus follows visibility: while the staged reveal is still holding the
@@ -429,17 +429,17 @@ function IntroStep({ onPrimary, leaving = false, onLeft }: IntroStepProps) {
     >
       <div className="onboarding-intro-body">
         {/* Explicit label: the period span's inline-block display can make
-            some accessible-name computations insert whitespace ("Noted .");
-            the name must read exactly "Noted." regardless of layout. */}
-        <h2 id={headingId} className="onboarding-wordmark" aria-label="Noted.">
-          Noted<span className="onboarding-wordmark-period">.</span>
+            some accessible-name computations insert whitespace ("Marked .");
+            the name must read exactly "Marked." regardless of layout. */}
+        <h2 id={headingId} className="onboarding-wordmark" aria-label="Marked.">
+          Marked<span className="onboarding-wordmark-period">.</span>
         </h2>
         <div className="onboarding-lines">
           <p className="onboarding-line">It's not a habit tracker.</p>
           <p className="onboarding-line">It's not about keeping score.</p>
           <p className="onboarding-line onboarding-line-turn">It's just a ledger of whatever.</p>
           <p className="onboarding-line onboarding-line-turn">It's just visibility.</p>
-          <p className="onboarding-line onboarding-line-turn">It's just Noted.</p>
+          <p className="onboarding-line onboarding-line-turn">It's just Marked.</p>
         </div>
       </div>
       <div ref={footerRef} className="onboarding-footer onboarding-intro-footer">
@@ -450,7 +450,7 @@ function IntroStep({ onPrimary, leaving = false, onLeft }: IntroStepProps) {
           onClick={onPrimary}
           tabIndex={revealed ? undefined : -1}
         >
-          Noted.
+          Marked.
         </button>
       </div>
     </div>
@@ -673,11 +673,11 @@ function InstallStep({ ios, canPromptInstall, onAddToHomeScreen, onNotNow }: Ins
         <h2 id={headingId}>Keep it close</h2>
         {ios ? (
           <p>
-            Add Noted. to your Home Screen if you want it to live alongside your other apps: tap{' '}
+            Add Marked. to your Home Screen if you want it to live alongside your other apps: tap{' '}
             <ShareIcon size={16} /> Share, then &ldquo;Add to Home Screen.&rdquo;
           </p>
         ) : (
-          <p>Add Noted. to your Home Screen if you want it to live alongside your other apps.</p>
+          <p>Add Marked. to your Home Screen if you want it to live alongside your other apps.</p>
         )}
         <div className="onboarding-footer">
           <button type="button" className="onboarding-skip" onClick={onNotNow}>
@@ -688,7 +688,7 @@ function InstallStep({ ios, canPromptInstall, onAddToHomeScreen, onNotNow }: Ins
               Add to Home Screen
             </button>
           ) : (
-            // Noted. cannot verify that Safari's Add to Home Screen steps
+            // Marked. cannot verify that Safari's Add to Home Screen steps
             // were actually completed, so this only acknowledges the
             // instructions rather than implying a confirmed install.
             <button type="button" className="onboarding-primary" onClick={onNotNow}>

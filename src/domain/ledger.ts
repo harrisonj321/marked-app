@@ -20,7 +20,7 @@ export const LEGACY_LEDGER_ID = 'default'
 /**
  * A small, fixed set of muted, cloth-like identifying colors -- not
  * freeform hex, so a ledger's color can never clash with the app's warm,
- * quiet palette. Leads with 'espresso', the original dark brown Noted. has
+ * quiet palette. Leads with 'espresso', the original dark brown Marked. has
  * always used for its one shared accent (see `--color-accent` in
  * index.css): every ledger resolves to a real color from this list (see
  * `resolveLedgerColor`), and espresso is what an otherwise-uncolored ledger

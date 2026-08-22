@@ -27,8 +27,8 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/__\/auth\//],
       },
       manifest: {
-        name: 'Noted.',
-        short_name: 'Noted.',
+        name: 'Marked.',
+        short_name: 'Marked.',
         description: 'A private personal observation log.',
         display: 'standalone',
         start_url: '/',

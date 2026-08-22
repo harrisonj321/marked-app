@@ -146,7 +146,7 @@ describe('App', () => {
       useLedgersMock.mockReturnValue({ ledgers: [], activeLedger: null, loading: true, error: null, switchLedger: vi.fn() })
     })
 
-    // The intro's primary action reads "Noted."; coach steps advance with
+    // The intro's primary action reads "Marked."; coach steps advance with
     // Next and the last one closes with Done -- see OnboardingTour.test.tsx.
     //
     // The staged orientation holds the welcome screen while its exit fade
@@ -161,10 +161,10 @@ describe('App', () => {
     }
 
     function clickNext() {
-      const button = screen.getByRole('button', { name: /^(Noted\.|Next|Done)$/ })
+      const button = screen.getByRole('button', { name: /^(Marked\.|Next|Done)$/ })
       const label = button.textContent
       fireEvent.click(button)
-      if (label === 'Noted.') {
+      if (label === 'Marked.') {
         fireAnimationEnd(document.querySelector('.onboarding-intro')!, 'onboarding-intro-leave')
       }
       if (label === 'Done') {
@@ -363,7 +363,7 @@ describe('App', () => {
 
       render(<App />)
 
-      fireEvent.click(screen.getByRole('button', { name: /^Noted\.$/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^Marked\.$/ }))
       fireEvent(document.querySelector('.onboarding-intro')!, (() => {
         const event = new Event('animationend', { bubbles: true }) as Event & { animationName: string }
         event.animationName = 'onboarding-intro-leave'
@@ -410,7 +410,7 @@ describe('App', () => {
     // authenticated session always skips the pre-auth orientation outright.
     describe('with an already-authenticated session', () => {
       function skipOrientation() {
-        fireEvent.click(screen.getByRole('button', { name: /^Noted\.$/ }))
+        fireEvent.click(screen.getByRole('button', { name: /^Marked\.$/ }))
         const event = new Event('animationend', { bubbles: true }) as Event & { animationName: string }
         event.animationName = 'onboarding-intro-leave'
         fireEvent(document.querySelector('.onboarding-intro')!, event)
@@ -504,7 +504,7 @@ describe('App', () => {
 
     // The real Home shell is present underneath (brand still shows),
     // not swapped out for a different screen.
-    expect(screen.getByText('Noted.')).toBeInTheDocument()
+    expect(screen.getByText('Marked.')).toBeInTheDocument()
     expect(screen.getByText(/what are you tracking/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Ledgers' })).toBeInTheDocument()
   })
@@ -517,7 +517,7 @@ describe('App', () => {
 
     fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
     fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'No' } })
-    fireEvent.change(screen.getByLabelText('Noted state'), { target: { value: 'Yes' } })
+    fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Yes' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     const expectedTimezone = resolveDeviceTimezone()

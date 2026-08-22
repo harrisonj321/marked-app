@@ -21,17 +21,27 @@ describe('onboarding orientation persistence', () => {
   })
 
   it('treats any existing legacy per-account record as proof the orientation was already completed, for backward compatibility with accounts from before it ran entirely pre-auth', () => {
+    window.localStorage.setItem('marked:onboarding:u1', JSON.stringify({ version: 1, status: 'completed' }))
+    expect(hasCompletedOnboarding()).toBe(true)
+  })
+
+  it('treats a pre-rename noted:onboarding:device record as proof of completion, for backward compatibility with devices from before the Marked rename', () => {
+    window.localStorage.setItem('noted:onboarding:device', JSON.stringify({ version: 1, status: 'completed' }))
+    expect(hasCompletedOnboarding()).toBe(true)
+  })
+
+  it('treats a pre-rename noted:onboarding:<uid> record as proof of completion, for backward compatibility with accounts from before the Marked rename', () => {
     window.localStorage.setItem('noted:onboarding:u1', JSON.stringify({ version: 1, status: 'completed' }))
     expect(hasCompletedOnboarding()).toBe(true)
   })
 
   it('treats a corrupted stored value as incomplete', () => {
-    window.localStorage.setItem('noted:onboarding:device', 'not json')
+    window.localStorage.setItem('marked:onboarding:device', 'not json')
     expect(hasCompletedOnboarding()).toBe(false)
   })
 
   it('treats a validly-parsed but wrong-shaped stored value as incomplete', () => {
-    window.localStorage.setItem('noted:onboarding:device', JSON.stringify({ foo: 'bar' }))
+    window.localStorage.setItem('marked:onboarding:device', JSON.stringify({ foo: 'bar' }))
     expect(hasCompletedOnboarding()).toBe(false)
   })
 

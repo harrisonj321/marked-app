@@ -23,7 +23,7 @@ interface SettingsSheetProps {
   onSaveStateLabels: (stateLabels: StateLabels) => Promise<void>
   onSaveColor: (color: LedgerColor) => Promise<void>
   onDelete: () => Promise<void>
-  onTourNoted: () => void
+  onTourMarked: () => void
   onDismiss: () => void
   /** The signed-in account's auth provider -- 'password' or 'google.com' -- decides which reauthentication step account deletion asks for. */
   authProviderId: string
@@ -50,7 +50,7 @@ export function SettingsSheet({
   onSaveStateLabels,
   onSaveColor,
   onDelete,
-  onTourNoted,
+  onTourMarked,
   onDismiss,
   authProviderId,
   onDeleteAccount,
@@ -62,7 +62,7 @@ export function SettingsSheet({
   const [colorDraft, setColorDraft] = useState<LedgerColor>(color)
   const [nameError, setNameError] = useState<string | null>(null)
   const [defaultLabelError, setDefaultLabelError] = useState<string | null>(null)
-  const [notedLabelError, setNotedLabelError] = useState<string | null>(null)
+  const [markedLabelError, setMarkedLabelError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -79,7 +79,7 @@ export function SettingsSheet({
   const accountPasswordId = useId()
   const nameId = useId()
   const defaultLabelId = useId()
-  const notedLabelId = useId()
+  const markedLabelId = useId()
 
   // The ledger is live, so the stored name, default, labels, and color can
   // change under an open sheet (another device). Re-sync during render
@@ -120,10 +120,10 @@ export function SettingsSheet({
   }
 
   // The "Default" field always edits the label of whichever underlying
-  // DayState is currently draft's default, and "Noted." always edits the
+  // DayState is currently draft's default, and "Marked." always edits the
   // other -- so swapping just flips draft, and the two fields'  contents
   // trade places with it, keeping the role/position fixed.
-  const notedState: DayState = otherDayState(draft)
+  const markedState: DayState = otherDayState(draft)
 
   function handleSwap() {
     setDraft((current) => otherDayState(current))
@@ -134,20 +134,20 @@ export function SettingsSheet({
 
     const nameValidation = validateTrackerName(nameDraft)
     const defaultValidation = validateStateLabel(labelDrafts[draft])
-    const notedValidation = validateStateLabel(labelDrafts[notedState])
+    const markedValidation = validateStateLabel(labelDrafts[markedState])
 
     setNameError(nameValidation.valid ? null : nameValidation.error)
     setDefaultLabelError(defaultValidation.valid ? null : defaultValidation.error)
-    setNotedLabelError(notedValidation.valid ? null : notedValidation.error)
+    setMarkedLabelError(markedValidation.valid ? null : markedValidation.error)
 
-    if (!nameValidation.valid || !defaultValidation.valid || !notedValidation.valid) {
+    if (!nameValidation.valid || !defaultValidation.valid || !markedValidation.valid) {
       return
     }
 
     const nextLabels: StateLabels = {
       ...labelDrafts,
       [draft]: defaultValidation.label,
-      [notedState]: notedValidation.label,
+      [markedState]: markedValidation.label,
     }
 
     const nameChanged = nameValidation.name !== syncedName
@@ -363,20 +363,20 @@ export function SettingsSheet({
               </button>
 
               <div className="state-role-row">
-                <label htmlFor={notedLabelId}>Noted.</label>
+                <label htmlFor={markedLabelId}>Marked.</label>
                 <input
-                  id={notedLabelId}
+                  id={markedLabelId}
                   type="text"
-                  value={labelDrafts[notedState]}
+                  value={labelDrafts[markedState]}
                   onChange={(event) =>
-                    setLabelDrafts((current) => ({ ...current, [notedState]: event.target.value }))
+                    setLabelDrafts((current) => ({ ...current, [markedState]: event.target.value }))
                   }
                   maxLength={STATE_LABEL_MAX_LENGTH}
                 />
               </div>
-              {notedLabelError && (
+              {markedLabelError && (
                 <p role="alert" className="message">
-                  {notedLabelError}
+                  {markedLabelError}
                 </p>
               )}
             </div>
@@ -416,8 +416,8 @@ export function SettingsSheet({
           </form>
 
           <div className="settings-secondary-actions">
-            <button type="button" className="footer-link" onClick={onTourNoted}>
-              Tour Noted.
+            <button type="button" className="footer-link" onClick={onTourMarked}>
+              Tour Marked.
             </button>
           </div>
 

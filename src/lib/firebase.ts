@@ -30,7 +30,7 @@ function assertFirebaseConfig(
 
 const firebaseConfig = assertFirebaseConfig(rawConfig)
 
-// Only Authentication and Firestore are Noted. features. Storage and
+// Only Authentication and Firestore are Marked. features. Storage and
 // Analytics must not be initialized even though the standard Firebase
 // web config shape includes a storage bucket value.
 export const app = initializeApp(firebaseConfig)

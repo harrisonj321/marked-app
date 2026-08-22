@@ -32,8 +32,8 @@ export function subscribeAuthUser(onChange: (user: User | null) => void): Unsubs
  * sign-in result back to this page, proactively opened specifically on
  * iOS/mobile/Safari -- confirmed by reading the installed
  * @firebase/auth package's BrowserPopupRedirectResolver, not assumed. With
- * the old cross-origin authDomain (noted-app-c7d53.firebaseapp.com vs. the
- * real the-noted-app.vercel.app), that relay crossed origins on WebKit --
+ * a cross-origin authDomain (the default *.firebaseapp.com value vs. the
+ * app's real production domain), that relay crosses origins on WebKit --
  * the engine every iOS browser is required to use, Firefox for iOS
  * included -- which is well known for restricting exactly this kind of
  * cross-origin storage/messaging. That is a plausible explanation for this
@@ -58,7 +58,7 @@ export async function signInWithGoogle(): Promise<void> {
   }
 }
 
-const GOOGLE_REDIRECT_PENDING_KEY = 'noted:auth:google-redirect-pending'
+const GOOGLE_REDIRECT_PENDING_KEY = 'marked:auth:google-redirect-pending'
 
 /**
  * signInWithRedirect performs a full top-level navigation away from the app

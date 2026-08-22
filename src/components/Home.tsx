@@ -88,7 +88,7 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
   // The full onboarding/orientation tour now always runs pre-auth, before
   // any account exists (see App's OnboardingOrientation) -- Home never
   // auto-starts it. The only remaining entry point is an explicit replay
-  // from Settings' "Tour Noted.", which always walks the whole experience
+  // from Settings' "Tour Marked.", which always walks the whole experience
   // again from the welcome screen and never persists anything: replaying
   // must not corrupt the first-run record this account already has.
   const [tourActive, setTourActive] = useState(false)
@@ -98,7 +98,7 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
     setTourActive(false)
   }
 
-  function handleTourNoted() {
+  function handleTourMarked() {
     setSettingsLedgerId(null)
     setTourActive(true)
   }
@@ -177,7 +177,7 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
     <>
       <main className="screen home home-enter" inert={tourActive || undefined}>
         <header className="home-header">
-          <p className="brand">Noted.</p>
+          <p className="brand">Marked.</p>
           {activeLedger && todayKey && (
             <div className="home-header-actions">
               <button
@@ -196,7 +196,7 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
         <div className="home-main">
           {!user ? (
             <>
-              <h1>Sign in to create and note your first thing.</h1>
+              <h1>Sign in to create and mark your first thing.</h1>
               <SignInActions authError={authError ?? null} />
             </>
           ) : activeLedger ? (
@@ -233,7 +233,7 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
               // empty beige screen if that sheet is ever closed some other
               // way; Sign out stays reachable from the footer regardless.
               <>
-                <h1>Nothing noted yet.</h1>
+                <h1>Nothing marked yet.</h1>
                 <button type="button" onClick={() => setSwitcherOpen(true)}>
                   Create your first ledger
                 </button>
@@ -285,7 +285,7 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
             onSaveStateLabels={(stateLabels) => handleStateLabelsSave(settingsLedger.id, stateLabels)}
             onSaveColor={(color) => handleColorSave(settingsLedger.id, color)}
             onDelete={() => handleDeleteLedger(settingsLedger.id)}
-            onTourNoted={handleTourNoted}
+            onTourMarked={handleTourMarked}
             onDismiss={() => setSettingsLedgerId(null)}
             authProviderId={authProviderId}
             onDeleteAccount={handleDeleteAccount}

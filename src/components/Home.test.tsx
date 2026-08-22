@@ -69,7 +69,7 @@ vi.mock('./SettingsSheet', () => ({
     onSaveDefaultState,
     onSaveColor,
     onDelete,
-    onTourNoted,
+    onTourMarked,
     onDismiss,
     authProviderId,
     onDeleteAccount,
@@ -81,7 +81,7 @@ vi.mock('./SettingsSheet', () => ({
     onSaveDefaultState: (next: 'did' | 'didnt') => Promise<void>
     onSaveColor: (next: string) => Promise<void>
     onDelete: () => Promise<void>
-    onTourNoted: () => void
+    onTourMarked: () => void
     onDismiss: () => void
     authProviderId: string
     onDeleteAccount: (password?: string) => Promise<void>
@@ -103,8 +103,8 @@ vi.mock('./SettingsSheet', () => ({
       <button type="button" onClick={() => void onDeleteAccount('hunter2').catch(reportSaveError)}>
         Delete my account
       </button>
-      <button type="button" onClick={onTourNoted}>
-        Tour Noted.
+      <button type="button" onClick={onTourMarked}>
+        Tour Marked.
       </button>
       <button type="button" onClick={onDismiss}>
         Close settings
@@ -252,9 +252,9 @@ describe('Home', () => {
 
       const main = container.querySelector('main.screen.home')
       expect(main).toBeInTheDocument()
-      expect(main?.querySelector('.home-header .brand')).toHaveTextContent('Noted.')
+      expect(main?.querySelector('.home-header .brand')).toHaveTextContent('Marked.')
       expect(screen.getByTestId('signin-actions')).toBeInTheDocument()
-      expect(screen.getByText(/sign in to create and note your first thing/i)).toBeInTheDocument()
+      expect(screen.getByText(/sign in to create and mark your first thing/i)).toBeInTheDocument()
     })
 
     it('shows no calendar, settings, or sign-out control while signed out', () => {
@@ -353,7 +353,7 @@ describe('Home', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Close switcher' }))
 
         expect(screen.queryByTestId('ledger-switcher-sheet')).not.toBeInTheDocument()
-        expect(screen.getByText('Nothing noted yet.')).toBeInTheDocument()
+        expect(screen.getByText('Nothing marked yet.')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Create your first ledger' })).toBeInTheDocument()
       })
 
@@ -366,7 +366,7 @@ describe('Home', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Create your first ledger' }))
 
         expect(screen.getByTestId('ledger-switcher-sheet')).toBeInTheDocument()
-        expect(screen.queryByText('Nothing noted yet.')).not.toBeInTheDocument()
+        expect(screen.queryByText('Nothing marked yet.')).not.toBeInTheDocument()
       })
 
       it('still offers Sign out from the fallback state -- the user is never trapped', () => {
@@ -382,7 +382,7 @@ describe('Home', () => {
         render(
           <Home user={makeUser()} ledgers={[]} activeLedger={null} ledgersLoading={true} onSwitchLedger={vi.fn()} />,
         )
-        expect(screen.queryByText('Nothing noted yet.')).not.toBeInTheDocument()
+        expect(screen.queryByText('Nothing marked yet.')).not.toBeInTheDocument()
       })
     })
   })
@@ -390,7 +390,7 @@ describe('Home', () => {
   it('renders the brand, date, ledger name, and today section without the calendar', () => {
     renderSettledHome()
 
-    expect(screen.getByText('Noted.')).toBeInTheDocument()
+    expect(screen.getByText('Marked.')).toBeInTheDocument()
     expect(screen.getByText('Today · 08/10/2026')).toBeInTheDocument()
     expect(screen.getByText('Worked out')).toBeInTheDocument()
     expect(screen.getByTestId('today-section')).toHaveTextContent('today-section:ledger-1:did:UTC:var(--ledger-color-espresso)')
@@ -728,7 +728,7 @@ describe('Home', () => {
       renderSettledHome()
 
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Tour Marked.' }))
 
       expect(screen.queryByTestId('settings-sheet')).not.toBeInTheDocument()
       expect(screen.getByText(WELCOME_TEXT)).toBeInTheDocument()
@@ -738,7 +738,7 @@ describe('Home', () => {
       const { container } = renderSettledHome()
 
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Tour Marked.' }))
 
       expect(container.querySelector('main')).toHaveAttribute('inert')
     })
@@ -748,7 +748,7 @@ describe('Home', () => {
       const storageWrites = vi.spyOn(Storage.prototype, 'setItem')
 
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Tour Marked.' }))
       fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()

@@ -1,12 +1,12 @@
-# Noted.
+# Marked.
 
 ## Product Identity
 
-The product name is **Noted.**
+The product name is **Marked.**
 
-The period is intentional and is part of the name. Always write the user-facing product name exactly as `Noted.` unless a technical identifier cannot contain punctuation.
+The period is intentional and is part of the name. Always write the user-facing product name exactly as `Marked.` unless a technical identifier cannot contain punctuation.
 
-Noted. is a private personal observation log.
+Marked. is a private personal observation log.
 
 Its governing principle is:
 
@@ -14,15 +14,25 @@ Its governing principle is:
 
 The app records what happened. It does not decide whether what happened was good, bad, healthy, unhealthy, productive, unproductive, successful, unsuccessful, desirable, or undesirable.
 
-Noted. observes. It does not react.
+Marked. observes. It does not react.
 
 This principle is a product requirement, not merely a copywriting preference.
 
 ---
 
+## Migration Status
+
+This application was originally built and branded **Noted.** and is being migrated to its own dedicated **Marked.** identity and infrastructure. The rename to Marked. is complete in this codebase's product identity, UI copy, and internal naming.
+
+Infrastructure has **not** yet cut over. As of this document, the deployed application still runs against the legacy Firebase project (`noted-app-c7d53`) and the legacy Vercel project (`noted-app`, `https://the-noted-app.vercel.app`) -- see Firebase Project and Deployment Safety below. Do not repoint `.firebaserc`, `.env`, `vercel.json`, production Firebase configuration, or any other pointer away from that legacy infrastructure until a dedicated Marked Firebase project and Vercel project exist and the cutover has been explicitly authorized.
+
+Once dedicated Marked infrastructure exists and cutover is complete, update the Firebase Project and Deployment Safety sections below to describe it, and remove this section.
+
+---
+
 ## Product Philosophy
 
-Noted. exists to make patterns visible without trying to change them.
+Marked. exists to make patterns visible without trying to change them.
 
 Examples of valid things a person might track include:
 
@@ -51,7 +61,7 @@ Do not introduce ideology around starting habits, quitting habits, abstinence, p
 
 ## Core Mental Model
 
-Noted. is inspired by marking events on a simple pocket calendar.
+Marked. is inspired by marking events on a simple pocket calendar.
 
 A day can carry meaning without requiring a formal entry.
 
@@ -90,7 +100,7 @@ The app should feel like marking a paper calendar, not completing a habit tracke
 
 ## Single-Ledger Experience
 
-Noted. may contain many ledgers, but the user experiences only one ledger at a time. Multi-ledger functionality must never turn the primary experience into a dashboard, checklist, or collection of simultaneous actions.
+Marked. may contain many ledgers, but the user experiences only one ledger at a time. Multi-ledger functionality must never turn the primary experience into a dashboard, checklist, or collection of simultaneous actions.
 
 This constraint applies to all ledger configuration below and to any future multi-ledger work; see Ledger Configuration below.
 
@@ -122,7 +132,7 @@ The primary interaction must be extremely fast.
 
 The intended flow is:
 
-1. Open Noted.
+1. Open Marked.
 2. See today's state.
 3. Tap one obvious primary control to flip today's state.
 4. Leave.
@@ -292,7 +302,7 @@ Unless the user explicitly changes the product specification, do not add:
 
 Do not add a feature merely because similar habit-tracking products have it.
 
-Noted. is intentionally not a habit tracker.
+Marked. is intentionally not a habit tracker.
 
 ---
 
@@ -304,7 +314,7 @@ The application should acknowledge user actions without emotionally reacting to 
 
 Good examples:
 
-- `Noted.`
+- `Marked.`
 - `Did`
 - `Didn't`
 - `Add note`
@@ -357,20 +367,22 @@ Keep the dependency surface minimal.
 
 ## Firebase Project
 
-The Firebase project already exists.
+The Firebase project described below is the legacy Noted project this application still runs against -- see Migration Status above. A dedicated Marked Firebase project has not yet been created.
 
-Current Firebase setup:
+Current (legacy) Firebase setup:
 
 - Firebase Web app registered
 - Cloud Firestore Standard edition created
 - Firestore location: `us-west1` (Oregon)
 - Firestore initialized in production mode
 - Google Authentication enabled
-- Email/Password Authentication disabled
+- Email/Password Authentication enabled
 - Phone Authentication disabled
 - Firebase project is on the Spark/no-cost plan
-- Firebase Storage is not required for Noted. and must not be used
+- Firebase Storage is not required for Marked. and must not be used
 - Google Analytics is not required for V1 and must not be added
+
+The same setup -- including both Google and Email/Password Authentication -- must be replicated on the dedicated Marked Firebase project when it is created; see Authentication below for why both providers are required.
 
 The app must remain compatible with the Firebase Spark plan unless the user explicitly authorizes functionality requiring billing.
 
@@ -380,11 +392,10 @@ Do not enable, add, or depend upon a billable Firebase/Google Cloud feature with
 
 ## Authentication
 
-V1 authentication uses Google Sign-In only.
+V1 authentication supports both Google Sign-In and email/password sign-in. Both are implemented and both must remain supported.
 
 Do not implement:
 
-- email/password
 - phone authentication
 - anonymous authentication
 - Apple authentication
@@ -481,7 +492,7 @@ Handle daylight-saving transitions correctly by relying on timezone-aware platfo
 
 ## Offline and PWA Behavior
 
-Noted. should behave like a lightweight installed phone app.
+Marked. should behave like a lightweight installed phone app.
 
 Configure it as an installable PWA.
 
@@ -622,7 +633,7 @@ Never claim success if validation failed.
 
 ### Production Deployment Architecture
 
-- The primary public production frontend is **Vercel**, project `noted-app`, served at `https://the-noted-app.vercel.app`.
+- The primary public production frontend is **Vercel**, project `noted-app`, served at `https://the-noted-app.vercel.app` -- this is the legacy Noted infrastructure described in Migration Status above, and it remains the actual production target until an explicit, approved cutover to dedicated Marked infrastructure.
 - Production deploys happen automatically when commits are pushed to `main`, through the existing Vercel GitHub integration. Pushing `main` *is* the deploy -- do not run a manual Vercel deploy as part of a routine release.
 - Firebase remains the backend platform: Authentication, Cloud Firestore, and Firestore Rules.
 - Firebase Hosting currently holds a working mirror of the frontend but is **not** the normal production deployment target. Do not run `firebase deploy --only hosting` (or a full `firebase deploy`) as part of a routine release unless the user explicitly requests it.
@@ -671,7 +682,7 @@ Do not make commits or push unless the user's instruction permits it.
 
 ## Scope Discipline
 
-The absence of features is part of Noted.'s design.
+The absence of features is part of Marked.'s design.
 
 Do not “improve” the app by making it more like competing trackers.
 

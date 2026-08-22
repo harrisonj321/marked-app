@@ -3,27 +3,27 @@ import { STATE_LABEL_MAX_LENGTH } from '../domain/tracker'
 
 /**
  * Synchronized example pairs shown as cycling placeholders, purely to
- * demonstrate that Noted. can represent many different binaries -- never
+ * demonstrate that Marked. can represent many different binaries -- never
  * treated as a canonical pair, a stored value, or a default selection.
  */
-const PLACEHOLDER_PAIRS: ReadonlyArray<{ defaultState: string; notedState: string }> = [
-  { defaultState: 'No', notedState: 'Yes' },
-  { defaultState: 'Rough', notedState: 'Good' },
-  { defaultState: 'Low', notedState: 'High' },
-  { defaultState: 'Absent', notedState: 'Present' },
+const PLACEHOLDER_PAIRS: ReadonlyArray<{ defaultState: string; markedState: string }> = [
+  { defaultState: 'No', markedState: 'Yes' },
+  { defaultState: 'Rough', markedState: 'Good' },
+  { defaultState: 'Low', markedState: 'High' },
+  { defaultState: 'Absent', markedState: 'Present' },
 ]
 
 const CYCLE_INTERVAL_MS = 2600
 
 interface StateLabelFieldsProps {
   defaultLabelId: string
-  notedLabelId: string
+  markedLabelId: string
   defaultValue: string
-  notedValue: string
+  markedValue: string
   onDefaultChange: (value: string) => void
-  onNotedChange: (value: string) => void
+  onMarkedChange: (value: string) => void
   defaultError: string | null
-  notedError: string | null
+  markedError: string | null
 }
 
 /**
@@ -34,16 +34,16 @@ interface StateLabelFieldsProps {
  */
 export function StateLabelFields({
   defaultLabelId,
-  notedLabelId,
+  markedLabelId,
   defaultValue,
-  notedValue,
+  markedValue,
   onDefaultChange,
-  onNotedChange,
+  onMarkedChange,
   defaultError,
-  notedError,
+  markedError,
 }: StateLabelFieldsProps) {
   const [pairIndex, setPairIndex] = useState(0)
-  const [focusedField, setFocusedField] = useState<'default' | 'noted' | null>(null)
+  const [focusedField, setFocusedField] = useState<'default' | 'marked' | null>(null)
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -81,21 +81,21 @@ export function StateLabelFields({
       </div>
 
       <div className="field">
-        <label htmlFor={notedLabelId}>Noted state</label>
+        <label htmlFor={markedLabelId}>Marked state</label>
         <input
-          id={notedLabelId}
+          id={markedLabelId}
           type="text"
-          value={notedValue}
-          placeholder={focusedField === 'noted' ? '' : pair.notedState}
-          onChange={(event) => onNotedChange(event.target.value)}
-          onFocus={() => setFocusedField('noted')}
-          onBlur={() => setFocusedField((current) => (current === 'noted' ? null : current))}
+          value={markedValue}
+          placeholder={focusedField === 'marked' ? '' : pair.markedState}
+          onChange={(event) => onMarkedChange(event.target.value)}
+          onFocus={() => setFocusedField('marked')}
+          onBlur={() => setFocusedField((current) => (current === 'marked' ? null : current))}
           maxLength={STATE_LABEL_MAX_LENGTH}
           autoComplete="off"
         />
-        {notedError && (
+        {markedError && (
           <p role="alert" className="message">
-            {notedError}
+            {markedError}
           </p>
         )}
       </div>

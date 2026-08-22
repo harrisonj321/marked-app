@@ -35,7 +35,7 @@ interface LedgerSwitcherSheetProps {
 }
 
 /**
- * Noted.'s one surface for picking a ledger: primarily a list to select
+ * Marked.'s one surface for picking a ledger: primarily a list to select
  * from, plus creating a new one -- this is also the exact surface a
  * brand-new account's first ledger is created through (see Home, which
  * auto-opens this straight into the creation form when the account has no
@@ -58,7 +58,7 @@ export function LedgerSwitcherSheet({
   const titleId = useId()
   const nameId = useId()
   const defaultLabelId = useId()
-  const notedLabelId = useId()
+  const markedLabelId = useId()
   const colorLabelId = useId()
 
   // A brand-new account has no ledgers at all, so Home renders this sheet
@@ -71,11 +71,11 @@ export function LedgerSwitcherSheet({
   const [newName, setNewName] = useState('')
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   const [newDefaultLabel, setNewDefaultLabel] = useState('')
-  const [newNotedLabel, setNewNotedLabel] = useState('')
+  const [newMarkedLabel, setNewMarkedLabel] = useState('')
   const [newColor, setNewColor] = useState<LedgerColor>(DEFAULT_LEDGER_COLOR)
   const [newNameError, setNewNameError] = useState<string | null>(null)
   const [defaultLabelError, setDefaultLabelError] = useState<string | null>(null)
-  const [notedLabelError, setNotedLabelError] = useState<string | null>(null)
+  const [markedLabelError, setMarkedLabelError] = useState<string | null>(null)
   const [newFormError, setNewFormError] = useState<string | null>(null)
   const [savingCreate, setSavingCreate] = useState(false)
 
@@ -118,11 +118,11 @@ export function LedgerSwitcherSheet({
     setNewName('')
     setSuggestionsOpen(false)
     setNewDefaultLabel('')
-    setNewNotedLabel('')
+    setNewMarkedLabel('')
     setNewColor(DEFAULT_LEDGER_COLOR)
     setNewNameError(null)
     setDefaultLabelError(null)
-    setNotedLabelError(null)
+    setMarkedLabelError(null)
     setNewFormError(null)
     setCreating(true)
   }
@@ -138,13 +138,13 @@ export function LedgerSwitcherSheet({
 
     const nameValidation = validateTrackerName(newName)
     const defaultValidation = validateStateLabel(newDefaultLabel)
-    const notedValidation = validateStateLabel(newNotedLabel)
+    const markedValidation = validateStateLabel(newMarkedLabel)
 
     setNewNameError(nameValidation.valid ? null : nameValidation.error)
     setDefaultLabelError(defaultValidation.valid ? null : defaultValidation.error)
-    setNotedLabelError(notedValidation.valid ? null : notedValidation.error)
+    setMarkedLabelError(markedValidation.valid ? null : markedValidation.error)
 
-    if (!nameValidation.valid || !defaultValidation.valid || !notedValidation.valid) {
+    if (!nameValidation.valid || !defaultValidation.valid || !markedValidation.valid) {
       return
     }
 
@@ -157,7 +157,7 @@ export function LedgerSwitcherSheet({
         // resolves to -- there is no separate radio choosing it, so the
         // underlying DayState key it's stored under is fixed here.
         defaultState: 'didnt',
-        stateLabels: { didnt: defaultValidation.label, did: notedValidation.label },
+        stateLabels: { didnt: defaultValidation.label, did: markedValidation.label },
         color: newColor,
       })
       setCreating(false)
@@ -245,7 +245,7 @@ export function LedgerSwitcherSheet({
                   aria-expanded={suggestionsOpen}
                   onClick={() => setSuggestionsOpen((open) => !open)}
                 >
-                  Not sure what to note? Try one of these.
+                  Not sure what to mark? Try one of these.
                 </button>
                 {suggestionsOpen && (
                   <div className="suggestion-grid">
@@ -267,13 +267,13 @@ export function LedgerSwitcherSheet({
 
           <StateLabelFields
             defaultLabelId={defaultLabelId}
-            notedLabelId={notedLabelId}
+            markedLabelId={markedLabelId}
             defaultValue={newDefaultLabel}
-            notedValue={newNotedLabel}
+            markedValue={newMarkedLabel}
             onDefaultChange={setNewDefaultLabel}
-            onNotedChange={setNewNotedLabel}
+            onMarkedChange={setNewMarkedLabel}
             defaultError={defaultLabelError}
-            notedError={notedLabelError}
+            markedError={markedLabelError}
           />
 
           <div className="field">

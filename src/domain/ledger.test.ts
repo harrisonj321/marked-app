@@ -60,7 +60,7 @@ describe('resolveLedgerColor', () => {
     }
   })
 
-  it('resolves no stored color to the canonical default -- espresso, the original Noted. accent', () => {
+  it('resolves no stored color to the canonical default -- espresso, the original Marked. accent', () => {
     expect(resolveLedgerColor(undefined)).toBe('espresso')
     expect(resolveLedgerColor(undefined)).toBe(DEFAULT_LEDGER_COLOR)
   })

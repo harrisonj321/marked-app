@@ -22,7 +22,7 @@ function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {
   const onSaveStateLabels = vi.fn().mockResolvedValue(undefined)
   const onSaveColor = vi.fn().mockResolvedValue(undefined)
   const onDelete = vi.fn().mockResolvedValue(undefined)
-  const onTourNoted = vi.fn()
+  const onTourMarked = vi.fn()
   const onDismiss = vi.fn()
   const onDeleteAccount = vi.fn().mockResolvedValue(undefined)
   render(
@@ -36,14 +36,14 @@ function renderSheet(overrides: Partial<Parameters<typeof SettingsSheet>[0]> = {
       onSaveStateLabels={onSaveStateLabels}
       onSaveColor={onSaveColor}
       onDelete={onDelete}
-      onTourNoted={onTourNoted}
+      onTourMarked={onTourMarked}
       onDismiss={onDismiss}
       authProviderId="password"
       onDeleteAccount={onDeleteAccount}
       {...overrides}
     />,
   )
-  return { onSaveName, onSaveDefaultState, onSaveStateLabels, onSaveColor, onDelete, onTourNoted, onDismiss, onDeleteAccount }
+  return { onSaveName, onSaveDefaultState, onSaveStateLabels, onSaveColor, onDelete, onTourMarked, onDismiss, onDeleteAccount }
 }
 
 describe('SettingsSheet', () => {
@@ -51,7 +51,7 @@ describe('SettingsSheet', () => {
     renderSheet()
 
     expect(screen.getByLabelText('Default')).toBeInTheDocument()
-    expect(screen.getByLabelText('Noted.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Marked.')).toBeInTheDocument()
     expect(screen.queryAllByRole('radio')).toHaveLength(0)
   })
 
@@ -63,18 +63,18 @@ describe('SettingsSheet', () => {
     expect(screen.queryByText(/two states/i)).not.toBeInTheDocument()
   })
 
-  it('pre-fills Default with the label for the current default state and Noted. with the other', () => {
+  it('pre-fills Default with the label for the current default state and Marked. with the other', () => {
     renderSheet({ stateLabels: { did: 'Took it', didnt: "Didn't take it" } })
 
     expect(screen.getByLabelText('Default')).toHaveValue('Took it')
-    expect(screen.getByLabelText('Noted.')).toHaveValue("Didn't take it")
+    expect(screen.getByLabelText('Marked.')).toHaveValue("Didn't take it")
   })
 
   it('pre-fills the fields in swapped order when didnt is the default', () => {
     renderSheet({ defaultState: 'didnt', stateLabels: { did: 'Took it', didnt: "Didn't take it" } })
 
     expect(screen.getByLabelText('Default')).toHaveValue("Didn't take it")
-    expect(screen.getByLabelText('Noted.')).toHaveValue('Took it')
+    expect(screen.getByLabelText('Marked.')).toHaveValue('Took it')
   })
 
   it('swapping trades the field contents and marks the default state changed', async () => {
@@ -85,7 +85,7 @@ describe('SettingsSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: SWAP_BUTTON }))
 
     expect(screen.getByLabelText('Default')).toHaveValue("Didn't take it")
-    expect(screen.getByLabelText('Noted.')).toHaveValue('Took it')
+    expect(screen.getByLabelText('Marked.')).toHaveValue('Took it')
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -111,7 +111,7 @@ describe('SettingsSheet', () => {
   it('editing a field while swapped edits the label for the underlying state now shown', async () => {
     const { onSaveStateLabels } = renderSheet({ defaultState: 'didnt' })
 
-    // Default currently shows "Didn't" (the didnt label); Noted. shows "Did".
+    // Default currently shows "Didn't" (the didnt label); Marked. shows "Did".
     fireEvent.click(screen.getByRole('button', { name: SWAP_BUTTON }))
     // After swapping, draft default is 'did', so Default field now shows "Did".
     expect(screen.getByLabelText('Default')).toHaveValue('Did')
@@ -139,7 +139,7 @@ describe('SettingsSheet', () => {
         onSaveStateLabels={onSaveStateLabels}
         onSaveColor={vi.fn()}
         onDelete={vi.fn()}
-        onTourNoted={vi.fn()}
+        onTourMarked={vi.fn()}
         onDismiss={onDismiss}
         authProviderId="password"
         onDeleteAccount={vi.fn()}
@@ -157,7 +157,7 @@ describe('SettingsSheet', () => {
         onSaveStateLabels={onSaveStateLabels}
         onSaveColor={vi.fn()}
         onDelete={vi.fn()}
-        onTourNoted={vi.fn()}
+        onTourMarked={vi.fn()}
         onDismiss={onDismiss}
         authProviderId="password"
         onDeleteAccount={vi.fn()}
@@ -165,7 +165,7 @@ describe('SettingsSheet', () => {
     )
 
     expect(screen.getByLabelText('Default')).toHaveValue("Didn't")
-    expect(screen.getByLabelText('Noted.')).toHaveValue('Did')
+    expect(screen.getByLabelText('Marked.')).toHaveValue('Did')
 
     // Saving an untouched form must not push the stale value back.
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -185,7 +185,7 @@ describe('SettingsSheet', () => {
         onSaveStateLabels={vi.fn()}
         onSaveColor={vi.fn()}
         onDelete={vi.fn()}
-        onTourNoted={vi.fn()}
+        onTourMarked={vi.fn()}
         onDismiss={vi.fn()}
         authProviderId="password"
         onDeleteAccount={vi.fn()}
@@ -203,7 +203,7 @@ describe('SettingsSheet', () => {
         onSaveStateLabels={vi.fn()}
         onSaveColor={vi.fn()}
         onDelete={vi.fn()}
-        onTourNoted={vi.fn()}
+        onTourMarked={vi.fn()}
         onDismiss={vi.fn()}
         authProviderId="password"
         onDeleteAccount={vi.fn()}
@@ -211,7 +211,7 @@ describe('SettingsSheet', () => {
     )
 
     expect(screen.getByLabelText('Default')).toHaveValue('Took it')
-    expect(screen.getByLabelText('Noted.')).toHaveValue("Didn't take it")
+    expect(screen.getByLabelText('Marked.')).toHaveValue("Didn't take it")
   })
 
   it('closes without writing when nothing is changed', async () => {
@@ -252,7 +252,7 @@ describe('SettingsSheet', () => {
     const { onSaveDefaultState, onSaveStateLabels, onDismiss } = renderSheet()
 
     fireEvent.change(screen.getByLabelText('Default'), { target: { value: 'Took it' } })
-    fireEvent.change(screen.getByLabelText('Noted.'), {
+    fireEvent.change(screen.getByLabelText('Marked.'), {
       target: { value: "Didn't take it" },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -290,7 +290,7 @@ describe('SettingsSheet', () => {
     const { onSaveDefaultState, onSaveStateLabels, onDismiss } = renderSheet()
 
     fireEvent.click(screen.getByRole('button', { name: SWAP_BUTTON }))
-    fireEvent.change(screen.getByLabelText('Noted.'), { target: { value: 'Took it' } })
+    fireEvent.change(screen.getByLabelText('Marked.'), { target: { value: 'Took it' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => {
@@ -312,12 +312,12 @@ describe('SettingsSheet', () => {
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
-  it('offers a Tour Noted. action that replays onboarding without touching saved state', () => {
-    const { onTourNoted, onSaveDefaultState, onSaveStateLabels, onDismiss } = renderSheet()
+  it('offers a Tour Marked. action that replays onboarding without touching saved state', () => {
+    const { onTourMarked, onSaveDefaultState, onSaveStateLabels, onDismiss } = renderSheet()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tour Noted.' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tour Marked.' }))
 
-    expect(onTourNoted).toHaveBeenCalled()
+    expect(onTourMarked).toHaveBeenCalled()
     expect(onSaveDefaultState).not.toHaveBeenCalled()
     expect(onSaveStateLabels).not.toHaveBeenCalled()
     expect(onDismiss).not.toHaveBeenCalled()
@@ -391,7 +391,7 @@ describe('SettingsSheet', () => {
         onSaveStateLabels={vi.fn()}
         onSaveColor={vi.fn()}
         onDelete={vi.fn()}
-        onTourNoted={vi.fn()}
+        onTourMarked={vi.fn()}
         onDismiss={vi.fn()}
         authProviderId="password"
         onDeleteAccount={vi.fn()}
@@ -409,7 +409,7 @@ describe('SettingsSheet', () => {
         onSaveStateLabels={vi.fn()}
         onSaveColor={vi.fn()}
         onDelete={vi.fn()}
-        onTourNoted={vi.fn()}
+        onTourMarked={vi.fn()}
         onDismiss={vi.fn()}
         authProviderId="password"
         onDeleteAccount={vi.fn()}
@@ -510,7 +510,7 @@ describe('SettingsSheet', () => {
           onSaveStateLabels={vi.fn()}
           onSaveColor={vi.fn()}
           onDelete={vi.fn()}
-          onTourNoted={vi.fn()}
+          onTourMarked={vi.fn()}
           onDismiss={vi.fn()}
           authProviderId="password"
           onDeleteAccount={vi.fn()}
@@ -528,7 +528,7 @@ describe('SettingsSheet', () => {
           onSaveStateLabels={vi.fn()}
           onSaveColor={vi.fn()}
           onDelete={vi.fn()}
-          onTourNoted={vi.fn()}
+          onTourMarked={vi.fn()}
           onDismiss={vi.fn()}
           authProviderId="password"
           onDeleteAccount={vi.fn()}

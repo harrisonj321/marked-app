@@ -45,10 +45,10 @@ function renderTour(onFinish = vi.fn()) {
   return { onFinish }
 }
 
-// The intro's primary action is "Noted." (acknowledging is the product's
+// The intro's primary action is "Marked." (acknowledging is the product's
 // whole gesture); coach steps advance with Next and close with Done.
 function clickNext() {
-  fireEvent.click(screen.getByRole('button', { name: /^(Noted\.|Next|Done)$/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^(Marked\.|Next|Done)$/ }))
 }
 
 /**
@@ -94,21 +94,21 @@ describe('OnboardingTour', () => {
     mockPlatform()
     renderTour()
 
-    expect(screen.getByRole('heading', { name: 'Noted.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Marked.' })).toBeInTheDocument()
     expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
     expect(screen.getByText(/not about keeping score/i)).toBeInTheDocument()
     expect(screen.getByText(/just a ledger of whatever/i)).toBeInTheDocument()
     expect(screen.getByText(/just visibility/i)).toBeInTheDocument()
-    expect(screen.getByText(/^It's just Noted\.$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^It's just Marked\.$/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
   })
 
-  it("advances from the intro with a primary action reading Noted., not generic tour language", () => {
+  it("advances from the intro with a primary action reading Marked., not generic tour language", () => {
     mockPlatform()
     renderTour()
 
-    expect(screen.getByRole('button', { name: 'Noted.' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Marked.' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
   })
 
@@ -116,7 +116,7 @@ describe('OnboardingTour', () => {
     mockPlatform()
     renderTour()
 
-    const primary = screen.getByRole('button', { name: 'Noted.' })
+    const primary = screen.getByRole('button', { name: 'Marked.' })
     // While the reveal is still holding the footer invisible, focus rests
     // on the (visible) dialog and the hidden button is not tabbable.
     expect(primary).toHaveAttribute('tabindex', '-1')
@@ -132,7 +132,7 @@ describe('OnboardingTour', () => {
     mockPlatform({ reducedMotion: true })
     renderTour()
 
-    const primary = screen.getByRole('button', { name: 'Noted.' })
+    const primary = screen.getByRole('button', { name: 'Marked.' })
     expect(primary).not.toHaveAttribute('tabindex')
     expect(primary).toHaveFocus()
   })
@@ -176,7 +176,7 @@ describe('OnboardingTour', () => {
 
     clickNext() // welcome -> coach-today
     expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Noted.' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Marked.' })).not.toBeInTheDocument()
   })
 
   it('walks the coach marks in importance order: today, then the record, then wording, then ledgers last', () => {
@@ -449,7 +449,7 @@ describe('OnboardingTour', () => {
     clickNext() // coach-ledger -> install
 
     expect(screen.getByRole('dialog')).toHaveTextContent(/Share, then/)
-    // "Got it" rather than "Done": Noted. has no way to confirm the user
+    // "Got it" rather than "Done": Marked. has no way to confirm the user
     // actually completed Safari's Add to Home Screen steps, so the CTA only
     // acknowledges the instructions instead of implying a verified install.
     expect(screen.getByRole('button', { name: 'Got it' })).toBeInTheDocument()
@@ -521,14 +521,14 @@ describe('OnboardingTour', () => {
 
     /** Advances past the welcome screen the way a motion-enabled browser would: press, then let the exit fade report done. */
     function leaveIntro() {
-      fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Marked.' }))
       fireAnimationEnd(document.querySelector('.onboarding-intro')!, 'onboarding-intro-leave')
     }
 
     it('holds the welcome screen while its exit fade plays, then advances when the fade reports done', () => {
       renderStaged()
 
-      fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Marked.' }))
 
       // Still the intro, now leaving -- no coach copy yet, no hard cut.
       expect(document.querySelector('.onboarding-intro-leaving')).toBeInTheDocument()
@@ -542,7 +542,7 @@ describe('OnboardingTour', () => {
     it('advances from the welcome screen immediately under reduced motion, where the exit fade would never play', () => {
       renderStaged({ reducedMotion: true })
 
-      fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Marked.' }))
 
       expect(screen.getByText(/flip today's mark/i)).toBeInTheDocument()
     })

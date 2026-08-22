@@ -35,7 +35,7 @@ interface DragSession {
 
 /**
  * The primary daily control: a two-position slide switch. The untouched-day
- * default always sits on the left and the actively-Noted state on the
+ * default always sits on the left and the actively-Marked state on the
  * right, regardless of which underlying DayState each currently is -- so
  * changing the tracker's default in Settings reorders which word appears
  * where without touching what's stored.

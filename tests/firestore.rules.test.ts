@@ -8,7 +8,7 @@ import {
 } from '@firebase/rules-unit-testing'
 import { deleteDoc, deleteField, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 
-const PROJECT_ID = 'noted-app-rules-test'
+const PROJECT_ID = 'marked-app-rules-test'
 const OWNER_UID = 'owner-uid'
 const OTHER_UID = 'other-uid'
 

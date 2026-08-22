@@ -34,7 +34,7 @@ function fireAnimationEnd(element: Element, animationName: string) {
 
 /** Advances past the welcome screen the way a motion-enabled browser would: press, then let the exit fade report done. */
 function leaveIntro() {
-  fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Marked.' }))
   fireAnimationEnd(document.querySelector('.onboarding-intro')!, 'onboarding-intro-leave')
 }
 
@@ -52,7 +52,7 @@ describe('OnboardingOrientation', () => {
     mockPlatform()
     render(<OnboardingOrientation onFinish={vi.fn()} />)
 
-    expect(screen.getByRole('heading', { name: 'Noted.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Marked.' })).toBeInTheDocument()
     expect(screen.getByText(/not a habit tracker/i)).toBeInTheDocument()
   })
 
@@ -112,7 +112,7 @@ describe('OnboardingOrientation', () => {
 
     expect(shellStage(container)).toBe('welcome')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Marked.' }))
     expect(shellStage(container)).toBe('today')
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
@@ -187,7 +187,7 @@ describe('OnboardingOrientation', () => {
     mockPlatform({ reducedMotion: true })
     const { container } = render(<OnboardingOrientation onFinish={vi.fn()} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Noted.' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Marked.' }))
     act(() => {
       vi.advanceTimersByTime(7000)
     })
