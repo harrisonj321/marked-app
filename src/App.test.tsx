@@ -504,7 +504,7 @@ describe('App', () => {
 
     // The real Home shell is present underneath (brand still shows),
     // not swapped out for a different screen.
-    expect(screen.getByText('Marked.')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Marked.' })).toBeInTheDocument()
     expect(screen.getByText(/what are you tracking/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Ledgers' })).toBeInTheDocument()
   })

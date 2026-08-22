@@ -154,9 +154,13 @@ h1 {
   text-align: center;
 }
 
+/* Same visual footprint the previous text brand mark occupied (the height
+   is the old font-size value, unchanged), so switching to the approved
+   wordmark artwork doesn't shift any surrounding layout. */
 .brand {
-  font-size: 1.0625rem;
-  font-weight: 600;
+  display: block;
+  height: 1.0625rem;
+  width: auto;
   margin: 0;
 }
 
@@ -1243,19 +1247,15 @@ fieldset label {
 
 .onboarding-wordmark {
   margin: 0;
-  font-size: clamp(2.25rem, 10vw, 2.75rem);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
 }
 
-/* inline-block so the stamp animation's transform applies; harmless when
-   reduced motion leaves it static. The origin sits low in the em box,
-   near the glyph's actual ink, so the stamp reads as pressing down onto
-   the baseline instead of a dot floating mid-line. */
-.onboarding-wordmark-period {
-  display: inline-block;
-  transform-origin: 50% 80%;
+/* Same visual footprint the previous text wordmark occupied (the clamp
+   values are unchanged), so switching from styled text to the approved
+   artwork doesn't shift the staged reveal's rhythm. */
+.onboarding-wordmark-image {
+  display: block;
+  height: clamp(2.25rem, 10vw, 2.75rem);
+  width: auto;
 }
 
 .onboarding-lines {
@@ -1374,10 +1374,9 @@ fieldset label {
    users simply see each step already settled. fill-mode "both" is what
    holds a delayed element at its keyframe start during the wait.
 
-   The intro reads out at a human pace: the wordmark rises, its period
-   stamps in on the same spring curve the today-toggle settles with, then
-   the five lines land one at a time, muted to ink, and the action arrives
-   last. Between coach steps the spotlight glides (its transition lives on
+   The intro reads out at a human pace: the wordmark rises, then the five
+   lines land one at a time, muted to ink, and the action arrives last.
+   Between coach steps the spotlight glides (its transition lives on
    .tour-spotlight above) while the new callout waits a beat and fades in
    where it lands. */
 @media (prefers-reduced-motion: no-preference) {
@@ -1392,36 +1391,28 @@ fieldset label {
     --enter-delay: 150ms;
   }
 
-  /* Fill-mode both hides the period (its own keyframe start) while the
-     wordmark rises, so "Marked" lands first and the period stamps onto it
-     a beat later -- the product's whole gesture, performed by the brand. */
-  .onboarding-wordmark-period {
-    animation: onboarding-stamp 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-    animation-delay: 650ms;
-  }
-
   .onboarding-line:nth-child(1) {
-    --enter-delay: 1150ms;
+    --enter-delay: 750ms;
   }
 
   .onboarding-line:nth-child(2) {
-    --enter-delay: 1650ms;
+    --enter-delay: 1250ms;
   }
 
   .onboarding-line:nth-child(3) {
-    --enter-delay: 2200ms;
+    --enter-delay: 1800ms;
   }
 
   .onboarding-line:nth-child(4) {
-    --enter-delay: 2700ms;
+    --enter-delay: 2300ms;
   }
 
   .onboarding-line:nth-child(5) {
-    --enter-delay: 3200ms;
+    --enter-delay: 2800ms;
   }
 
   .onboarding-intro-footer {
-    --enter-delay: 3850ms;
+    --enter-delay: 3450ms;
   }
 
   .onboarding-coach {
@@ -1758,7 +1749,8 @@ fieldset label {
   }
 
   /* The switch affordance is discovered, not labeled: it stamps in beside
-     the name with the same spring the intro's period lands with. */
+     the name with the same spring-loaded settle used elsewhere in the
+     product's brief moments of emphasis. */
   .demo-home[data-stage='ledger'] [data-demo='chevron'] {
     animation: onboarding-stamp 400ms cubic-bezier(0.34, 1.56, 0.64, 1) 150ms both;
   }

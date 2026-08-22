@@ -5,6 +5,7 @@ import { prefersReducedMotion } from '../lib/platform'
 import { DEFAULT_STATE_LABELS, type DayState } from '../domain/tracker'
 import { OnboardingTour, type OrientationStage } from './OnboardingTour'
 import { TodayToggle } from './TodayToggle'
+import { Wordmark } from './Wordmark'
 import { CalendarIcon, ChevronDownIcon } from './icons'
 
 interface OnboardingOrientationProps {
@@ -111,9 +112,7 @@ function DemoShell({ stage }: DemoShellProps) {
   return (
     <main className="screen home demo-home" data-stage={stage} inert>
       <header className="home-header">
-        <p className="brand" data-demo="brand">
-          Marked.
-        </p>
+        <Wordmark className="brand" data-demo="brand" />
         <div className="home-header-actions">
           <button
             type="button"

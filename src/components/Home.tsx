@@ -26,6 +26,7 @@ import { OnboardingTour } from './OnboardingTour'
 import { SettingsSheet } from './SettingsSheet'
 import { SignInActions } from './SignInActions'
 import { TodaySection } from './TodaySection'
+import { Wordmark } from './Wordmark'
 import { CalendarIcon, ChevronDownIcon } from './icons'
 
 interface HomeProps {
@@ -177,7 +178,7 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
     <>
       <main className="screen home home-enter" inert={tourActive || undefined}>
         <header className="home-header">
-          <p className="brand">Marked.</p>
+          <Wordmark className="brand" />
           {activeLedger && todayKey && (
             <div className="home-header-actions">
               <button

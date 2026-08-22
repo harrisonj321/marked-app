@@ -6,6 +6,7 @@ import { useLedgers } from './hooks/useLedgers'
 import { LoadingScreen } from './components/LoadingScreen'
 import { OnboardingOrientation } from './components/OnboardingOrientation'
 import { Home } from './components/Home'
+import { Wordmark } from './components/Wordmark'
 
 function App() {
   const { user, loading: authLoading, authError } = useAuthUser()
@@ -72,7 +73,7 @@ function App() {
   if (error) {
     return (
       <main className="screen screen-center">
-        <p className="brand">Marked.</p>
+        <Wordmark className="brand" />
         <p role="alert" className="message">
           {error}
         </p>

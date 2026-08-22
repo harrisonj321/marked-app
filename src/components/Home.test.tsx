@@ -252,7 +252,7 @@ describe('Home', () => {
 
       const main = container.querySelector('main.screen.home')
       expect(main).toBeInTheDocument()
-      expect(main?.querySelector('.home-header .brand')).toHaveTextContent('Marked.')
+      expect(main?.querySelector('.home-header .brand')).toHaveAttribute('alt', 'Marked.')
       expect(screen.getByTestId('signin-actions')).toBeInTheDocument()
       expect(screen.getByText(/sign in to create and mark your first thing/i)).toBeInTheDocument()
     })
@@ -390,7 +390,7 @@ describe('Home', () => {
   it('renders the brand, date, ledger name, and today section without the calendar', () => {
     renderSettledHome()
 
-    expect(screen.getByText('Marked.')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Marked.' })).toBeInTheDocument()
     expect(screen.getByText('Today · 08/10/2026')).toBeInTheDocument()
     expect(screen.getByText('Worked out')).toBeInTheDocument()
     expect(screen.getByTestId('today-section')).toHaveTextContent('today-section:ledger-1:did:UTC:var(--ledger-color-espresso)')

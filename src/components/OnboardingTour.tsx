@@ -4,6 +4,7 @@ import { useInstallPrompt, type InstallPromptOutcome } from '../hooks/useInstall
 import { useTourTargetRect } from '../hooks/useTourTargetRect'
 import { isIOSDevice, isStandaloneDisplay, prefersReducedMotion } from '../lib/platform'
 import { ShareIcon } from './icons'
+import { Wordmark } from './Wordmark'
 
 /**
  * True once the given element's named CSS entrance animation is over --
@@ -366,11 +367,11 @@ interface IntroStepProps {
 }
 
 /**
- * The one brand moment Marked. allows itself. The wordmark rises, its period
- * stamps in with the same spring the today-toggle settles with, and the
- * five lines land one at a time -- what it isn't in muted ink, what it is
- * in full ink. The primary action reads "Marked." because pressing it is the
- * product's whole gesture: acknowledge, move on.
+ * The one brand moment Marked. allows itself. The approved wordmark artwork
+ * rises as one image (see Wordmark), and the five lines land one at a time
+ * after it -- what it isn't in muted ink, what it is in full ink. The
+ * primary action reads "Marked." because pressing it is the product's whole
+ * gesture: acknowledge, move on.
  *
  * Focus follows visibility: while the staged reveal is still holding the
  * footer at opacity 0, focus rests on the dialog itself (visible from the
@@ -428,11 +429,10 @@ function IntroStep({ onPrimary, leaving = false, onLeft }: IntroStepProps) {
       tabIndex={-1}
     >
       <div className="onboarding-intro-body">
-        {/* Explicit label: the period span's inline-block display can make
-            some accessible-name computations insert whitespace ("Marked .");
-            the name must read exactly "Marked." regardless of layout. */}
-        <h2 id={headingId} className="onboarding-wordmark" aria-label="Marked.">
-          Marked<span className="onboarding-wordmark-period">.</span>
+        {/* No separate aria-label needed: the heading's accessible name
+            comes straight from the wordmark image's own alt text. */}
+        <h2 id={headingId} className="onboarding-wordmark">
+          <Wordmark className="onboarding-wordmark-image" />
         </h2>
         <div className="onboarding-lines">
           <p className="onboarding-line">It's not a habit tracker.</p>
