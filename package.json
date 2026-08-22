@@ -18,7 +18,10 @@
     "migrate:inventory": "node scripts/migrate-firestore.mjs inventory",
     "migrate:dry-run": "node scripts/migrate-firestore.mjs dry-run",
     "migrate:verify": "node scripts/migrate-firestore.mjs verify",
-    "migrate:run": "node scripts/migrate-firestore.mjs migrate"
+    "migrate:run": "node scripts/migrate-firestore.mjs migrate",
+    "migrate:auth:inventory": "node scripts/migrate-auth.mjs inventory",
+    "migrate:auth:run": "node scripts/migrate-auth.mjs migrate",
+    "migrate:auth:verify": "node scripts/migrate-auth.mjs verify"
   },
   "dependencies": {
     "firebase": "^12.17.1",

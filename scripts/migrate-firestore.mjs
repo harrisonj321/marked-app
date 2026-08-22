@@ -117,6 +117,44 @@ function hashDoc(data) {
   return createHash('sha256').update(JSON.stringify(stableValue(data))).digest('hex')
 }
 
+// Runs unconditionally before every mode: proves hashDoc compares Firestore
+// documents by actual value, not incidental object shape -- key insertion
+// order must not matter, and Timestamp equality must be exact-value
+// (seconds + nanoseconds), not reference identity or default toString/JSON
+// formatting. A manifest built on a hash that fails either property could
+// either miss a real content difference or flag two identical documents as
+// mismatched.
+function selfTestHashing() {
+  const a = { b: 1, a: new Timestamp(1700000000, 500), nested: { y: 2, x: 1 } }
+  const b = { nested: { x: 1, y: 2 }, a: new Timestamp(1700000000, 500), b: 1 }
+  if (hashDoc(a) !== hashDoc(b)) {
+    throw new Error(
+      'Hashing self-test failed: two documents with the same values in different key order hashed differently.',
+    )
+  }
+
+  const sameSecondsDifferentNanos = { a: new Timestamp(1700000000, 500) }
+  const baseline = { a: new Timestamp(1700000000, 501) }
+  if (hashDoc(sameSecondsDifferentNanos) === hashDoc(baseline)) {
+    throw new Error('Hashing self-test failed: Timestamps differing only in nanoseconds hashed identically.')
+  }
+
+  const differentSeconds = { a: new Timestamp(1700000001, 500) }
+  const sameNanosOriginal = { a: new Timestamp(1700000000, 500) }
+  if (hashDoc(differentSeconds) === hashDoc(sameNanosOriginal)) {
+    throw new Error('Hashing self-test failed: Timestamps differing only in seconds hashed identically.')
+  }
+
+  const distinctInstancesSameValue = { a: new Timestamp(1700000000, 500) }
+  if (hashDoc(sameNanosOriginal) !== hashDoc(distinctInstancesSameValue)) {
+    throw new Error(
+      'Hashing self-test failed: two distinct Timestamp instances holding the same value hashed differently.',
+    )
+  }
+
+  console.log('Hashing self-test passed: canonical key order and exact Timestamp-value comparison confirmed.')
+}
+
 // Every field type actually present in this app's schema, per
 // src/data/*.ts and firestore.rules -- anything outside this set on a real
 // document is flagged, not silently assumed safe to copy verbatim.
@@ -166,6 +204,69 @@ async function fetchAllDocs(app) {
     }
   }
   return results
+}
+
+// Proves the source inventory is exhaustive rather than a query over an
+// assumed schema. collectionGroup(id) already searches the *entire*
+// database for every collection literally named 'tracker'/'days'/
+// 'ledgers'/'settings' regardless of where it's nested, so COLLECTION_GROUPS
+// alone already can't miss a document under one of those four names. What
+// it structurally cannot detect is a collection under a *different* name --
+// so this walks the actual discovered structure with listCollections()
+// (which enumerates real collection ids, not assumed ones) at every level
+// this app's schema has: the database root, each known user, and each known
+// ledger. Bounded by what's actually discovered, not the schema's own
+// expectations of itself.
+async function verifyExhaustiveTopology(app, sourceDocs) {
+  const db = getFirestore(app)
+  const anomalies = []
+
+  const rootCollections = await db.listCollections()
+  const rootIds = rootCollections.map((c) => c.id)
+  for (const id of rootIds) {
+    if (id !== 'users') anomalies.push(`unexpected top-level collection: ${id}`)
+  }
+
+  const uids = new Set(sourceDocs.map((doc) => uidOf(doc.path)))
+  const ledgerPaths = sourceDocs.filter((doc) => categorize(doc.path) === 'ledger').map((doc) => doc.path)
+
+  for (const uid of uids) {
+    const userDocRef = db.doc(`users/${uid}`)
+    const userDocSnapshot = await userDocRef.get()
+    if (userDocSnapshot.exists) {
+      anomalies.push(`unexpected document directly at users/${uid} (this app never writes one)`)
+    }
+    const subcollections = await userDocRef.listCollections()
+    for (const collectionRef of subcollections) {
+      if (!['tracker', 'days', 'ledgers', 'settings'].includes(collectionRef.id)) {
+        anomalies.push(`unexpected subcollection users/${uid}/${collectionRef.id}`)
+      }
+    }
+  }
+
+  for (const ledgerPath of ledgerPaths) {
+    const subcollections = await db.doc(ledgerPath).listCollections()
+    for (const collectionRef of subcollections) {
+      if (collectionRef.id !== 'days') {
+        anomalies.push(`unexpected subcollection ${ledgerPath}/${collectionRef.id}`)
+      }
+    }
+  }
+
+  return { anomalies, rootCollectionIds: rootIds, usersInspected: uids.size, ledgersInspected: ledgerPaths.length }
+}
+
+function printTopologyCheck(result) {
+  console.log(`\nExhaustive topology check:`)
+  console.log(`  root collections:     [${result.rootCollectionIds.join(', ')}]`)
+  console.log(`  users inspected:      ${result.usersInspected}`)
+  console.log(`  ledgers inspected:    ${result.ledgersInspected}`)
+  if (result.anomalies.length === 0) {
+    console.log('  no unexpected collections, subcollections, or orphaned paths found.')
+  } else {
+    console.log(`  ⚠ ${result.anomalies.length} anomaly(ies) found:`)
+    for (const anomaly of result.anomalies) console.log(`    ${anomaly}`)
+  }
 }
 
 async function destinationIsEmpty(app) {
@@ -242,6 +343,7 @@ async function runInventory(sourceApp, destinationApp) {
 
   const sourceDocs = await fetchAllDocs(sourceApp)
   printSummary('Source inventory (noted-app-c7d53):', summarize(sourceDocs))
+  printTopologyCheck(await verifyExhaustiveTopology(sourceApp, sourceDocs))
 
   const empty = await destinationIsEmpty(destinationApp)
   console.log(`\nDestination empty (${DESTINATION_PROJECT_ID}): ${empty ? 'YES' : 'NO -- contains data'}`)
@@ -257,6 +359,7 @@ async function runDryRun(sourceApp, destinationApp) {
   const sourceDocs = await fetchAllDocs(sourceApp)
   const summary = summarize(sourceDocs)
   printSummary('Dry-run: what a real migrate would copy from noted-app-c7d53:', summary)
+  printTopologyCheck(await verifyExhaustiveTopology(sourceApp, sourceDocs))
 
   const empty = await destinationIsEmpty(destinationApp)
   console.log(`\nDestination empty (${DESTINATION_PROJECT_ID}): ${empty ? 'YES' : 'NO -- contains data'}`)
@@ -328,6 +431,16 @@ async function runMigrate(sourceApp, destinationApp, confirmArg) {
   }
 
   const sourceDocs = await fetchAllDocs(sourceApp)
+
+  const topology = await verifyExhaustiveTopology(sourceApp, sourceDocs)
+  printTopologyCheck(topology)
+  if (topology.anomalies.length > 0) {
+    throw new Error(
+      'Refusing to run: exhaustive topology check found anomalies outside the known schema -- see above. ' +
+        'Investigate before migrating.',
+    )
+  }
+
   console.log(`Copying ${sourceDocs.length} documents from ${SOURCE_PROJECT_ID} to ${DESTINATION_PROJECT_ID}...`)
 
   const destDb = getFirestore(destinationApp)
@@ -367,6 +480,8 @@ async function main() {
     process.exitCode = 1
     return
   }
+
+  selfTestHashing()
 
   console.log(`Mode: ${mode}`)
   console.log(`Configured source:      ${SOURCE_PROJECT_ID}`)
