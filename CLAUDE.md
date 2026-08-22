@@ -20,16 +20,6 @@ This principle is a product requirement, not merely a copywriting preference.
 
 ---
 
-## Migration Status
-
-This application was originally built and branded **Noted.** and is being migrated to its own dedicated **Marked.** identity and infrastructure. The rename to Marked. is complete in this codebase's product identity, UI copy, and internal naming.
-
-Infrastructure has **not** yet cut over. As of this document, the deployed application still runs against the legacy Firebase project (`noted-app-c7d53`) and the legacy Vercel project (`noted-app`, `https://the-noted-app.vercel.app`) -- see Firebase Project and Deployment Safety below. Do not repoint `.firebaserc`, `.env`, `vercel.json`, production Firebase configuration, or any other pointer away from that legacy infrastructure until a dedicated Marked Firebase project and Vercel project exist and the cutover has been explicitly authorized.
-
-Once dedicated Marked infrastructure exists and cutover is complete, update the Firebase Project and Deployment Safety sections below to describe it, and remove this section.
-
----
-
 ## Product Philosophy
 
 Marked. exists to make patterns visible without trying to change them.
@@ -367,9 +357,9 @@ Keep the dependency surface minimal.
 
 ## Firebase Project
 
-The Firebase project described below is the legacy Noted project this application still runs against -- see Migration Status above. A dedicated Marked Firebase project has not yet been created.
+The dedicated Marked Firebase project is `marked-app-733c0`.
 
-Current (legacy) Firebase setup:
+Current Firebase setup:
 
 - Firebase Web app registered
 - Cloud Firestore Standard edition created
@@ -382,7 +372,7 @@ Current (legacy) Firebase setup:
 - Firebase Storage is not required for Marked. and must not be used
 - Google Analytics is not required for V1 and must not be added
 
-The same setup -- including both Google and Email/Password Authentication -- must be replicated on the dedicated Marked Firebase project when it is created; see Authentication below for why both providers are required.
+Both Google and Email/Password Authentication are enabled on this project; see Authentication below for why both providers are required.
 
 The app must remain compatible with the Firebase Spark plan unless the user explicitly authorizes functionality requiring billing.
 
@@ -633,7 +623,7 @@ Never claim success if validation failed.
 
 ### Production Deployment Architecture
 
-- The primary public production frontend is **Vercel**, project `noted-app`, served at `https://the-noted-app.vercel.app` -- this is the legacy Noted infrastructure described in Migration Status above, and it remains the actual production target until an explicit, approved cutover to dedicated Marked infrastructure.
+- The primary public production frontend is **Vercel**, project `marked-app`, served at `https://marked-ledger.vercel.app`.
 - Production deploys happen automatically when commits are pushed to `main`, through the existing Vercel GitHub integration. Pushing `main` *is* the deploy -- do not run a manual Vercel deploy as part of a routine release.
 - Firebase remains the backend platform: Authentication, Cloud Firestore, and Firestore Rules.
 - Firebase Hosting currently holds a working mirror of the frontend but is **not** the normal production deployment target. Do not run `firebase deploy --only hosting` (or a full `firebase deploy`) as part of a routine release unless the user explicitly requests it.
@@ -644,7 +634,7 @@ Never claim success if validation failed.
 2. Bump the version and commit as appropriate.
 3. Push `main`.
 4. Let the existing Vercel GitHub integration auto-deploy -- do not trigger a manual deploy.
-5. Verify `https://the-noted-app.vercel.app` is serving the expected commit/version/build (compare the deployed commit SHA and/or built asset hash, not just that the site loads).
+5. Verify `https://marked-ledger.vercel.app` is serving the expected commit/version/build (compare the deployed commit SHA and/or built asset hash, not just that the site loads).
 6. Do not deploy to Firebase Hosting as part of this workflow.
 7. If `firestore.rules` changed, deploy the rules separately through Firebase and verify that deployment too.
 
