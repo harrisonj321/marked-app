@@ -26,3 +26,7 @@ ui-debug.log
 
 # Vitest / coverage
 coverage
+
+# Migration manifests: content-hash-only, but no reason to keep them
+# outside a git-ignored local scratch dir -- see scripts/migrate-firestore.mjs
+.migration
