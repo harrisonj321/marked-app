@@ -5,8 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f6f0e4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#1b1611" media="(prefers-color-scheme: dark)" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32-dark.png" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16-dark.png" media="(prefers-color-scheme: dark)" />
+    <!--
+      The browser-tab favicon is the only install-adjacent icon surface with
+      standards-track dark-mode support (the `media` attribute on `link
+      rel="icon"`). The PWA manifest icons (icon-192/icon-512, the installed
+      Android/desktop app icon) and apple-touch-icon (the iOS Home Screen
+      icon) have no equivalent standardized conditional mechanism, so both
+      stay on the single approved light M. artwork -- see
+      design/icon-dark-master.png for the approved dark artwork held in
+      reserve for whichever of those surfaces gains real platform support.
+    -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>Marked.</title>
   </head>
