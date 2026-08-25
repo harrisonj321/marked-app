@@ -6,8 +6,27 @@
   --color-border: #e7ddce;
   --color-border-strong: #c9b99e;
   --color-surface: #fbf7ee;
+  /* One step brighter than --color-surface, for dialogs/sheets that float
+     above the page -- elevation reads as a lit surface, not just a
+     different fill. */
+  --color-raised: #fffdf7;
   --color-accent: #4a3524;
   --color-accent-text: #f8f2e6;
+  /* The brand's one drop of gold ink, taken from the dot in the approved
+     wordmark (public/wordmark.png). Reserved for atmosphere and emphasis --
+     halos, selection, small lit accents -- never for the toggle/day-state
+     ink itself, which stays --color-accent so meaning never depends on this
+     color. */
+  --color-gold: #b99a68;
+  /* The one shared "this is lit" shape -- a crisp ring plus a soft bloom
+     behind it, not just a hard outline. Used sparingly: text-field focus,
+     and a couple of small "this is the current one" markers. */
+  --halo: 0 0 0 3px color-mix(in srgb, var(--color-gold) 20%, transparent),
+    0 0 16px color-mix(in srgb, var(--color-gold) 24%, transparent);
+  /* The inset highlight line on a raised dialog -- a plain white catch-light
+     in daylight; overridden warm below since a white sheen on a candlelit
+     dark surface would read as a plastic edge rather than light. */
+  --sheet-highlight: rgb(255 255 255 / 40%);
   /* Shared warm-umber shadow tone (space-separated for rgb(var(...) / a)).
      Shadows read as "dark" in both themes, so this is not overridden
      under prefers-color-scheme: dark. */
@@ -61,10 +80,16 @@
     --color-border: #332a1f;
     --color-border-strong: #5a4c38;
     --color-surface: #221c15;
+    --color-raised: #2b241a;
     --color-accent: #f0e6d3;
     --color-accent-text: #241c14;
     --color-vignette: rgb(50 40 28 / 45%);
     --grain-opacity: 0.065;
+    /* Gold reads as light in the dark rather than as a deeper ink. */
+    --color-gold: #d0b483;
+    --halo: 0 0 0 3px color-mix(in srgb, var(--color-gold) 28%, transparent),
+      0 0 18px color-mix(in srgb, var(--color-gold) 30%, transparent);
+    --sheet-highlight: color-mix(in srgb, var(--color-gold) 12%, transparent);
     --ledger-color-clay: #d9a688;
     --ledger-color-moss: #a8bb8a;
     --ledger-color-dust: #a3c2cf;
@@ -148,6 +173,15 @@ h1 {
   gap: var(--space-3);
 }
 
+/* A phone doesn't need the same top clearance a wider viewport reads as
+   restful -- trims the dead air above the wordmark without touching the
+   safe-area handling or any width above the breakpoint. */
+@media (max-width: 480px) {
+  .screen {
+    padding-top: max(1.75rem, calc(var(--space-1) + env(safe-area-inset-top, 0px)));
+  }
+}
+
 .screen-center {
   justify-content: center;
   align-items: center;
@@ -177,11 +211,21 @@ button {
   color: var(--color-text);
   padding: 0.75rem 1.25rem;
   min-height: 44px;
+  transition: transform 0.08s ease;
 }
 
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* A small tactile press, the one place every button gets to feel physical
+   rather than just clicked -- restrained enough that it reads as material,
+   not as an animation. */
+@media (prefers-reduced-motion: no-preference) {
+  button:not(:disabled):active {
+    transform: scale(0.97);
+  }
 }
 
 button:focus-visible,
@@ -202,11 +246,32 @@ textarea {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 textarea {
   resize: vertical;
   min-height: 4.5rem;
+}
+
+/* The one deliberate moment of light on a form: a text field takes the
+   halo on focus instead of the generic hard outline above. */
+input[type='text']:focus-visible,
+input[type='number']:focus-visible,
+input[type='email']:focus-visible,
+input[type='password']:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-gold) 55%, var(--color-border-strong));
+  box-shadow: var(--halo);
+}
+
+/* Selected text carries the same gold as everything else the product marks
+   as "yours, right now." */
+::selection {
+  background: color-mix(in srgb, var(--color-gold) 32%, transparent);
 }
 
 form {
@@ -256,10 +321,16 @@ fieldset label {
   color: var(--color-text-muted);
   border-radius: 0.625rem;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
+/* Translucent rather than a fixed surface tone, so the same hover reads
+   correctly whether the button sits on the page or on a raised dialog. */
 .icon-button:hover {
   color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
 }
 
 /* Sign-in */
@@ -366,6 +437,11 @@ fieldset label {
   border-radius: 0.75rem;
   min-height: 44px;
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.tracker-title-button:hover {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
 .tracker-title-button:hover .tracker-title-name {
@@ -417,6 +493,7 @@ fieldset label {
   border: 1px solid var(--color-border-strong);
   border-radius: 1.25rem;
   background: var(--color-surface);
+  isolation: isolate;
   /* A recessed woven track (inset) resting on the page with a soft
      ambient lift (the two outer layers) -- cushioned, not glossy. */
   box-shadow:
@@ -437,6 +514,23 @@ fieldset label {
 
 .today-toggle[data-position='right'] {
   --x: 1;
+}
+
+/* A quiet pool of light behind the app's one primary control -- the same
+   "the important surface is lit" idea as everywhere else, just here it's
+   ambient rather than a hard highlight. Low enough opacity that it reads
+   as warmth around the toggle, not a visible shape of its own. */
+.today-toggle::before {
+  content: '';
+  position: absolute;
+  inset: -2.25rem -1.5rem;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 85% at 50% 40%,
+    color-mix(in srgb, var(--color-gold) 14%, transparent),
+    transparent 70%
+  );
 }
 
 .today-toggle-option {
@@ -502,6 +596,10 @@ fieldset label {
   font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+  /* A whisper of light catching the ink's own top edge, clipped along with
+     the card itself -- what keeps it reading as a raised piece of material
+     rather than a flat color swap. */
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
   clip-path: inset(
     0.3125rem
     calc(50% + 0.15625rem - var(--x) * (50% - 0.15625rem))
@@ -663,6 +761,11 @@ fieldset label {
   padding: 0.5rem;
   border-color: transparent;
   background: none;
+  transition: background-color 0.15s ease;
+}
+
+.calendar-nav button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
 }
 
 .calendar-month-label {
@@ -700,6 +803,11 @@ fieldset label {
   cursor: pointer;
   min-height: 40px;
   padding: 0.25rem;
+  transition: background-color 0.15s ease;
+}
+
+.calendar-cell:hover {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
 .calendar-cell-inactive {
@@ -708,12 +816,19 @@ fieldset label {
   cursor: default;
 }
 
+.calendar-cell-inactive:hover {
+  background: none;
+}
+
 .calendar-cell-blank {
   visibility: hidden;
 }
 
+/* A quiet marker for "now," not a status -- the same restrained halo used
+   for a focused text field, at a fraction of the strength. */
 .calendar-cell-today {
   border-color: var(--color-text-muted);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-gold) 14%, transparent);
 }
 
 .calendar-cell-day {
@@ -730,6 +845,9 @@ fieldset label {
   border-radius: 50%;
   background: var(--color-accent);
   color: var(--color-accent-text);
+  /* The same quiet ink-catching-light treatment as the toggle's ink card,
+     at a smaller scale -- material consistency, not a badge. */
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 14%);
 }
 
 .calendar-cell-note-dot {
@@ -767,13 +885,17 @@ fieldset label {
 .ledger-sheet {
   border: none;
   border-radius: 0.75rem;
-  background: var(--color-surface);
+  /* One step brighter than the page, so a dialog reads as lifted into the
+     light rather than just a different-colored panel. */
+  background: var(--color-raised);
   color: var(--color-text);
-  /* A close, tight shadow for grounding plus a wide, soft one for lift --
-     reads as a card resting gently above the page, not a hard drop. */
+  /* A close, tight shadow for grounding, a wide soft one for lift, and a
+     faint inset line catching the card's own top edge -- reads as resting
+     gently above the page and lit from the front, not a hard drop. */
   box-shadow:
     0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
-    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12);
+    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12),
+    inset 0 1px 0 var(--sheet-highlight);
 }
 
 .day-detail,
@@ -797,6 +919,29 @@ fieldset label {
   overflow-y: auto;
   padding: var(--space-3);
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+}
+
+/* A phone's dialogs sit closer to full-width already (see the width
+   formulas above); trimming their inner padding a step keeps them from
+   reading as an oversized desktop form pasted into a narrow sheet. Touch
+   targets are untouched -- every control inside still meets its own
+   min-height floor regardless of the padding around it. */
+@media (max-width: 480px) {
+  .day-detail,
+  .settings-sheet,
+  .ledger-sheet {
+    padding: var(--space-2);
+  }
+
+  .calendar-sheet {
+    padding: var(--space-2);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .day-detail-header,
+  .settings-sheet-header {
+    margin-bottom: var(--space-1);
+  }
 }
 
 .day-detail::backdrop,
@@ -883,6 +1028,7 @@ fieldset label {
 }
 
 .ledger-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -908,10 +1054,29 @@ fieldset label {
 
 /* The current selection reads by weight and full ink, not a checkmark --
    the same restraint the today-toggle already uses for "which side is
-   current" rather than a success-style badge. */
+   current" rather than a success-style badge. A whisper of gold warms the
+   row itself, with a quiet edge marker doing double duty as the cue --
+   :has() support is broad enough here that a plain progressive-enhancement
+   miss (no wash, name still reads via weight/ink above) is an acceptable
+   fallback for a purely decorative touch. */
 .ledger-row-select[aria-current='true'] {
   color: var(--color-text);
   font-weight: 600;
+}
+
+.ledger-row:has(.ledger-row-select[aria-current='true']) {
+  background: color-mix(in srgb, var(--color-raised) 92%, var(--color-gold) 8%);
+}
+
+.ledger-row:has(.ledger-row-select[aria-current='true'])::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--color-gold);
 }
 
 .ledger-row-name {
@@ -971,10 +1136,13 @@ fieldset label {
 }
 
 /* A ring outside the swatch, not a change to the swatch's own fill, so the
-   color itself always reads true. */
+   color itself always reads true. A faint gold bloom sits just outside that
+   ring -- "this is chosen," the same small warmth as everywhere else the
+   product marks a current selection. */
 .ledger-color-chip[aria-pressed='true'] {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-gold) 18%, transparent);
 }
 
 /* Ledger-creation disclosures -- the first-ledger name suggestions and the
@@ -1039,6 +1207,7 @@ fieldset label {
   border-color: var(--color-accent);
   background: var(--color-accent);
   color: var(--color-accent-text);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-gold) 18%, transparent);
 }
 
 /* Update banner */
@@ -1051,12 +1220,14 @@ fieldset label {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  background: var(--color-surface);
+  background: var(--color-raised);
   border: 1px solid var(--color-border);
   border-radius: 0.75rem;
   padding: 0.5rem 0.5rem 0.5rem 0.875rem;
   max-width: calc(100vw - 2rem);
-  box-shadow: 0 0.25rem 1rem rgb(var(--color-shadow-rgb) / 0.1);
+  box-shadow:
+    0 0.25rem 1rem rgb(var(--color-shadow-rgb) / 0.1),
+    inset 0 1px 0 var(--sheet-highlight);
 }
 
 .update-banner-message {
@@ -1143,6 +1314,7 @@ fieldset label {
 .onboarding-dot-active {
   width: 14px;
   background: var(--color-accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-gold) 45%, transparent);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1336,12 +1508,13 @@ fieldset label {
   pointer-events: auto;
   width: min(22rem, calc(100vw - 2rem));
   box-sizing: border-box;
-  background: var(--color-surface);
+  background: var(--color-raised);
   border-radius: 0.75rem;
   padding: var(--space-2);
   box-shadow:
     0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
-    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12);
+    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12),
+    inset 0 1px 0 var(--sheet-highlight);
   display: flex;
   flex-direction: column;
   /* Tighter than a modal card's rhythm (space-2): this is a brief
@@ -1490,14 +1663,15 @@ fieldset label {
 }
 
 .onboarding-card {
-  background: var(--color-surface);
+  background: var(--color-raised);
   border-radius: 0.75rem;
   padding: var(--space-3);
   width: min(24rem, 100%);
   box-sizing: border-box;
   box-shadow:
     0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
-    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12);
+    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12),
+    inset 0 1px 0 var(--sheet-highlight);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
