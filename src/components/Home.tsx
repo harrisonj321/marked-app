@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { deleteAllUserData } from '../data/account'
 import {
   createLedger,
@@ -94,6 +94,13 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
   // must not corrupt the first-run record this account already has.
   const [tourActive, setTourActive] = useState(false)
   const settingsLedger = ledgers.find((ledger) => ledger.id === settingsLedgerId) ?? null
+
+  // The active ledger's resolved color doubles as Home's atmosphere (see
+  // .home-main::before in index.css): the one place the ledger's material
+  // gets to tint the room around the primary interaction. Keyed to ledger
+  // identity only -- never to today's state, which would quietly turn one
+  // state into the "lit" one.
+  const activeLedgerColor = activeLedger ? resolveLedgerColor(activeLedger.color) : null
 
   function handleTourFinish() {
     setTourActive(false)
@@ -194,7 +201,15 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
           )}
         </header>
 
-        <div className="home-main">
+        <div
+          className="home-main"
+          data-atmosphere={activeLedgerColor ?? undefined}
+          style={
+            activeLedgerColor
+              ? ({ '--atmosphere': `var(--ledger-color-${activeLedgerColor})` } as CSSProperties)
+              : undefined
+          }
+        >
           {!user ? (
             <>
               <h1>Sign in to create and mark your first thing.</h1>

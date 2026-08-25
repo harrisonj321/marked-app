@@ -32,6 +32,11 @@
      the field is on the page (sign-in) or on a raised sheet. Deeper in the
      dark, where a recess needs more distance to register at all. */
   --color-well: rgb(var(--color-shadow-rgb) / 0.06);
+  /* Peak strength of the Home atmosphere (see .home-main::before) -- how
+     much of the active ledger's color the field carries at its center.
+     Colored light shows more against the dark than against lit paper, so
+     dark mode gets a slightly higher ceiling. */
+  --atmosphere-peak: 9%;
   /* Native radios/checkboxes render in the app's own ink, not the
      browser's default blue -- the one control color the platform lets us
      set without rebuilding the control. */
@@ -104,6 +109,7 @@
       0 0 18px color-mix(in srgb, var(--color-gold) 30%, transparent);
     --sheet-highlight: color-mix(in srgb, var(--color-gold) 12%, transparent);
     --color-well: rgb(var(--color-shadow-rgb) / 0.35);
+    --atmosphere-peak: 14%;
     /* The same materials by candlelight: each hue lifts toward luminous
        rather than washing toward pastel -- deep enough to stay enamel, not
        sherbet, while keeping wide contrast against the dark accent text. */
@@ -465,6 +471,50 @@ fieldset label {
   text-align: center;
   gap: var(--space-3);
   padding: var(--space-3) 0;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Registered so a ledger switch can interpolate the atmosphere's color
+   instead of snapping; browsers without @property simply switch at once. */
+@property --atmosphere {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-main {
+    transition: --atmosphere 600ms ease;
+  }
+}
+
+/* The active ledger's atmosphere: one broad, very low field of its color
+   pooled around Home's focal column -- the date, the name, and the toggle
+   sit inside a room faintly lit by the ledger's own material, while every
+   actual surface stays warm paper. Painted behind the content (z-index -1
+   under isolation) so legibility never sits ON the tint, and only here:
+   header, footer, sheets, and the calendar deliberately get none of it.
+   Home.tsx supplies --atmosphere (and a per-hue --atmosphere-lift, the
+   same one-number calibration Its Tacos uses for pale accents) only while
+   a ledger is active; signed-out, this resolves to transparent and the
+   paper is just paper.
+
+   The falloff is sized to finish inside the painted box (transparent by
+   92% of a half-width radius), so the field dissolves into the page
+   instead of clipping at an edge -- ambient light, not a colored panel. */
+.home-main::before {
+  content: '';
+  position: absolute;
+  inset: -1.5rem calc(-1 * var(--space-3));
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 52% 46% at 50% 55%,
+    color-mix(in srgb, var(--atmosphere) calc(var(--atmosphere-peak) * var(--atmosphere-lift, 1)), transparent) 0%,
+    color-mix(in srgb, var(--atmosphere) calc(var(--atmosphere-peak) * 0.35 * var(--atmosphere-lift, 1)), transparent) 48%,
+    transparent 92%
+  );
 }
 
 /* An instrument's engraving, not a sentence: small, tracked, even --
@@ -554,7 +604,6 @@ fieldset label {
   border: 1px solid var(--color-border-strong);
   border-radius: 1.25rem;
   background: var(--color-surface);
-  isolation: isolate;
   /* A recessed woven track (inset) resting on the page with a soft
      ambient lift (the two outer layers) -- cushioned, not glossy. */
   box-shadow:
@@ -575,23 +624,6 @@ fieldset label {
 
 .today-toggle[data-position='right'] {
   --x: 1;
-}
-
-/* A quiet pool of light behind the app's one primary control -- the same
-   "the important surface is lit" idea as everywhere else, just here it's
-   ambient rather than a hard highlight. Low enough opacity that it reads
-   as warmth around the toggle, not a visible shape of its own. */
-.today-toggle::before {
-  content: '';
-  position: absolute;
-  inset: -2.25rem -1.5rem;
-  z-index: -1;
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse 70% 85% at 50% 40%,
-    color-mix(in srgb, var(--color-gold) 14%, transparent),
-    transparent 70%
-  );
 }
 
 .today-toggle-option {
