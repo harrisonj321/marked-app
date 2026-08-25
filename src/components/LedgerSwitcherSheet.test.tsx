@@ -95,7 +95,7 @@ describe('LedgerSwitcherSheet', () => {
     expect(screen.getByRole('button', { name: 'Manage Worked out' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Manage Drinking' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument()
-    expect(screen.queryAllByRole('button').filter((b) => /^(Clay|Moss|Dust|Plum|Rose|Straw|None)$/.test(b.textContent ?? ''))).toHaveLength(0)
+    expect(screen.queryAllByRole('button').filter((b) => /^(Persimmon|Fern|Petrol|Ultramarine|Raspberry|Saffron|None)$/.test(b.textContent ?? ''))).toHaveLength(0)
   })
 
   it('switching to a different ledger closes the sheet', () => {
@@ -328,7 +328,7 @@ describe('LedgerSwitcherSheet', () => {
       fireEvent.change(screen.getByLabelText(/what are you tracking/i), { target: { value: 'Reading' } })
       fireEvent.change(screen.getByLabelText('Default state'), { target: { value: 'Rough' } })
       fireEvent.change(screen.getByLabelText('Marked state'), { target: { value: 'Good' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Moss' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Fern' }))
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {

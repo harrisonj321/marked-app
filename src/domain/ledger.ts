@@ -18,26 +18,34 @@ export interface Ledger extends TrackerConfig {
 export const LEGACY_LEDGER_ID = 'default'
 
 /**
- * A small, fixed set of muted, cloth-like identifying colors -- not
- * freeform hex, so a ledger's color can never clash with the app's warm,
- * quiet palette. Leads with 'espresso', the original dark brown Marked. has
- * always used for its one shared accent (see `--color-accent` in
- * index.css): every ledger resolves to a real color from this list (see
- * `resolveLedgerColor`), and espresso is what an otherwise-uncolored ledger
- * -- including the legacy migrated one -- has always actually rendered as.
+ * A small, fixed set of identifying colors -- not freeform hex, so a
+ * ledger's color can never clash with the app's warm, quiet palette. Leads
+ * with 'espresso', the original dark brown Marked. has always used for its
+ * one shared accent (see `--color-accent` in index.css): every ledger
+ * resolves to a real color from this list (see `resolveLedgerColor`), and
+ * espresso is what an otherwise-uncolored ledger -- including the legacy
+ * migrated one -- has always actually rendered as.
+ *
+ * These ids are STORED VALUES on ledger documents and must never change or
+ * be reordered; the rendered hue behind each id and its display label are
+ * presentation, and have been revised since the ids were named (the
+ * original muted palette read as muddy in aggregate). Each id keeps its
+ * hue family, so every existing ledger keeps the color identity its owner
+ * chose -- just a richer, more material version of it.
  */
 export const LEDGER_COLORS = ['espresso', 'clay', 'moss', 'dust', 'plum', 'rose', 'straw'] as const
 
 export type LedgerColor = (typeof LEDGER_COLORS)[number]
 
+/** Display names follow the rendered hues, not the legacy stored ids. */
 export const LEDGER_COLOR_LABELS: Record<LedgerColor, string> = {
   espresso: 'Espresso',
-  clay: 'Clay',
-  moss: 'Moss',
-  dust: 'Dust',
-  plum: 'Plum',
-  rose: 'Rose',
-  straw: 'Straw',
+  clay: 'Persimmon',
+  moss: 'Fern',
+  dust: 'Petrol',
+  plum: 'Ultramarine',
+  rose: 'Raspberry',
+  straw: 'Saffron',
 }
 
 /**

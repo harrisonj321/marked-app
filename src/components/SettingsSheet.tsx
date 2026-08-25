@@ -409,7 +409,7 @@ export function SettingsSheet({
             )}
 
             <div className="settings-actions">
-              <button type="submit" disabled={saving}>
+              <button type="submit" className="button-primary" disabled={saving}>
                 Save
               </button>
             </div>

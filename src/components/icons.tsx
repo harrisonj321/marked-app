@@ -109,6 +109,27 @@ export function EditIcon({ size = 18 }: IconProps) {
   )
 }
 
+/** The ledger catalog's "add" glyph, seated on the color-dot axis. */
+export function PlusIcon({ size = 16 }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  )
+}
+
 export function SwapIcon({ size = 18 }: IconProps) {
   return (
     <svg

@@ -330,12 +330,12 @@ describe('SettingsSheet', () => {
     // literal absence.
     renderSheet({ color: 'espresso' })
     expect(screen.getByRole('button', { name: 'Espresso' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Clay' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Persimmon' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('pre-selects the ledger\'s current color', () => {
     renderSheet({ color: 'moss' })
-    expect(screen.getByRole('button', { name: 'Moss' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Fern' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Espresso' })).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -347,7 +347,7 @@ describe('SettingsSheet', () => {
   it('saves a newly picked color alongside no other changes', async () => {
     const { onSaveColor, onSaveDefaultState, onSaveStateLabels } = renderSheet({ color: 'espresso' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Rose' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Raspberry' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => {
@@ -416,7 +416,7 @@ describe('SettingsSheet', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Straw' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Saffron' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('renaming a label does not change which state is the default', async () => {
@@ -489,7 +489,7 @@ describe('SettingsSheet', () => {
       const { onSaveName, onSaveColor } = renderSheet({ color: 'espresso' })
 
       fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Reading' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Rose' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Raspberry' }))
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await vi.waitFor(() => {

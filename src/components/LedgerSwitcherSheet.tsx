@@ -16,7 +16,7 @@ import {
   type Ledger,
   type LedgerColor,
 } from '../domain/ledger'
-import { CloseIcon, EditIcon } from './icons'
+import { CloseIcon, EditIcon, PlusIcon } from './icons'
 
 export interface NewLedgerInput {
   name: string
@@ -213,7 +213,7 @@ export function LedgerSwitcherSheet({
               aria-label={`Manage ${ledger.name}`}
               onClick={() => handleManage(ledger.id)}
             >
-              <EditIcon />
+              <EditIcon size={16} />
             </button>
           </li>
         ))}
@@ -301,21 +301,27 @@ export function LedgerSwitcherSheet({
 
           <div className="settings-actions">
             {!isFirstLedger && (
-              <button type="button" onClick={() => setCreating(false)} disabled={savingCreate}>
+              <button
+                type="button"
+                className="button-quiet"
+                onClick={() => setCreating(false)}
+                disabled={savingCreate}
+              >
                 Cancel
               </button>
             )}
-            <button type="submit" disabled={savingCreate}>
+            <button type="submit" className="button-primary" disabled={savingCreate}>
               Save
             </button>
           </div>
         </form>
       ) : (
-        <div className="settings-secondary-actions">
-          <button type="button" className="footer-link" onClick={startCreating}>
-            New ledger
-          </button>
-        </div>
+        <button type="button" className="ledger-add" onClick={startCreating}>
+          <span className="ledger-add-glyph" aria-hidden="true">
+            <PlusIcon />
+          </span>
+          New ledger
+        </button>
       )}
     </dialog>
   )

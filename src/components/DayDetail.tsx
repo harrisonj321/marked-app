@@ -189,7 +189,7 @@ export function DayDetail({
         )}
 
         <div className="day-detail-actions">
-          <button type="submit" disabled={saving}>
+          <button type="submit" className="button-primary" disabled={saving}>
             Save
           </button>
         </div>

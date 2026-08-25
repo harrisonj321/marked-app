@@ -27,6 +27,15 @@
      in daylight; overridden warm below since a white sheen on a candlelit
      dark surface would read as a plastic edge rather than light. */
   --sheet-highlight: rgb(255 255 255 / 40%);
+  /* The fill of a recessed input well: a translucent shadow tint, so the
+     same value reads as "a step below whatever surface it sits on" whether
+     the field is on the page (sign-in) or on a raised sheet. Deeper in the
+     dark, where a recess needs more distance to register at all. */
+  --color-well: rgb(var(--color-shadow-rgb) / 0.06);
+  /* Native radios/checkboxes render in the app's own ink, not the
+     browser's default blue -- the one control color the platform lets us
+     set without rebuilding the control. */
+  accent-color: var(--color-accent);
   /* Shared warm-umber shadow tone (space-separated for rgb(var(...) / a)).
      Shadows read as "dark" in both themes, so this is not overridden
      under prefers-color-scheme: dark. */
@@ -50,13 +59,17 @@
   --space-2: 1rem;
   --space-3: 1.5rem;
   --space-4: 2.5rem;
-  /* A ledger's identifying color -- a small, fixed, muted palette (see
+  /* A ledger's identifying color -- a small, fixed palette (see
      domain/ledger.ts's LEDGER_COLORS), not freeform hex, so nothing a user
-     picks can clash with the app's warm, quiet palette. Deep enough in
-     light mode (and light enough in dark mode) to keep --color-accent-text
-     legible when used as the today-toggle's own accent fill -- the same
-     pairing the app's one shared accent already relies on, just recolored,
-     never a second contrast system.
+     picks can clash with the app's warm, quiet palette. The set is drawn
+     like physical materials -- lacquer, enamel, dyed leather, rich ink --
+     against the neutral paper: one confident value per hue family, deep
+     enough in light mode (and light enough in dark mode) to keep
+     --color-accent-text legible when used as the today-toggle's own accent
+     fill, the same pairing the app's one shared accent already relies on.
+     The custom-property names are the STORED ids (clay/moss/...), which
+     never change -- only the rendered material behind each id does; see
+     LEDGER_COLOR_LABELS for the display names that follow these hues.
 
      --ledger-color-espresso is a live alias for --color-accent itself, not
      a separate value: it's what an uncolored ledger has always rendered
@@ -64,12 +77,12 @@
      can never drift apart, and it automatically follows --color-accent's
      own light/dark redefinition below without needing one of its own. */
   --ledger-color-espresso: var(--color-accent);
-  --ledger-color-clay: #8a4a32;
-  --ledger-color-moss: #4f5c38;
-  --ledger-color-dust: #3f5866;
-  --ledger-color-plum: #4a3d66;
-  --ledger-color-rose: #7a3d4c;
-  --ledger-color-straw: #7a642a;
+  --ledger-color-clay: #b34a22;
+  --ledger-color-moss: #4a7038;
+  --ledger-color-dust: #1f6673;
+  --ledger-color-plum: #3a4da6;
+  --ledger-color-rose: #a63a5c;
+  --ledger-color-straw: #a86e0e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -90,12 +103,16 @@
     --halo: 0 0 0 3px color-mix(in srgb, var(--color-gold) 28%, transparent),
       0 0 18px color-mix(in srgb, var(--color-gold) 30%, transparent);
     --sheet-highlight: color-mix(in srgb, var(--color-gold) 12%, transparent);
-    --ledger-color-clay: #d9a688;
-    --ledger-color-moss: #a8bb8a;
-    --ledger-color-dust: #a3c2cf;
-    --ledger-color-plum: #b3a3d1;
-    --ledger-color-rose: #d1a3ae;
-    --ledger-color-straw: #d9c17e;
+    --color-well: rgb(var(--color-shadow-rgb) / 0.35);
+    /* The same materials by candlelight: each hue lifts toward luminous
+       rather than washing toward pastel -- deep enough to stay enamel, not
+       sherbet, while keeping wide contrast against the dark accent text. */
+    --ledger-color-clay: #dd7a4c;
+    --ledger-color-moss: #86ad6d;
+    --ledger-color-dust: #4fa4b2;
+    --ledger-color-plum: #7d92e6;
+    --ledger-color-rose: #dd7392;
+    --ledger-color-straw: #dfa63e;
   }
 }
 
@@ -198,10 +215,6 @@ h1 {
   margin: 0;
 }
 
-label {
-  font-size: 0.9375rem;
-}
-
 button {
   font: inherit;
   cursor: pointer;
@@ -211,7 +224,14 @@ button {
   color: var(--color-text);
   padding: 0.75rem 1.25rem;
   min-height: 44px;
-  transition: transform 0.08s ease;
+  transition:
+    transform 0.08s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
 }
 
 button:disabled {
@@ -234,6 +254,11 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+/* Editable fields are recessed wells, not outlined boxes: a shade below
+   the surface they sit on, with a whisper of shadow at the top edge where
+   the recess catches light. Recessed = "type into me"; raised or outlined
+   = "press me" -- the same physical distinction a well-made instrument
+   makes, so editable and actionable can never be confused. */
 input[type='text'],
 input[type='number'],
 input[type='email'],
@@ -243,12 +268,19 @@ textarea {
   width: 100%;
   padding: 0.65rem 0.75rem;
   border-radius: 0.625rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border: 1px solid transparent;
+  background: var(--color-well);
   color: var(--color-text);
+  box-shadow: inset 0 1px 2px rgb(var(--color-shadow-rgb) / 0.06);
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.75;
 }
 
 textarea {
@@ -268,39 +300,63 @@ textarea:focus-visible {
   box-shadow: var(--halo);
 }
 
+/* Interface labels recede to muted so the user's own words own the full
+   ink -- the content is the subject, the label is the engraving beside the
+   control. Control-sized labels (the day-detail state radios, fieldset
+   rows) stay full ink below: there the label text IS the choice. */
+label {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.field > span {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
 /* Selected text carries the same gold as everything else the product marks
    as "yours, right now." */
 ::selection {
   background: color-mix(in srgb, var(--color-gold) 32%, transparent);
 }
 
+/* A touch more air between fields than inside them (label-to-input is
+   0.375rem), so each field reads as one unit and the form as a sequence
+   of units -- rhythm, not an even stack. */
 form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 1.25rem;
 }
 
+/* A plain grouping, not a bordered box -- the radio rows carry their own
+   44px targets, and a frame around them was the one outlined container
+   left among the sheets' recessed wells and quiet cards. */
 fieldset {
-  border: 1px solid var(--color-border);
-  border-radius: 0.625rem;
-  padding: var(--space-2);
+  border: none;
+  border-radius: 0;
+  padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 0;
 }
 
 legend {
-  padding: 0 0.25rem;
+  padding: 0;
   color: var(--color-text-muted);
   font-size: 0.875rem;
 }
 
+/* These labels are the choices themselves (Did / Didn't), so they keep
+   full ink and body size against the muted engraving-labels elsewhere. */
 fieldset label {
   display: flex;
   align-items: center;
   gap: 0.625rem;
   min-height: 44px;
+  color: var(--color-text);
+  font-size: 0.9375rem;
 }
 
 .message {
@@ -391,10 +447,11 @@ fieldset label {
 
 /* A small identifying dot, reused everywhere a ledger's color needs to
    read at a glance without becoming a theme: the ledger catalog's rows and
-   its color pickers. */
+   its color pickers. Sized like an indicator lamp -- large enough that the
+   palette's hues actually register at a glance. */
 .ledger-dot {
-  width: 8px;
-  height: 8px;
+  width: 0.625rem;
+  height: 0.625rem;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -410,10 +467,14 @@ fieldset label {
   padding: var(--space-3) 0;
 }
 
+/* An instrument's engraving, not a sentence: small, tracked, even --
+   quiet context above the object's actual subject (the ledger name). */
 .today-date {
   color: var(--color-text-muted);
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .tracker-title {
@@ -766,6 +827,7 @@ fieldset label {
 
 .calendar-nav button:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  border-color: transparent;
 }
 
 .calendar-month-label {
@@ -884,7 +946,10 @@ fieldset label {
 .calendar-sheet,
 .ledger-sheet {
   border: none;
-  border-radius: 0.75rem;
+  /* One shared card radius, a step softer than control radius (0.625rem)
+     and a step tighter than the toggle (1.25rem) -- the radius rhythm that
+     makes controls, cards, and the primary object read as one family. */
+  border-radius: 1rem;
   /* One step brighter than the page, so a dialog reads as lifted into the
      light rather than just a different-colored panel. */
   background: var(--color-raised);
@@ -1010,6 +1075,8 @@ fieldset label {
 .day-detail-actions,
 .settings-actions {
   display: flex;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
 }
 
 .day-detail-actions button,
@@ -1027,56 +1094,52 @@ fieldset label {
   flex-direction: column;
 }
 
+/* Rows breathe past the sheet's text column so a selection fill can wrap
+   its row symmetrically -- content stays on the sheet's grid, the fill
+   extends into the margin, the way a well-set list highlights. No
+   separator rules: three aligned rows on one card don't need drawn lines
+   between them. */
+.ledger-list {
+  margin: 0 calc(-1 * var(--space-1));
+}
+
 .ledger-row {
-  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.ledger-row:last-child {
-  border-bottom: none;
+  padding: 0 var(--space-1);
+  border-radius: 0.625rem;
 }
 
 .ledger-row-select {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.75rem;
   border: none;
   background: none;
-  padding: 0.625rem 0.25rem;
+  padding: 0.625rem 0;
   min-height: 44px;
   color: var(--color-text-muted);
   text-align: left;
+  transition: color 0.15s ease;
 }
 
-/* The current selection reads by weight and full ink, not a checkmark --
-   the same restraint the today-toggle already uses for "which side is
-   current" rather than a success-style badge. A whisper of gold warms the
-   row itself, with a quiet edge marker doing double duty as the cue --
-   :has() support is broad enough here that a plain progressive-enhancement
-   miss (no wash, name still reads via weight/ink above) is an acceptable
-   fallback for a purely decorative touch. */
+.ledger-row-select:hover {
+  color: var(--color-text);
+}
+
+/* The current selection: full ink and weight (the cue that never depends
+   on color), seated in one soft warm fill -- a single resolved statement
+   in place of the bar-plus-wash it replaces. :has() misses degrade to
+   weight and ink alone, which still read. */
 .ledger-row-select[aria-current='true'] {
   color: var(--color-text);
   font-weight: 600;
 }
 
 .ledger-row:has(.ledger-row-select[aria-current='true']) {
-  background: color-mix(in srgb, var(--color-raised) 92%, var(--color-gold) 8%);
-}
-
-.ledger-row:has(.ledger-row-select[aria-current='true'])::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 22%;
-  bottom: 22%;
-  width: 3px;
-  border-radius: 999px;
-  background: var(--color-gold);
+  background: color-mix(in srgb, var(--color-gold) 12%, transparent);
 }
 
 .ledger-row-name {
@@ -1087,6 +1150,40 @@ fieldset label {
 
 .ledger-row-manage {
   flex-shrink: 0;
+}
+
+/* "New ledger" as a continuation of the list itself, not a footer link: a
+   quiet plus glyph seated exactly on the color-dot axis, the label where
+   the names sit. The affordance is the alignment. */
+.ledger-add {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: calc(100% + 2 * var(--space-1));
+  margin: 0 calc(-1 * var(--space-1));
+  border: none;
+  background: none;
+  padding: 0.625rem var(--space-1);
+  min-height: 44px;
+  color: var(--color-text-muted);
+  text-align: left;
+  font-size: inherit;
+  border-radius: 0.625rem;
+  transition: color 0.15s ease;
+}
+
+.ledger-add:hover {
+  color: var(--color-text);
+}
+
+/* The glyph slot matches the dot's footprint so the plus centers on the
+   same axis the dots do; the icon overflows the slot without moving it. */
+.ledger-add-glyph {
+  width: 0.625rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Settings' delete-confirmation block: one small "are you sure" prompt
@@ -1126,23 +1223,23 @@ fieldset label {
   flex-wrap: wrap;
 }
 
+/* Lacquered enamel buttons: a hairline seat plus a whisper of light on
+   the top edge, so each swatch reads as a made object, not a paint chip. */
 .ledger-color-chip {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2rem;
+  height: 2rem;
   min-height: 0;
   border-radius: 50%;
   border: 1px solid rgb(var(--color-shadow-rgb) / 0.15);
   padding: 0;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%);
 }
 
-/* A ring outside the swatch, not a change to the swatch's own fill, so the
-   color itself always reads true. A faint gold bloom sits just outside that
-   ring -- "this is chosen," the same small warmth as everywhere else the
-   product marks a current selection. */
+/* Selection is one precise ink ring offset from the swatch -- the color
+   itself always reads true, and nothing blooms around it. */
 .ledger-color-chip[aria-pressed='true'] {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-gold) 18%, transparent);
 }
 
 /* Ledger-creation disclosures -- the first-ledger name suggestions and the
@@ -1207,7 +1304,6 @@ fieldset label {
   border-color: var(--color-accent);
   background: var(--color-accent);
   color: var(--color-accent-text);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--color-gold) 18%, transparent);
 }
 
 /* Update banner */
@@ -1344,15 +1440,36 @@ fieldset label {
   flex: 1;
 }
 
-/* The one accent-filled treatment already established elsewhere in Marked.
-   (the update banner's Reload, the active count chip) -- reused here so the
-   forward/progression action in the tour reads as clearly primary without
-   inventing a new visual language. */
-.onboarding-primary {
+/* The one accent-filled treatment: every sheet's confirming action (Save,
+   the tour's forward action, the update banner's Reload) carries the app's
+   ink, and everything beside it stays quiet -- one clear answer to "what
+   does pressing the obvious thing do" on any surface. */
+.onboarding-primary,
+.button-primary {
   background: var(--color-accent);
   color: var(--color-accent-text);
   border-color: var(--color-accent);
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
+}
+
+.onboarding-primary:hover:not(:disabled),
+.button-primary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+/* The step-aside action beside a primary: present, comfortable to hit,
+   visually silent. */
+.button-quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--color-text-muted);
+}
+
+.button-quiet:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
 /* The intro slide: an opaque full-screen takeover, matching Setup/SignIn's
@@ -1509,7 +1626,7 @@ fieldset label {
   width: min(22rem, calc(100vw - 2rem));
   box-sizing: border-box;
   background: var(--color-raised);
-  border-radius: 0.75rem;
+  border-radius: 1rem;
   padding: var(--space-2);
   box-shadow:
     0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
@@ -1664,7 +1781,7 @@ fieldset label {
 
 .onboarding-card {
   background: var(--color-raised);
-  border-radius: 0.75rem;
+  border-radius: 1rem;
   padding: var(--space-3);
   width: min(24rem, 100%);
   box-sizing: border-box;
