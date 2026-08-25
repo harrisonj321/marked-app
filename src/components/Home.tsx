@@ -206,7 +206,15 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
           data-atmosphere={activeLedgerColor ?? undefined}
           style={
             activeLedgerColor
-              ? ({ '--atmosphere': `var(--ledger-color-${activeLedgerColor})` } as CSSProperties)
+              ? ({
+                  '--atmosphere': `var(--ledger-color-${activeLedgerColor})`,
+                  // The same value as --atmosphere, under its own name --
+                  // atmosphere is consumed only by the glow, --ledger-accent
+                  // by everything else in this subtree that wants the
+                  // ledger's ink at full strength (currently just
+                  // .today-detail-link, a descendant of this element).
+                  '--ledger-accent': `var(--ledger-color-${activeLedgerColor})`,
+                } as CSSProperties)
               : undefined
           }
         >
@@ -226,6 +234,13 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
                   aria-label={`Switch ledger, current: ${activeLedger.name}`}
                   onClick={() => setSwitcherOpen(true)}
                 >
+                  {activeLedgerColor && (
+                    <span
+                      className="ledger-dot"
+                      style={{ background: `var(--ledger-color-${activeLedgerColor})` }}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span className="tracker-title-name">{activeLedger.name}</span>
                   <ChevronDownIcon />
                 </button>

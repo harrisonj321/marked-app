@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import {
   addMonths,
   compareYearMonth,
@@ -12,7 +12,7 @@ import {
 import { formatDisplayDate } from '../domain/date'
 import { formatCount, type NormalizedDailyRecord } from '../domain/day'
 import { resolveStateLabels, type StateLabels } from '../domain/tracker'
-import type { Ledger } from '../domain/ledger'
+import { resolveLedgerColor, type Ledger } from '../domain/ledger'
 import { saveDailyRecord } from '../data/day'
 import { useMonthRecords } from '../hooks/useMonthRecords'
 import { DayDetail } from './DayDetail'
@@ -58,8 +58,14 @@ export function Calendar({ uid, ledger, todayKey }: CalendarProps) {
     await saveDailyRecord(uid, ledger.id, dateKey, normalized)
   }
 
+  // CalendarSheet is a sibling of Home's .home-main, not a descendant, so
+  // it can't inherit --ledger-accent from there -- this is its own supply
+  // of the same ledger accent, tying the calendar visibly to whichever
+  // ledger it's showing rather than reading as a neutral detached tool.
+  const ledgerAccent = { '--ledger-accent': `var(--ledger-color-${resolveLedgerColor(ledger.color)})` } as CSSProperties
+
   return (
-    <section className="calendar">
+    <section className="calendar" style={ledgerAccent}>
       <div className="calendar-nav">
         <button type="button" onClick={goToPreviousMonth} aria-label="Previous month">
           &larr;

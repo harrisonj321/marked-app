@@ -36,7 +36,7 @@
      much of the active ledger's color the field carries at its center.
      Colored light shows more against the dark than against lit paper, so
      dark mode gets a slightly higher ceiling. */
-  --atmosphere-peak: 9%;
+  --atmosphere-peak: 24%;
   /* Native radios/checkboxes render in the app's own ink, not the
      browser's default blue -- the one control color the platform lets us
      set without rebuilding the control. */
@@ -109,7 +109,7 @@
       0 0 18px color-mix(in srgb, var(--color-gold) 30%, transparent);
     --sheet-highlight: color-mix(in srgb, var(--color-gold) 12%, transparent);
     --color-well: rgb(var(--color-shadow-rgb) / 0.35);
-    --atmosphere-peak: 14%;
+    --atmosphere-peak: 32%;
     /* The same materials by candlelight: each hue lifts toward luminous
        rather than washing toward pastel -- deep enough to stay enamel, not
        sherbet, while keeping wide contrast against the dark accent text. */
@@ -489,32 +489,48 @@ fieldset label {
   }
 }
 
-/* The active ledger's atmosphere: one broad, very low field of its color
-   pooled around Home's focal column -- the date, the name, and the toggle
-   sit inside a room faintly lit by the ledger's own material, while every
-   actual surface stays warm paper. Painted behind the content (z-index -1
-   under isolation) so legibility never sits ON the tint, and only here:
-   header, footer, sheets, and the calendar deliberately get none of it.
-   Home.tsx supplies --atmosphere (and a per-hue --atmosphere-lift, the
-   same one-number calibration Its Tacos uses for pale accents) only while
-   a ledger is active; signed-out, this resolves to transparent and the
-   paper is just paper.
+/* The active ledger's atmosphere: one field of its color pooled around
+   Home's focal column -- the date, the name, and the toggle sit inside a
+   room lit by the ledger's own material, while every actual surface stays
+   warm paper. Painted behind the content (z-index -1 under isolation) so
+   legibility never sits ON the tint, and only here: header, footer,
+   sheets, and the calendar's own chrome deliberately get none of it (the
+   calendar gets a narrower, separate accent -- see .calendar-cell-marked
+   and .calendar-cell-today below). Home.tsx supplies --atmosphere (and a
+   per-hue --atmosphere-lift, the same one-number calibration Its Tacos
+   uses for pale accents) only while a ledger is active; signed-out, this
+   resolves to transparent and the paper is just paper.
 
-   The falloff is sized to finish inside the painted box (transparent by
-   92% of a half-width radius), so the field dissolves into the page
-   instead of clipping at an edge -- ambient light, not a colored panel. */
+   The ellipse is sized in fixed units, not as a percentage of .home-main
+   -- .home-main is a flex:1 region that can run to 600px+ of empty space
+   on a tall phone, and a percentage-sized glow dilutes across all of it
+   until it's imperceptible. Content is vertically centered by flexbox, so
+   .home-main's own 50%/50% midpoint already lands on the content group's
+   true center regardless of how much blank space surrounds it -- only the
+   ellipse's SIZE needed to stop tracking the container. */
 .home-main::before {
   content: '';
   position: absolute;
-  inset: -1.5rem calc(-1 * var(--space-3));
+  inset: 0;
   z-index: -1;
   pointer-events: none;
   background: radial-gradient(
-    ellipse 52% 46% at 50% 55%,
+    ellipse min(82vw, 26rem) min(48vh, 16rem) at 50% 50%,
     color-mix(in srgb, var(--atmosphere) calc(var(--atmosphere-peak) * var(--atmosphere-lift, 1)), transparent) 0%,
-    color-mix(in srgb, var(--atmosphere) calc(var(--atmosphere-peak) * 0.35 * var(--atmosphere-lift, 1)), transparent) 48%,
-    transparent 92%
+    color-mix(in srgb, var(--atmosphere) calc(var(--atmosphere-peak) * 0.4 * var(--atmosphere-lift, 1)), transparent) 45%,
+    transparent 100%
   );
+}
+
+/* Petrol sits close to the warm page's own luminance in daylight, so an
+   equal-alpha mix reads as merely grayed rather than tinted -- the same
+   "pale accent needs more alpha" calibration Its Tacos keeps per-hue.
+   Scoped to light only: petrol already reads clearly in dark mode against
+   the near-black ground, and doesn't need (or want) the same boost there. */
+@media (prefers-color-scheme: light) {
+  .home-main[data-atmosphere='dust'] {
+    --atmosphere-lift: 1.6;
+  }
 }
 
 /* An instrument's engraving, not a sentence: small, tracked, even --
@@ -568,6 +584,13 @@ fieldset label {
 .tracker-title-button svg {
   color: var(--color-text-muted);
   flex-shrink: 0;
+}
+
+/* The immediate "which ledger am I in" cue -- the same dot the switcher
+   already uses, so a glance at the title answers the question before the
+   name is even read, without a second visual language. */
+.tracker-title-button .ledger-dot {
+  margin-right: 0.25rem;
 }
 
 .today {
@@ -779,10 +802,14 @@ fieldset label {
   }
 }
 
+/* A quiet ledger-linked tint rather than the plain muted text every other
+   secondary link uses -- --ledger-accent comes from .home-main (Home.tsx),
+   an ancestor of this link, so it's inherited for free; mixed rather than
+   applied at full strength so it reads as tinted, not as a loud CTA. */
 .today-detail-link {
   border: none;
   background: none;
-  color: var(--color-text-muted);
+  color: color-mix(in srgb, var(--ledger-accent, var(--color-text-muted)) 65%, var(--color-text-muted));
   text-decoration: underline;
   text-underline-offset: 2px;
   min-height: auto;
@@ -918,11 +945,13 @@ fieldset label {
   visibility: hidden;
 }
 
-/* A quiet marker for "now," not a status -- the same restrained halo used
-   for a focused text field, at a fraction of the strength. */
+/* A quiet marker for "now," not a status -- the ledger's own accent
+   (supplied by Calendar.tsx, since this sheet is a sibling of .home-main
+   rather than a descendant) so the calendar reads as this ledger's
+   calendar, not a neutral detached tool; gold stays out of this context. */
 .calendar-cell-today {
   border-color: var(--color-text-muted);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-gold) 14%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ledger-accent, var(--color-text-muted)) 22%, transparent);
 }
 
 .calendar-cell-day {
@@ -930,6 +959,10 @@ fieldset label {
   line-height: 1;
 }
 
+/* Marked days carry the same fill/text pairing as the toggle's own ink
+   card (ledger accent behind --color-accent-text) -- one proven pairing,
+   reused, so a day marked in this ledger reads as unmistakably this
+   ledger's mark rather than the app's generic ink. */
 .calendar-cell-marked .calendar-cell-day {
   display: inline-flex;
   align-items: center;
@@ -937,7 +970,7 @@ fieldset label {
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 50%;
-  background: var(--color-accent);
+  background: var(--ledger-accent, var(--color-accent));
   color: var(--color-accent-text);
   /* The same quiet ink-catching-light treatment as the toggle's ink card,
      at a smaller scale -- material consistency, not a badge. */
