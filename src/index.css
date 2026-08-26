@@ -158,8 +158,9 @@
      re-declares the shape per element, which is what lets each one supply
      its own color and scale.
 
-     Every accent-carrying object shares it: the today toggle's ink card
-     (as drop-shadow, since clip-path would eat a box-shadow), the
+     Every accent-carrying object shares it: the today toggle's glow
+     stand-in (a transformed sibling of the clipped ink card -- see
+     .today-toggle-glow for why the card can't carry it itself), the
      calendar's marked days and today ring, a ledger's primary Save, the
      count chips, the color swatches, and the ledger dots. Anything not
      carrying a ledger's accent stays unlit. */
@@ -278,8 +279,16 @@ button {
     background-color 0.15s ease;
 }
 
-button:hover:not(:disabled) {
-  border-color: var(--color-border-strong);
+/* Every cosmetic :hover in the app is gated to devices that can actually
+   hover: iOS Safari latches :hover on after a tap (sticky hover) and
+   holds it until the next tap lands somewhere else, which left tapped
+   controls -- most visibly the ledger title -- stuck in their hover fill.
+   Keyboard users keep the separate :focus-visible treatment; touch gets
+   resting styles only. */
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    border-color: var(--color-border-strong);
+  }
 }
 
 button:disabled {
@@ -432,9 +441,11 @@ fieldset label {
 
 /* Translucent rather than a fixed surface tone, so the same hover reads
    correctly whether the button sits on the page or on a raised dialog. */
-.icon-button:hover {
-  color: var(--color-text);
-  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+@media (hover: hover) {
+  .icon-button:hover {
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  }
 }
 
 /* Sign-in */
@@ -620,12 +631,14 @@ fieldset label {
   transition: background-color 0.15s ease;
 }
 
-.tracker-title-button:hover {
-  background: color-mix(in srgb, var(--color-text) 5%, transparent);
-}
+@media (hover: hover) {
+  .tracker-title-button:hover {
+    background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  }
 
-.tracker-title-button:hover .tracker-title-name {
-  color: var(--color-text-muted);
+  .tracker-title-button:hover .tracker-title-name {
+    color: var(--color-text-muted);
+  }
 }
 
 .tracker-title-name {
@@ -732,29 +745,42 @@ fieldset label {
    window slides the card while the words themselves stay perfectly
    registered with the track underneath.
 
-   Its cushioned shadow lives on the wrapper, not on the card itself:
-   filter and clip-path on the same element clip the shadow away along
-   with everything else outside the window, so drop-shadow has to sit on
-   an unclipped ancestor and read the card's already-clipped silhouette.
+   Its halo and cushioned seat live on .today-toggle-glow below, a
+   transparent stand-in for the pill -- NOT on the card and NOT as a
+   filter on an ancestor. box-shadow on the card itself would be clipped
+   away with everything else outside the window, and the previous
+   architecture (a filter: drop-shadow() chain on a track-sized wrapper,
+   reading this card's clipped silhouette) is exactly what iOS WebKit
+   rendered as hard-edged translucent rectangles around the control --
+   the filter's rasterization region made visible, worst while the clip
+   animated. Desktop Chromium never showed it, which is how it shipped in
+   v0.10.3. Do not reintroduce filter anywhere in this control. */
 
-   The same constraint is what makes the halo work: because drop-shadow
-   reads that clipped silhouette, the ledger-colored light is attached to
-   the ink card and slides with it, rather than pooling at a fixed point
-   on the track. It is --object-glow's shape rendered in the one syntax
-   available here -- zero offset, two coincident blooms -- and it is
-   listed first so the two seating shadows below fall from the card plus
-   its halo, not the halo from the shadows. Both positions carry the exact
-   same light: neither state may read as the lit one. */
-.today-toggle-ink-shadow {
+/* The pill's light and its seat: the same rounded rect the clip window
+   describes, driven by the same --x. translateX resolves 100% against
+   this element's own width, so x = 1 lands its left edge exactly where
+   the clip formula puts the pill's. It carries the shared --object-glow
+   (the toggle is on the same lit-object token as every other accent
+   carrier) plus the two neutral seating shadows, all as ordinary
+   box-shadows on a plainly transformed element -- the most conservative
+   compositing path available. An outer box-shadow paints only outside
+   its own border box, so this layer never tints the pill face rendered
+   above it. Both positions carry the exact same light: neither state
+   may read as the lit one. */
+.today-toggle-glow {
   position: absolute;
-  inset: 0;
+  top: 0.3125rem;
+  bottom: 0.3125rem;
+  left: 0.3125rem;
+  width: calc(50% - 0.46875rem);
+  border-radius: 0.9375rem;
   pointer-events: none;
-  --ink: var(--today-toggle-accent, var(--color-accent));
-  filter:
-    drop-shadow(0 0 0.5rem color-mix(in srgb, var(--ink) var(--glow-near-alpha), transparent))
-    drop-shadow(0 0 1.5rem color-mix(in srgb, var(--ink) var(--glow-far-alpha), transparent))
-    drop-shadow(0 1px 1px rgb(var(--color-shadow-rgb) / 0.14))
-    drop-shadow(0 4px 10px rgb(var(--color-shadow-rgb) / 0.12));
+  --glow-color: var(--today-toggle-accent, var(--color-accent));
+  transform: translateX(calc(var(--x) * (100% + 0.3125rem)));
+  box-shadow:
+    var(--object-glow),
+    0 1px 1px rgb(var(--color-shadow-rgb) / 0.14),
+    0 4px 10px rgb(var(--color-shadow-rgb) / 0.12);
 }
 
 /* The clip window is a fixed width sliding between the two halves; its
@@ -798,9 +824,18 @@ fieldset label {
     transition: clip-path 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
+  /* The glow rides the identical spring: clip insets and translateX are
+     both linear in --x with the same endpoints, so sharing one duration
+     and curve keeps halo and pill registered through every frame of the
+     settle, overshoot included. */
+  .today-toggle-glow {
+    transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
   /* Live-dragging tracks the pointer 1:1; the spring only plays once the
      finger lets go and --x snaps back to its resolved 0/1. */
-  .today-toggle-dragging .today-toggle-ink {
+  .today-toggle-dragging .today-toggle-ink,
+  .today-toggle-dragging .today-toggle-glow {
     transition: none;
   }
 }
@@ -809,7 +844,8 @@ fieldset label {
    unclipped overlay would hide both words. Drop it and mark the current
    side directly instead. */
 @supports not (clip-path: inset(0 round 1px)) {
-  .today-toggle-ink-shadow {
+  .today-toggle-glow,
+  .today-toggle-ink {
     display: none;
   }
 
@@ -949,9 +985,11 @@ fieldset label {
   transition: background-color 0.15s ease;
 }
 
-.calendar-nav button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-text) 6%, transparent);
-  border-color: transparent;
+@media (hover: hover) {
+  .calendar-nav button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-text) 6%, transparent);
+    border-color: transparent;
+  }
 }
 
 .calendar-month-label {
@@ -992,8 +1030,10 @@ fieldset label {
   transition: background-color 0.15s ease;
 }
 
-.calendar-cell:hover {
-  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+@media (hover: hover) {
+  .calendar-cell:hover {
+    background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  }
 }
 
 .calendar-cell-inactive {
@@ -1002,8 +1042,10 @@ fieldset label {
   cursor: default;
 }
 
-.calendar-cell-inactive:hover {
-  background: none;
+@media (hover: hover) {
+  .calendar-cell-inactive:hover {
+    background: none;
+  }
 }
 
 .calendar-cell-blank {
@@ -1277,8 +1319,10 @@ fieldset label {
   transition: color 0.15s ease;
 }
 
-.ledger-row-select:hover {
-  color: var(--color-text);
+@media (hover: hover) {
+  .ledger-row-select:hover {
+    color: var(--color-text);
+  }
 }
 
 /* The current selection: full ink and weight (the cue that never depends
@@ -1324,8 +1368,10 @@ fieldset label {
   transition: color 0.15s ease;
 }
 
-.ledger-add:hover {
-  color: var(--color-text);
+@media (hover: hover) {
+  .ledger-add:hover {
+    color: var(--color-text);
+  }
 }
 
 /* The glyph slot matches the dot's footprint so the plus centers on the
@@ -1641,8 +1687,10 @@ fieldset label {
     var(--object-glow);
 }
 
-.button-primary:hover:not(:disabled) {
-  border-color: var(--ledger-accent, var(--color-accent));
+@media (hover: hover) {
+  .button-primary:hover:not(:disabled) {
+    border-color: var(--ledger-accent, var(--color-accent));
+  }
 }
 
 /* The tour's forward action is deliberately NOT ledger-colored: it runs
@@ -1655,8 +1703,10 @@ fieldset label {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
 }
 
-.onboarding-primary:hover:not(:disabled) {
-  border-color: var(--color-accent);
+@media (hover: hover) {
+  .onboarding-primary:hover:not(:disabled) {
+    border-color: var(--color-accent);
+  }
 }
 
 /* The step-aside action beside a primary: present, comfortable to hit,
@@ -1667,10 +1717,12 @@ fieldset label {
   color: var(--color-text-muted);
 }
 
-.button-quiet:hover:not(:disabled) {
-  border-color: transparent;
-  color: var(--color-text);
-  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+@media (hover: hover) {
+  .button-quiet:hover:not(:disabled) {
+    border-color: transparent;
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  }
 }
 
 /* The intro slide: an opaque full-screen takeover, matching Setup/SignIn's
