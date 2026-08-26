@@ -13,7 +13,7 @@
   --color-accent: #4a3524;
   --color-accent-text: #f8f2e6;
   /* The brand's one drop of gold ink, taken from the dot in the approved
-     wordmark (public/wordmark.png). Reserved for atmosphere and emphasis --
+     wordmark (public/wordmark.png). Reserved for emphasis --
      halos, selection, small lit accents -- never for the toggle/day-state
      ink itself, which stays --color-accent so meaning never depends on this
      color. */
@@ -28,16 +28,22 @@
      these two are plain inherited values: a subtree, or a single element,
      can turn its own light up or down without restating the shape. */
   --glow-near-alpha: 40%;
-  --glow-far-alpha: 20%;
-  /* The other half of the luminous material: one restrained catch-light
-     along an accent surface's top edge -- the internal shine that pairs
-     with --object-glow's external halo. Shared by the primary Save, the
-     toggle's ink pill, and the active count chip, so every accent-filled
-     control reads as the same lacquered material; the calendar's marked
-     days (14%) and the color swatches (25%) keep their own tuned takes
-     on the same line. Contains no var() references, so :root is a safe
-     home (unlike --object-glow -- see the reset). */
-  --shine: inset 0 1px 0 rgb(255 255 255 / 12%);
+  --glow-far-alpha: 14%;
+  /* The other half of the luminous material: the specular catch-light
+     that visually explains an accent object's glow -- a crisp warm-white
+     hairline on the top edge plus a soft pool of light hugging the top
+     few pixels (the negative spread keeps the second layer a shallow
+     band, not a wash down the face). Small enough to read subconsciously
+     -- light catching a softly lit object, never gloss. Shared by the
+     primary Save, the toggle's ink pill, and the active count chip, so
+     every accent-filled control reads as the same material; the
+     calendar's marked days and the color swatches keep their own quieter
+     hairlines (small objects don't need the full treatment). Contains no
+     var() references, so :root is a safe home (unlike --object-glow --
+     see the reset). */
+  --shine:
+    inset 0 1px 0 rgb(255 249 240 / 28%),
+    inset 0 12px 16px -12px rgb(255 249 240 / 20%);
   /* The inset highlight line on a raised dialog -- a plain white catch-light
      in daylight; overridden warm below since a white sheen on a candlelit
      dark surface would read as a plastic edge rather than light. */
@@ -47,16 +53,6 @@
      the field is on the page (sign-in) or on a raised sheet. Deeper in the
      dark, where a recess needs more distance to register at all. */
   --color-well: rgb(var(--color-shadow-rgb) / 0.06);
-  /* Peak strength of the Home atmosphere (see .home-main::before) -- how
-     much of the active ledger's color the field carries at its center.
-     Colored light shows more against the dark than against lit paper, so
-     dark mode gets a slightly higher ceiling. Deliberately restrained
-     since the accent objects now carry their own attached glow (see
-     --object-glow): the room's light is the secondary effect, the light
-     coming off the toggle, the marked days, and the primary action is the
-     primary one. Two strong fields fighting each other just reads as
-     haze. */
-  --atmosphere-peak: 15%;
   /* Native radios/checkboxes render in the app's own ink, not the
      browser's default blue -- the one control color the platform lets us
      set without rebuilding the control. */
@@ -128,13 +124,19 @@
     --halo: 0 0 0 3px color-mix(in srgb, var(--color-gold) 28%, transparent),
       0 0 18px color-mix(in srgb, var(--color-gold) 30%, transparent);
     --sheet-highlight: color-mix(in srgb, var(--color-gold) 12%, transparent);
+    /* Same catch-light by candlelight: warmer and a step quieter, so the
+       lit accents (already luminous in dark mode) don't turn glossy. */
+    --shine:
+      inset 0 1px 0 rgb(255 243 226 / 22%),
+      inset 0 12px 16px -12px rgb(255 243 226 / 15%);
     --color-well: rgb(var(--color-shadow-rgb) / 0.35);
-    --atmosphere-peak: 21%;
-    /* Colored light registers as light against a near-black ground and as
-       a faint stain against lit paper, so the dark carries both blooms
-       further before either reads as strong. */
-    --glow-near-alpha: 50%;
-    --glow-far-alpha: 30%;
+    /* Colored light registers as light against a near-black ground, so
+       dark mode must NOT simply raise the light-mode alphas -- that way
+       lies neon. The near bloom gets a small lift so the rim still reads
+       against the low-contrast ground; the far bloom stays as tight as
+       daylight's. */
+    --glow-near-alpha: 45%;
+    --glow-far-alpha: 18%;
     /* The same materials by candlelight: each hue lifts toward luminous
        rather than washing toward pastel -- deep enough to stay enamel, not
        sherbet, while keeping wide contrast against the dark accent text. */
@@ -176,7 +178,7 @@
   --object-glow:
     0 0 calc(0.5rem * var(--glow-scale, 1))
       color-mix(in srgb, var(--glow-color, transparent) var(--glow-near-alpha), transparent),
-    0 0 calc(1.5rem * var(--glow-scale, 1))
+    0 0 calc(1rem * var(--glow-scale, 1))
       color-mix(in srgb, var(--glow-color, transparent) var(--glow-far-alpha), transparent);
 }
 
@@ -542,69 +544,16 @@ fieldset label {
   isolation: isolate;
 }
 
-/* Registered so a ledger switch can interpolate the atmosphere's color
-   instead of snapping; browsers without @property simply switch at once. */
-@property --atmosphere {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: transparent;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .home-main {
-    transition: --atmosphere 600ms ease;
-  }
-}
-
-/* The active ledger's atmosphere: one field of its color pooled around
-   Home's focal column -- the date, the name, and the toggle sit inside a
-   room lit by the ledger's own material, while every actual surface stays
-   warm paper. Painted behind the content (z-index -1 under isolation) so
-   legibility never sits ON the tint, and only here: header, footer,
-   sheets, and the calendar's own chrome deliberately get none of it (the
-   calendar gets a narrower, separate accent -- see .calendar-cell-marked
-   and .calendar-cell-today below). Home.tsx supplies --atmosphere (and a
-   per-hue --atmosphere-lift, the same one-number calibration Its Tacos
-   uses for pale accents) only while a ledger is active; signed-out, this
-   resolves to transparent and the paper is just paper.
-
-   The two radii are sized differently on purpose. Vertically, .home-main
-   is a flex:1 region that can run to 600px+ of empty space on a tall
-   phone, and a percentage-sized glow dilutes across all of it until it's
-   imperceptible -- so the vertical radius is a fixed unit that stops
-   tracking the container. Horizontally there is no such problem: the
-   column is always .screen's fixed max-width, so a 50% radius lands the
-   gradient's transparent stop exactly on the left and right edges. A
-   fixed horizontal radius wider than that column (which 26rem was on any
-   viewport at all) gets cut off mid-falloff by the ::before box and the
-   field reads as a soft-cornered rectangle of color rather than a pool of
-   light. Content is vertically centered by flexbox, so .home-main's own
-   50%/50% midpoint already lands on the content group's true center
-   regardless of how much blank space surrounds it. */
-.home-main::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse 50% min(48vh, 16rem) at 50% 50%,
-    color-mix(in srgb, var(--atmosphere) calc(var(--atmosphere-peak) * var(--atmosphere-lift, 1)), transparent) 0%,
-    color-mix(in srgb, var(--atmosphere) calc(var(--atmosphere-peak) * 0.4 * var(--atmosphere-lift, 1)), transparent) 45%,
-    transparent 100%
-  );
-}
-
-/* Petrol sits close to the warm page's own luminance in daylight, so an
-   equal-alpha mix reads as merely grayed rather than tinted -- the same
-   "pale accent needs more alpha" calibration Its Tacos keeps per-hue.
-   Scoped to light only: petrol already reads clearly in dark mode against
-   the near-black ground, and doesn't need (or want) the same boost there. */
-@media (prefers-color-scheme: light) {
-  .home-main[data-atmosphere='dust'] {
-    --atmosphere-lift: 1.6;
-  }
-}
+/* No ambient accent field here, deliberately. An earlier iteration
+   painted a page-level radial wash of the ledger color behind this
+   region (an "atmosphere"), and no peak value ever stopped it from
+   reading as a global color cast: switching ledgers recolored the cream
+   canvas itself. The governing rule is that the ENVIRONMENT stays
+   neutral warm paper and only accent-bearing OBJECTS carry the color,
+   as their own attached light (--object-glow) -- so the only page-level
+   paints are body::before's neutral grain and vignette. Do not
+   reintroduce an accent-derived background, gradient, or pseudo-element
+   at page or region level. */
 
 /* An instrument's engraving, not a sentence: small, tracked, even --
    quiet context above the object's actual subject (the ledger name). */

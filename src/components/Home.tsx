@@ -95,11 +95,13 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
   const [tourActive, setTourActive] = useState(false)
   const settingsLedger = ledgers.find((ledger) => ledger.id === settingsLedgerId) ?? null
 
-  // The active ledger's resolved color doubles as Home's atmosphere (see
-  // .home-main::before in index.css): the one place the ledger's material
-  // gets to tint the room around the primary interaction. Keyed to ledger
-  // identity only -- never to today's state, which would quietly turn one
-  // state into the "lit" one.
+  // The active ledger's resolved color, supplied to Home's subtree only as
+  // --ledger-accent -- the objects that carry the ledger's color (the
+  // toggle, its glow, the note link, the title dot) read it from there.
+  // Deliberately NOT painted as any page-level field: the environment
+  // stays neutral paper (see the "No ambient accent field" note in
+  // index.css). Keyed to ledger identity only -- never to today's state,
+  // which would quietly turn one state into the "lit" one.
   const activeLedgerColor = activeLedger ? resolveLedgerColor(activeLedger.color) : null
 
   function handleTourFinish() {
@@ -203,18 +205,9 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
 
         <div
           className="home-main"
-          data-atmosphere={activeLedgerColor ?? undefined}
           style={
             activeLedgerColor
-              ? ({
-                  '--atmosphere': `var(--ledger-color-${activeLedgerColor})`,
-                  // The same value as --atmosphere, under its own name --
-                  // atmosphere is consumed only by the glow, --ledger-accent
-                  // by everything else in this subtree that wants the
-                  // ledger's ink at full strength (currently just
-                  // .today-detail-link, a descendant of this element).
-                  '--ledger-accent': `var(--ledger-color-${activeLedgerColor})`,
-                } as CSSProperties)
+              ? ({ '--ledger-accent': `var(--ledger-color-${activeLedgerColor})` } as CSSProperties)
               : undefined
           }
         >
