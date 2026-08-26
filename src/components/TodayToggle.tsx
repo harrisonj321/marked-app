@@ -231,12 +231,12 @@ export function TodayToggle({
           <span className="today-toggle-word">{labels[position]}</span>
         </label>
       ))}
-      <div className="today-toggle-glow" aria-hidden="true" />
       <div className="today-toggle-ink" aria-hidden="true">
         {positions.map((position) => (
           <span key={position}>{labels[position]}</span>
         ))}
       </div>
+      <div className="today-toggle-glow" aria-hidden="true" />
     </div>
   )
 }

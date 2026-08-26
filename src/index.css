@@ -29,6 +29,15 @@
      can turn its own light up or down without restating the shape. */
   --glow-near-alpha: 40%;
   --glow-far-alpha: 20%;
+  /* The other half of the luminous material: one restrained catch-light
+     along an accent surface's top edge -- the internal shine that pairs
+     with --object-glow's external halo. Shared by the primary Save, the
+     toggle's ink pill, and the active count chip, so every accent-filled
+     control reads as the same lacquered material; the calendar's marked
+     days (14%) and the color swatches (25%) keep their own tuned takes
+     on the same line. Contains no var() references, so :root is a safe
+     home (unlike --object-glow -- see the reset). */
+  --shine: inset 0 1px 0 rgb(255 255 255 / 12%);
   /* The inset highlight line on a raised dialog -- a plain white catch-light
      in daylight; overridden warm below since a white sheen on a candlelit
      dark surface would read as a plastic edge rather than light. */
@@ -756,28 +765,39 @@ fieldset label {
    animated. Desktop Chromium never showed it, which is how it shipped in
    v0.10.3. Do not reintroduce filter anywhere in this control. */
 
-/* The pill's light and its seat: the same rounded rect the clip window
-   describes, driven by the same --x. translateX resolves 100% against
-   this element's own width, so x = 1 lands its left edge exactly where
-   the clip formula puts the pill's. It carries the shared --object-glow
-   (the toggle is on the same lit-object token as every other accent
-   carrier) plus the two neutral seating shadows, all as ordinary
-   box-shadows on a plainly transformed element -- the most conservative
-   compositing path available. An outer box-shadow paints only outside
-   its own border box, so this layer never tints the pill face rendered
-   above it. Both positions carry the exact same light: neither state
-   may read as the lit one. */
+/* The pill's light, its seat, and its shine: the same rounded rect the
+   clip window describes, driven by the same --x -- its `left` is
+   LITERALLY the clip formula's own left inset, so the two can never
+   disagree about where the pill is, at any x, overshoot included. It
+   paints AFTER the ink card (see TodayToggle.tsx): the outer halo and
+   seat shadows land only outside its border box either way, and sitting
+   on top is what lets the inset --shine land ON the accent fill -- the
+   same catch-light the primary Save carries, which the ink card itself
+   cannot paint (its own top edge is clipped away with the rest of the
+   card outside the window).
+
+   Deliberately positioned with `left`, NOT transform, and carrying no
+   filter: v0.10.3's filter and v0.10.4's transitioned transform each
+   promoted this follower to its own iOS compositing layer, whose
+   backing WebKit mispainted -- first as translucent rectangles, then as
+   a white pill-shaped ghost trailing the drag plus a white sliver at
+   the settled pill's edge (compositor-snapped layer edges vs the ink's
+   analytically rasterized clip). A left-positioned, unpromoted element
+   rasterizes in the same main-thread paint as the clip window, with the
+   same rounding; painting one pill-sized element per frame is nothing,
+   and the clip animation already repaints every frame regardless. Do
+   not reintroduce transform, filter, or will-change here. */
 .today-toggle-glow {
   position: absolute;
   top: 0.3125rem;
   bottom: 0.3125rem;
-  left: 0.3125rem;
+  left: calc(0.3125rem + var(--x) * (50% - 0.15625rem));
   width: calc(50% - 0.46875rem);
   border-radius: 0.9375rem;
   pointer-events: none;
   --glow-color: var(--today-toggle-accent, var(--color-accent));
-  transform: translateX(calc(var(--x) * (100% + 0.3125rem)));
   box-shadow:
+    var(--shine),
     var(--object-glow),
     0 1px 1px rgb(var(--color-shadow-rgb) / 0.14),
     0 4px 10px rgb(var(--color-shadow-rgb) / 0.12);
@@ -803,10 +823,10 @@ fieldset label {
   font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.01em;
-  /* A whisper of light catching the ink's own top edge, clipped along with
-     the card itself -- what keeps it reading as a raised piece of material
-     rather than a flat color swap. */
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
+  /* No box-shadow here on purpose: an inset catch-light on this element
+     sits at the element's own top edge, which the clip window below
+     always cuts away -- the pill's actual shine lives on
+     .today-toggle-glow, which paints above this card. */
   clip-path: inset(
     0.3125rem
     calc(50% + 0.15625rem - var(--x) * (50% - 0.15625rem))
@@ -824,12 +844,12 @@ fieldset label {
     transition: clip-path 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  /* The glow rides the identical spring: clip insets and translateX are
-     both linear in --x with the same endpoints, so sharing one duration
-     and curve keeps halo and pill registered through every frame of the
-     settle, overshoot included. */
+  /* The follower rides the identical spring: its left and the clip's
+     left inset are the same expression, so sharing one duration and
+     curve keeps halo, shine, and pill registered through every frame of
+     the settle, overshoot included. */
   .today-toggle-glow {
-    transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: left 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   /* Live-dragging tracks the pointer 1:1; the spring only plays once the
@@ -1527,7 +1547,9 @@ fieldset label {
   --glow-scale: 0.7;
   --glow-near-alpha: 34%;
   --glow-far-alpha: 18%;
-  box-shadow: var(--object-glow);
+  box-shadow:
+    var(--shine),
+    var(--object-glow);
 }
 
 /* Update banner */
@@ -1683,7 +1705,7 @@ fieldset label {
   font-weight: 600;
   --glow-color: var(--ledger-accent);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 12%),
+    var(--shine),
     var(--object-glow);
 }
 
