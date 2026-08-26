@@ -1,4 +1,13 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent, type SyntheticEvent } from 'react'
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type MouseEvent,
+  type SyntheticEvent,
+} from 'react'
 import { LEDGER_NAME_SUGGESTIONS } from '../domain/ledgerSuggestions'
 import {
   TRACKER_NAME_MAX_LENGTH,
@@ -202,7 +211,15 @@ export function LedgerSwitcherSheet({
             >
               <span
                 className="ledger-dot"
-                style={{ background: `var(--ledger-color-${resolveLedgerColor(ledger.color)})` }}
+                // A row shows its OWN ledger's color, so its fill and its
+                // halo both come from this one value rather than from any
+                // surrounding accent -- see .ledger-dot.
+                style={
+                  {
+                    background: `var(--ledger-color-${resolveLedgerColor(ledger.color)})`,
+                    '--glow-color': `var(--ledger-color-${resolveLedgerColor(ledger.color)})`,
+                  } as CSSProperties
+                }
                 aria-hidden="true"
               />
               <span className="ledger-row-name">{ledger.name}</span>
@@ -220,7 +237,17 @@ export function LedgerSwitcherSheet({
       </ul>
 
       {creating ? (
-        <form onSubmit={(event) => void handleCreateSubmit(event)} noValidate className="ledger-new-form">
+        <form
+          onSubmit={(event) => void handleCreateSubmit(event)}
+          noValidate
+          className="ledger-new-form"
+          // The ledger being created owns this form's primary action: Save
+          // carries the color currently picked for it (and updates live as
+          // the picker changes), rather than the app's generic ink. Scoped
+          // to the form, not the sheet, so the catalog rows above -- which
+          // list other ledgers -- stay neutral.
+          style={{ '--ledger-accent': `var(--ledger-color-${newColor})` } as CSSProperties}
+        >
           <div className="field">
             <label htmlFor={nameId}>What are you tracking?</label>
             <input
@@ -284,7 +311,12 @@ export function LedgerSwitcherSheet({
                   key={swatch}
                   type="button"
                   className="ledger-color-chip"
-                  style={{ background: `var(--ledger-color-${swatch})` }}
+                  style={
+                    {
+                      background: `var(--ledger-color-${swatch})`,
+                      '--glow-color': `var(--ledger-color-${swatch})`,
+                    } as CSSProperties
+                  }
                   aria-pressed={newColor === swatch}
                   aria-label={LEDGER_COLOR_LABELS[swatch]}
                   onClick={() => setNewColor(swatch)}

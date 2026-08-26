@@ -23,6 +23,12 @@
      and a couple of small "this is the current one" markers. */
   --halo: 0 0 0 3px color-mix(in srgb, var(--color-gold) 20%, transparent),
     0 0 16px color-mix(in srgb, var(--color-gold) 24%, transparent);
+  /* How much of itself a lit object's light carries -- see --object-glow
+     just below the reset. Kept here (and not beside the shape) because
+     these two are plain inherited values: a subtree, or a single element,
+     can turn its own light up or down without restating the shape. */
+  --glow-near-alpha: 40%;
+  --glow-far-alpha: 20%;
   /* The inset highlight line on a raised dialog -- a plain white catch-light
      in daylight; overridden warm below since a white sheen on a candlelit
      dark surface would read as a plastic edge rather than light. */
@@ -35,8 +41,13 @@
   /* Peak strength of the Home atmosphere (see .home-main::before) -- how
      much of the active ledger's color the field carries at its center.
      Colored light shows more against the dark than against lit paper, so
-     dark mode gets a slightly higher ceiling. */
-  --atmosphere-peak: 24%;
+     dark mode gets a slightly higher ceiling. Deliberately restrained
+     since the accent objects now carry their own attached glow (see
+     --object-glow): the room's light is the secondary effect, the light
+     coming off the toggle, the marked days, and the primary action is the
+     primary one. Two strong fields fighting each other just reads as
+     haze. */
+  --atmosphere-peak: 15%;
   /* Native radios/checkboxes render in the app's own ink, not the
      browser's default blue -- the one control color the platform lets us
      set without rebuilding the control. */
@@ -109,7 +120,12 @@
       0 0 18px color-mix(in srgb, var(--color-gold) 30%, transparent);
     --sheet-highlight: color-mix(in srgb, var(--color-gold) 12%, transparent);
     --color-well: rgb(var(--color-shadow-rgb) / 0.35);
-    --atmosphere-peak: 32%;
+    --atmosphere-peak: 21%;
+    /* Colored light registers as light against a near-black ground and as
+       a faint stain against lit paper, so the dark carries both blooms
+       further before either reads as strong. */
+    --glow-near-alpha: 50%;
+    --glow-far-alpha: 30%;
     /* The same materials by candlelight: each hue lifts toward luminous
        rather than washing toward pastel -- deep enough to stay enamel, not
        sherbet, while keeping wide contrast against the dark accent text. */
@@ -126,6 +142,32 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  /* The one shared "this object is lit" shape, and the app's whole answer
+     to glow: two coincident blooms made of the object's OWN color, both at
+     zero offset so the light reads as coming off the shape in every
+     direction rather than falling beneath it as a drop shadow. An element
+     opts in by naming its color -- --glow-color -- and, when it is much
+     smaller or larger than a standard control, its --glow-scale; with no
+     --glow-color both mixes resolve to transparent, so nothing glows by
+     accident and `box-shadow: var(--object-glow)` is safe anywhere.
+
+     Declared on every element rather than once on :root deliberately: a
+     custom property's var() references are substituted where the property
+     is DECLARED, so a :root definition would resolve --glow-color against
+     :root -- transparent -- and inherit that dead value everywhere. This
+     re-declares the shape per element, which is what lets each one supply
+     its own color and scale.
+
+     Every accent-carrying object shares it: the today toggle's ink card
+     (as drop-shadow, since clip-path would eat a box-shadow), the
+     calendar's marked days and today ring, a ledger's primary Save, the
+     count chips, the color swatches, and the ledger dots. Anything not
+     carrying a ledger's accent stays unlit. */
+  --object-glow:
+    0 0 calc(0.5rem * var(--glow-scale, 1))
+      color-mix(in srgb, var(--glow-color, transparent) var(--glow-near-alpha), transparent),
+    0 0 calc(1.5rem * var(--glow-scale, 1))
+      color-mix(in srgb, var(--glow-color, transparent) var(--glow-far-alpha), transparent);
 }
 
 html {
@@ -453,13 +495,18 @@ fieldset label {
 
 /* A small identifying dot, reused everywhere a ledger's color needs to
    read at a glance without becoming a theme: the ledger catalog's rows and
-   its color pickers. Sized like an indicator lamp -- large enough that the
-   palette's hues actually register at a glance. */
+   the home title. Sized like an indicator lamp -- large enough that the
+   palette's hues actually register at a glance, and lit like one. A row
+   can show a ledger other than the active one, so its fill and its light
+   both come from the one color supplied inline beside it (see the call
+   sites) rather than from the surrounding --ledger-accent. */
 .ledger-dot {
   width: 0.625rem;
   height: 0.625rem;
   border-radius: 50%;
   flex-shrink: 0;
+  --glow-scale: 0.42;
+  box-shadow: var(--object-glow);
 }
 
 .home-main {
@@ -501,13 +548,19 @@ fieldset label {
    uses for pale accents) only while a ledger is active; signed-out, this
    resolves to transparent and the paper is just paper.
 
-   The ellipse is sized in fixed units, not as a percentage of .home-main
-   -- .home-main is a flex:1 region that can run to 600px+ of empty space
-   on a tall phone, and a percentage-sized glow dilutes across all of it
-   until it's imperceptible. Content is vertically centered by flexbox, so
-   .home-main's own 50%/50% midpoint already lands on the content group's
-   true center regardless of how much blank space surrounds it -- only the
-   ellipse's SIZE needed to stop tracking the container. */
+   The two radii are sized differently on purpose. Vertically, .home-main
+   is a flex:1 region that can run to 600px+ of empty space on a tall
+   phone, and a percentage-sized glow dilutes across all of it until it's
+   imperceptible -- so the vertical radius is a fixed unit that stops
+   tracking the container. Horizontally there is no such problem: the
+   column is always .screen's fixed max-width, so a 50% radius lands the
+   gradient's transparent stop exactly on the left and right edges. A
+   fixed horizontal radius wider than that column (which 26rem was on any
+   viewport at all) gets cut off mid-falloff by the ::before box and the
+   field reads as a soft-cornered rectangle of color rather than a pool of
+   light. Content is vertically centered by flexbox, so .home-main's own
+   50%/50% midpoint already lands on the content group's true center
+   regardless of how much blank space surrounds it. */
 .home-main::before {
   content: '';
   position: absolute;
@@ -515,7 +568,7 @@ fieldset label {
   z-index: -1;
   pointer-events: none;
   background: radial-gradient(
-    ellipse min(82vw, 26rem) min(48vh, 16rem) at 50% 50%,
+    ellipse 50% min(48vh, 16rem) at 50% 50%,
     color-mix(in srgb, var(--atmosphere) calc(var(--atmosphere-peak) * var(--atmosphere-lift, 1)), transparent) 0%,
     color-mix(in srgb, var(--atmosphere) calc(var(--atmosphere-peak) * 0.4 * var(--atmosphere-lift, 1)), transparent) 45%,
     transparent 100%
@@ -682,12 +735,24 @@ fieldset label {
    Its cushioned shadow lives on the wrapper, not on the card itself:
    filter and clip-path on the same element clip the shadow away along
    with everything else outside the window, so drop-shadow has to sit on
-   an unclipped ancestor and read the card's already-clipped silhouette. */
+   an unclipped ancestor and read the card's already-clipped silhouette.
+
+   The same constraint is what makes the halo work: because drop-shadow
+   reads that clipped silhouette, the ledger-colored light is attached to
+   the ink card and slides with it, rather than pooling at a fixed point
+   on the track. It is --object-glow's shape rendered in the one syntax
+   available here -- zero offset, two coincident blooms -- and it is
+   listed first so the two seating shadows below fall from the card plus
+   its halo, not the halo from the shadows. Both positions carry the exact
+   same light: neither state may read as the lit one. */
 .today-toggle-ink-shadow {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  --ink: var(--today-toggle-accent, var(--color-accent));
   filter:
+    drop-shadow(0 0 0.5rem color-mix(in srgb, var(--ink) var(--glow-near-alpha), transparent))
+    drop-shadow(0 0 1.5rem color-mix(in srgb, var(--ink) var(--glow-far-alpha), transparent))
     drop-shadow(0 1px 1px rgb(var(--color-shadow-rgb) / 0.14))
     drop-shadow(0 4px 10px rgb(var(--color-shadow-rgb) / 0.12));
 }
@@ -809,7 +874,7 @@ fieldset label {
 .today-detail-link {
   border: none;
   background: none;
-  color: color-mix(in srgb, var(--ledger-accent, var(--color-text-muted)) 65%, var(--color-text-muted));
+  color: color-mix(in srgb, var(--ledger-accent, var(--color-text-muted)) 80%, var(--color-text-muted));
   text-decoration: underline;
   text-underline-offset: 2px;
   min-height: auto;
@@ -948,10 +1013,20 @@ fieldset label {
 /* A quiet marker for "now," not a status -- the ledger's own accent
    (supplied by Calendar.tsx, since this sheet is a sibling of .home-main
    rather than a descendant) so the calendar reads as this ledger's
-   calendar, not a neutral detached tool; gold stays out of this context. */
+   calendar, not a neutral detached tool; gold stays out of this context.
+   The ring is the accent's, and the accent's own light sits outside it,
+   so "today" belongs to the same lit-object language as the marked days
+   it sits among -- at a lower strength, because a ring is a location cue
+   and a mark is content. */
 .calendar-cell-today {
-  border-color: var(--color-text-muted);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ledger-accent, var(--color-text-muted)) 22%, transparent);
+  border-color: color-mix(in srgb, var(--ledger-accent, var(--color-text-muted)) 55%, var(--color-text-muted));
+  --glow-color: var(--ledger-accent);
+  --glow-scale: 0.55;
+  --glow-near-alpha: 26%;
+  --glow-far-alpha: 14%;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--ledger-accent, var(--color-text-muted)) 26%, transparent),
+    var(--object-glow);
 }
 
 .calendar-cell-day {
@@ -973,8 +1048,20 @@ fieldset label {
   background: var(--ledger-accent, var(--color-accent));
   color: var(--color-accent-text);
   /* The same quiet ink-catching-light treatment as the toggle's ink card,
-     at a smaller scale -- material consistency, not a badge. */
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 14%);
+     plus the same attached halo, scaled down to the dot -- material
+     consistency, not a badge. Scaled rather than re-tuned so a month of
+     marks reads as a field of small lit dots instead of smearing into one
+     another across the grid's tight gaps. */
+  --glow-color: var(--ledger-accent);
+  --glow-scale: 0.5;
+  /* Restated rather than inherited: on a day that is both today and
+     marked, .calendar-cell-today's deliberately weaker pair would
+     otherwise cascade in and dim the mark itself. */
+  --glow-near-alpha: 42%;
+  --glow-far-alpha: 22%;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 14%),
+    var(--object-glow);
 }
 
 .calendar-cell-note-dot {
@@ -1282,14 +1369,22 @@ fieldset label {
   padding-top: var(--space-2);
 }
 
+/* A step more air than the controls elsewhere, so seven lit swatches sit
+   as distinct points of light rather than one continuous smear. */
 .ledger-color-picker {
   display: flex;
-  gap: 0.625rem;
+  gap: 0.8125rem;
   flex-wrap: wrap;
 }
 
 /* Lacquered enamel buttons: a hairline seat plus a whisper of light on
-   the top edge, so each swatch reads as a made object, not a paint chip. */
+   the top edge, so each swatch reads as a made object, not a paint chip.
+   Every swatch is lit, not just the chosen one -- these are the accent
+   colors on offer, and each should read as the luminous accent it would
+   become. Each swatch's own hue arrives inline as both its fill and its
+   --glow-color, from one value: the picker sits inside a sheet whose
+   --ledger-accent is the draft color, and deriving the light from that
+   would give all seven swatches the same halo. */
 .ledger-color-chip {
   width: 2rem;
   height: 2rem;
@@ -1297,14 +1392,23 @@ fieldset label {
   border-radius: 50%;
   border: 1px solid rgb(var(--color-shadow-rgb) / 0.15);
   padding: 0;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%);
+  --glow-scale: 0.55;
+  --glow-near-alpha: 32%;
+  --glow-far-alpha: 16%;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 25%),
+    var(--object-glow);
 }
 
 /* Selection is one precise ink ring offset from the swatch -- the color
-   itself always reads true, and nothing blooms around it. */
+   itself always reads true -- over a fuller measure of the same light the
+   unselected swatches already carry. The ring is what marks the choice;
+   the extra light only confirms it. */
 .ledger-color-chip[aria-pressed='true'] {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
+  --glow-near-alpha: 55%;
+  --glow-far-alpha: 30%;
 }
 
 /* Ledger-creation disclosures -- the first-ledger name suggestions and the
@@ -1365,10 +1469,19 @@ fieldset label {
   color: var(--color-text-muted);
 }
 
+/* The day sheet is operating on one ledger's day, so its chosen count
+   carries that ledger's accent (and its light) rather than the app's
+   generic ink -- the same fill/text pairing the toggle and the marked
+   days use, at chip scale. */
 .count-chip-active {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--ledger-accent, var(--color-accent));
+  background: var(--ledger-accent, var(--color-accent));
   color: var(--color-accent-text);
+  --glow-color: var(--ledger-accent);
+  --glow-scale: 0.7;
+  --glow-near-alpha: 34%;
+  --glow-far-alpha: 18%;
+  box-shadow: var(--object-glow);
 }
 
 /* Update banner */
@@ -1505,12 +1618,36 @@ fieldset label {
   flex: 1;
 }
 
-/* The one accent-filled treatment: every sheet's confirming action (Save,
-   the tour's forward action, the update banner's Reload) carries the app's
-   ink, and everything beside it stays quiet -- one clear answer to "what
-   does pressing the obvious thing do" on any surface. */
-.onboarding-primary,
+/* The one accent-filled treatment: a sheet's confirming action carries
+   the accent and everything beside it stays quiet -- one clear answer to
+   "what does pressing the obvious thing do" on any surface.
+
+   Which accent depends on what is being confirmed. .button-primary is
+   only ever a ledger's own Save (Settings, the day sheet, ledger
+   creation), so it takes that ledger's color and that ledger's light: in
+   a ledger context the ledger color IS the action color, not a tint laid
+   over a brown button. --ledger-accent reaches it by inheritance from
+   whichever subtree it is in -- .home-main, .calendar, the settings
+   dialog, or the new-ledger form -- and falls back to the app's shared
+   ink only where no ledger is in play. */
 .button-primary {
+  background: var(--ledger-accent, var(--color-accent));
+  border-color: var(--ledger-accent, var(--color-accent));
+  color: var(--color-accent-text);
+  font-weight: 600;
+  --glow-color: var(--ledger-accent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 12%),
+    var(--object-glow);
+}
+
+.button-primary:hover:not(:disabled) {
+  border-color: var(--ledger-accent, var(--color-accent));
+}
+
+/* The tour's forward action is deliberately NOT ledger-colored: it runs
+   pre-auth, before any ledger exists, so it keeps the app's own ink. */
+.onboarding-primary {
   background: var(--color-accent);
   color: var(--color-accent-text);
   border-color: var(--color-accent);
@@ -1518,8 +1655,7 @@ fieldset label {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
 }
 
-.onboarding-primary:hover:not(:disabled),
-.button-primary:hover:not(:disabled) {
+.onboarding-primary:hover:not(:disabled) {
   border-color: var(--color-accent);
 }
 

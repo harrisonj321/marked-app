@@ -237,7 +237,14 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
                   {activeLedgerColor && (
                     <span
                       className="ledger-dot"
-                      style={{ background: `var(--ledger-color-${activeLedgerColor})` }}
+                      // One color, used as both the dot's fill and the
+                      // color its halo is made of -- see .ledger-dot.
+                      style={
+                        {
+                          background: `var(--ledger-color-${activeLedgerColor})`,
+                          '--glow-color': `var(--ledger-color-${activeLedgerColor})`,
+                        } as CSSProperties
+                      }
                       aria-hidden="true"
                     />
                   )}

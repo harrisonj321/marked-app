@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent } from 'react'
 import {
   STATE_LABEL_MAX_LENGTH,
   TRACKER_NAME_MAX_LENGTH,
@@ -243,6 +243,14 @@ export function SettingsSheet({
       aria-labelledby={titleId}
       onClose={onDismiss}
       onClick={handleBackdropClick}
+      // Everything on this sheet is operating on one ledger, so the
+      // ledger's own color -- not the app's shared ink -- is the accent
+      // here, and Save carries it. Driven by the live draft rather than
+      // the stored color, so picking a swatch shows what that choice
+      // actually looks like as this ledger's action color before it is
+      // saved. Only .button-primary and .count-chip-active read this; the
+      // deletion confirmations below stay deliberately neutral.
+      style={{ '--ledger-accent': `var(--ledger-color-${colorDraft})` } as CSSProperties}
     >
       <div className="settings-sheet-header">
         <h2 id={titleId}>Settings</h2>
@@ -393,7 +401,12 @@ export function SettingsSheet({
                     key={swatch}
                     type="button"
                     className="ledger-color-chip"
-                    style={{ background: `var(--ledger-color-${swatch})` }}
+                    style={
+                      {
+                        background: `var(--ledger-color-${swatch})`,
+                        '--glow-color': `var(--ledger-color-${swatch})`,
+                      } as CSSProperties
+                    }
                     aria-pressed={colorDraft === swatch}
                     aria-label={LEDGER_COLOR_LABELS[swatch]}
                     onClick={() => setColorDraft(swatch)}
