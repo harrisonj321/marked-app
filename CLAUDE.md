@@ -2,7 +2,7 @@
 
 ## Maker 428 Inheritance
 
-This app is part of the Maker 428 family and inherits the [Maker 428 App Standard v1.0.0](https://github.com/harrisonj321/maker-428-app-standard).
+This app is part of the Maker 428 family and inherits the [Maker 428 App Standard v1.0.1](https://github.com/harrisonj321/maker-428-app-standard).
 
 1. Read this file (`CLAUDE.md`) for product identity, architecture, and product-specific behavior.
 2. Read the canonical [Maker 428 App Standard](https://github.com/harrisonj321/maker-428-app-standard) for shared UI, visual language, interaction, onboarding, navigation, accessibility, iconography, motion, PWA, and provenance rules.

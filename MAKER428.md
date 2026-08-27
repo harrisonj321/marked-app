@@ -3,8 +3,8 @@
 This app inherits from the Maker 428 App Standard.
 
 **Canonical source:** https://github.com/harrisonj321/maker-428-app-standard
-**Inherited version:** v1.0.0
-**Last reviewed against standard:** 2026-08-27
+**Inherited version:** v1.0.1
+**Last reviewed against standard:** 2026-08-26
 
 ## SHOULD overrides (locally documented)
 
