@@ -85,6 +85,18 @@ function mockDistinctTourRects() {
   })
 }
 
+/**
+ * Presses a key the way a browser does -- on whatever element actually holds
+ * focus, bubbling so it can reach the useOverlay boundary on
+ * document.documentElement. `fireEvent.keyDown(window, …)` does NOT bubble
+ * into `document`/`documentElement` at all (window has no DOM parent to
+ * traverse through), so it would silently never reach that listener --
+ * exercising nothing rather than the real Escape path.
+ */
+function pressEscape() {
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape', bubbles: true })
+}
+
 afterEach(() => {
   vi.restoreAllMocks()
 })
@@ -165,9 +177,73 @@ describe('OnboardingTour', () => {
     const { onFinish } = renderTour()
 
     clickNext() // welcome -> coach-today
-    fireEvent.keyDown(window, { key: 'Escape' })
+    pressEscape()
 
     expect(onFinish).toHaveBeenCalledWith('skipped')
+  })
+
+  it('traps Tab within the tour, wrapping from the last focusable back to the first', () => {
+    // useOverlay's own gap-close: previously nothing stopped Tab from
+    // leaving the tour into the inert screen underneath (MAKER428.md's
+    // named accessibility gap).
+    mockPlatform({ reducedMotion: true })
+    renderTour()
+
+    clickNext() // welcome -> coach-today; entrance settles immediately under reduced motion
+    // DOM/tab order is the coach card's Next, then the topbar's Skip -- Next
+    // is first, Skip is last.
+    const next = screen.getByRole('button', { name: 'Next' })
+    const skip = screen.getByRole('button', { name: 'Skip' })
+    expect(next).toHaveFocus()
+
+    skip.focus()
+    fireEvent.keyDown(skip, { key: 'Tab', bubbles: true })
+    expect(next).toHaveFocus()
+  })
+
+  it('traps Shift+Tab the same way, wrapping from the first focusable back to the last', () => {
+    mockPlatform({ reducedMotion: true })
+    renderTour()
+
+    clickNext() // welcome -> coach-today
+    const next = screen.getByRole('button', { name: 'Next' })
+    const skip = screen.getByRole('button', { name: 'Skip' })
+    expect(next).toHaveFocus()
+
+    fireEvent.keyDown(next, { key: 'Tab', shiftKey: true, bubbles: true })
+    expect(skip).toHaveFocus()
+  })
+
+  it('returns focus to what had it before the tour opened, once the tour closes', () => {
+    // The tour previously returned focus nowhere on close; this is a new
+    // correctness win from useOverlay, not a preserved behavior.
+    mockPlatform()
+    const opener = document.createElement('button')
+    opener.textContent = 'Tour Marked.'
+    document.body.appendChild(opener)
+    opener.focus()
+    expect(opener).toHaveFocus()
+
+    const onFinish = vi.fn()
+    const view = render(
+      <>
+        <div data-tour-id="open-settings" />
+        <div data-tour-id="today-toggle" />
+        <div data-tour-id="open-calendar" />
+        <div data-tour-id="ledger-title" />
+        <OnboardingTour onFinish={onFinish} />
+      </>,
+    )
+    expect(opener).not.toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    expect(onFinish).toHaveBeenCalledWith('skipped')
+
+    // Home reacts to onFinish by unmounting the tour (tourActive -> false).
+    view.unmount()
+
+    expect(opener).toHaveFocus()
+    opener.remove()
   })
 
   it('leads from the intro straight to the primary daily control, not another intro slide or a settings detour', () => {
@@ -502,6 +578,106 @@ describe('OnboardingTour', () => {
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
   })
 
+  describe('background isolation', () => {
+    /**
+     * Mirrors main.tsx's real DOM shape: `<App/>` (standing in for Home
+     * here) and `<UpdatePrompt/>` are unrelated siblings under the same
+     * React root, neither one a descendant of the other -- exactly the
+     * topology the previous `isolateBackground: false` + hand-rolled
+     * `inert` on Home's own `<main>` could not reach (MAKER428.md's
+     * outstanding compliance issue this migration closes). Portalling the
+     * tour to document.body (see OnboardingTour's return statement) is what
+     * lets the package's real isolation cover both siblings alike, without
+     * either one needing to know the tour exists.
+     */
+    function renderWithSiblings(onFinish = vi.fn()) {
+      const view = render(
+        <>
+          <main>
+            <div data-tour-id="open-settings" />
+            <div data-tour-id="today-toggle" />
+            <div data-tour-id="open-calendar" />
+            <div data-tour-id="ledger-title" />
+            <button type="button">Home control</button>
+          </main>
+          {/* Stands in for UpdatePrompt: a real interactive sibling that is
+              not inside Home/<main> at all, and has no idea the tour
+              exists -- see main.tsx, where `<UpdatePrompt/>` renders beside
+              `<App/>`, not inside it. */}
+          <div role="status">
+            <button type="button">Reload</button>
+          </div>
+          <OnboardingTour onFinish={onFinish} />
+        </>,
+      )
+      return { onFinish, ...view }
+    }
+
+    it('makes every sibling outside the tour unreachable -- including one that is not inside Home, e.g. UpdatePrompt', () => {
+      mockPlatform()
+      renderWithSiblings()
+
+      // Not merely visually covered: genuinely excluded from a normal,
+      // accessibility-respecting query, exactly like a real screen reader
+      // would experience it.
+      expect(screen.queryByRole('button', { name: 'Home control' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument()
+
+      // Still genuinely present in the DOM -- isolated, not removed -- so
+      // this is proving real inert/aria-hidden isolation, not a mount gate.
+      expect(screen.getByRole('button', { name: 'Home control', hidden: true })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Reload', hidden: true })).toBeInTheDocument()
+
+      // The tour's own controls are unaffected by its own isolation.
+      expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
+    })
+
+    it('keeps Tab trapped in the tour even with reachable-looking siblings in the DOM -- jsdom does not enforce inert, so this is the trap actually doing the work', () => {
+      mockPlatform({ reducedMotion: true })
+      renderWithSiblings()
+
+      clickNext() // welcome -> coach-today
+      const next = screen.getByRole('button', { name: 'Next' })
+      const skip = screen.getByRole('button', { name: 'Skip' })
+      expect(next).toHaveFocus()
+
+      skip.focus()
+      fireEvent.keyDown(skip, { key: 'Tab', bubbles: true })
+      expect(next).toHaveFocus()
+
+      fireEvent.keyDown(next, { key: 'Tab', shiftKey: true, bubbles: true })
+      expect(skip).toHaveFocus()
+    })
+
+    it('cleans up isolation on close, restoring every sibling to reachable', () => {
+      mockPlatform()
+      const { onFinish, rerender } = renderWithSiblings()
+
+      expect(screen.queryByRole('button', { name: 'Home control' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+      expect(onFinish).toHaveBeenCalledWith('skipped')
+
+      // Home reacts to onFinish by unmounting only the tour (tourActive ->
+      // false) -- the siblings themselves stay mounted throughout, exactly
+      // as they do in the real app.
+      rerender(
+        <>
+          <main>
+            <button type="button">Home control</button>
+          </main>
+          <div role="status">
+            <button type="button">Reload</button>
+          </div>
+        </>,
+      )
+
+      expect(screen.getByRole('button', { name: 'Home control' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument()
+    })
+  })
+
   describe('staged presentation (the pre-auth orientation)', () => {
     function renderStaged({ reducedMotion = false } = {}) {
       mockPlatform({ reducedMotion })
@@ -658,7 +834,7 @@ describe('OnboardingTour', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Done' }))
 
       expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
-      fireEvent.keyDown(window, { key: 'Escape' })
+      pressEscape()
       expect(onFinish).not.toHaveBeenCalled()
 
       fireAnimationEnd(document.querySelector('.onboarding-coach')!, 'onboarding-close')

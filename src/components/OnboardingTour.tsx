@@ -1,4 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useOverlay } from '@maker428/ui'
 import type { OnboardingStatus } from '../domain/onboarding'
 import { useInstallPrompt, type InstallPromptOutcome } from '../hooks/useInstallPrompt'
 import { useTourTargetRect } from '../hooks/useTourTargetRect'
@@ -162,16 +164,21 @@ interface OnboardingTourProps {
 /**
  * Drives the first-run/replayable tour: one staged full-screen intro, four
  * coach marks anchored to real, on-screen controls, then an optional PWA
- * install step. Always runs over a screen that stays mounted (and inert)
- * underneath the whole time -- the real Home for Settings' "Tour Marked."
- * replay, or the neutral demo shell for the pre-auth orientation (see
- * OnboardingOrientation) -- so this component only ever needs to render
- * whichever single step is current. The one exception to "single step"
- * thinking: all four coach steps share one persistent CoachOverlay so the
- * spotlight element survives step changes and its CSS position transition
- * glides it from control to control -- in both presentations; staged mode
- * only softens the overlay's veil and button emphasis, never its
- * targeting.
+ * install step. Always runs over a screen that stays mounted underneath the
+ * whole time -- the real Home for Settings' "Tour Marked." replay, or the
+ * neutral demo shell for the pre-auth orientation (see OnboardingOrientation)
+ * -- so this component only ever needs to render whichever single step is
+ * current. The one exception to "single step" thinking: all four coach steps
+ * share one persistent CoachOverlay so the spotlight element survives step
+ * changes and its CSS position transition glides it from control to control
+ * -- in both presentations; staged mode only softens the overlay's veil and
+ * button emphasis, never its targeting.
+ *
+ * Portalled straight to document.body (see the return statement) so the
+ * shared useOverlay's own background isolation -- not a hand-rolled
+ * substitute -- correctly marks the entire rest of the app inert while the
+ * tour is open, including anything mounted at the React root alongside the
+ * screen the tour is annotating (e.g. UpdatePrompt).
  */
 export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageChange }: OnboardingTourProps) {
   const { canPromptInstall, promptInstall } = useInstallPrompt()
@@ -212,25 +219,63 @@ export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageCh
     }
   }, [staged, onStageChange, step, closing])
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !closing) {
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  useOverlay(overlayRef, {
+    onDismiss: () => {
+      if (!closing) {
         onFinish('skipped')
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onFinish, closing])
-
-  // Background scroll would otherwise fight the fixed-position overlay on
-  // long-content phones; restored on unmount regardless of how the tour ends.
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previousOverflow
-    }
-  }, [])
+    },
+    // Full Tab/Shift+Tab trapping is the actual named gap this closes
+    // (MAKER428.md's outstanding compliance issue, reference/migration-
+    // roadmap.md §4.1): nothing previously stopped Tab from leaving the tour
+    // into the inert screen underneath.
+    trapFocus: true,
+    // Escape now goes through the stack's topmost-only, descendant-claim-
+    // first model instead of an unconditional window listener -- an inner
+    // control could claim Escape for itself first, though nothing in the
+    // tour currently does. dismissOnEscape stays true; the callback's own
+    // !closing guard is unchanged from the previous handler.
+    dismissOnEscape: true,
+    // Replaces the previous manual `document.body.style.overflow = 'hidden'`
+    // effect with the shared, reference-counted lock (exact prior inline
+    // style restored on close rather than a hardcoded '').
+    lockScroll: true,
+    // isolateBackground defaults to true and is left unset here rather than
+    // redundantly restated: this overlay is portalled straight to
+    // document.body below (see the return statement), so it is its own
+    // body-level branch and the package's isolation correctly reaches every
+    // OTHER body-level branch -- the real Home content (Settings' "Tour
+    // Marked." replay) or the demo shell (the pre-auth orientation), and
+    // critically also anything else mounted at the React root alongside
+    // them, such as UpdatePrompt. Marking only Home's/the demo shell's own
+    // <main> inert by hand (the previous approach, needed only because the
+    // tour was nested inside the app tree rather than portalled) missed
+    // exactly that sibling.
+    // Mirrors IntroStep's own initial-focus choice (the only step mounted
+    // when this fires, since this registration effect runs once on mount):
+    // reduced motion starts IntroStep already "revealed", so its own effect
+    // focuses the primary button immediately; otherwise it focuses the
+    // dialog itself pending the entrance animation. Because a child
+    // component's effects run before an ancestor's on mount, IntroStep's own
+    // focus call happens first and this one would otherwise clobber it a
+    // moment later -- matching its decision here makes the two idempotent
+    // instead of racing.
+    initialFocus: () => {
+      const dialog = overlayRef.current?.querySelector<HTMLElement>('[role="dialog"]')
+      if (!dialog) return null
+      return prefersReducedMotion()
+        ? (dialog.querySelector<HTMLElement>('.onboarding-primary') ?? dialog)
+        : dialog
+    },
+    // No returnFocusTo override: useOverlay's own default opener capture
+    // (read at render time, before any descendant effect can move focus
+    // first -- see the hook's own doc comment, which names this exact
+    // component as the defect report that fixed it in 0.1.1) is correct on
+    // its own. Supplying a local override here would just re-implement the
+    // package's own logic.
+  })
 
   function goNext() {
     if (closing) {
@@ -286,8 +331,23 @@ export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageCh
     return outcome
   }
 
-  return (
-    <>
+  return createPortal(
+    // The useOverlay boundary for the whole tour: Tab/Shift+Tab trapping,
+    // topmost Escape ownership, focus return, and scroll locking all apply
+    // across whichever single step is current, plus the always-present
+    // topbar, rather than needing a trap of their own per step. Unstyled and
+    // uninvolved in layout -- every child below keeps its own fixed
+    // positioning exactly as before (a non-positioned ancestor doesn't
+    // affect a `position: fixed` descendant's containing block, and neither
+    // `document.body` nor this wrapper introduces a new containing block or
+    // stacking context -- see the z-index/stacking note on the portal call
+    // below) -- and carries no role/aria-modal of its own: each step's own
+    // dialog div (IntroStep's, CoachCallout's, InstallStep's) already
+    // supplies the real accessible name and semantics, so this wrapper's
+    // only job is to be a stable node for the trap/focus-return boundary.
+    // tabIndex={-1} is the container-fallback focus target if a step ever
+    // renders nothing focusable.
+    <div ref={overlayRef} tabIndex={-1}>
       {step === 'welcome' && (
         <IntroStep onPrimary={handleIntroPrimary} leaving={introLeaving} onLeft={handleIntroLeft} />
       )}
@@ -320,7 +380,19 @@ export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageCh
         closing={closing}
         onSkip={step === 'install' || closing ? undefined : skip}
       />
-    </>
+    </div>,
+    // document.body directly, matching useOverlay's own recommended shape
+    // (and Sheet's) -- makes this wrapper its own body-level branch, which
+    // is what lets isolateBackground's default apply correctly (see the
+    // useOverlay call above). Every rendered step already positions itself
+    // with `position: fixed` and explicit z-index (1000/1001), computed
+    // against the viewport and the nearest ancestor stacking context; since
+    // neither `#root` (the tour's previous parent) nor `document.body` (its
+    // new one) establishes a stacking context or containing block of their
+    // own -- no transform/filter/opacity/will-change/contain on either, see
+    // index.css -- this move changes nothing about where the tour's content
+    // is positioned or how it paints relative to the rest of the page.
+    document.body,
   )
 }
 

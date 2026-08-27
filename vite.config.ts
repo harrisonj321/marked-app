@@ -2,6 +2,7 @@ import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import packageJson from './package.json' with { type: 'json' }
+import { PWA_MANIFEST_ICONS } from './src/pwaIcons.ts'
 
 export default defineConfig({
   define: {
@@ -35,22 +36,7 @@ export default defineConfig({
         scope: '/',
         background_color: '#f6f0e4',
         theme_color: '#f6f0e4',
-        icons: [
-          {
-            src: 'icon-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            // The mark sits well inside the maskable safe zone on a full-bleed
-            // background, so the same artwork serves both purposes unaltered.
-            src: 'icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
-        ],
+        icons: [...PWA_MANIFEST_ICONS],
       },
     }),
   ],

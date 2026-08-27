@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent } from 'react'
+import { IconButton } from '@maker428/ui'
 import {
   STATE_LABEL_MAX_LENGTH,
   TRACKER_NAME_MAX_LENGTH,
@@ -254,14 +255,9 @@ export function SettingsSheet({
     >
       <div className="settings-sheet-header">
         <h2 id={titleId}>Settings</h2>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Close"
-          onClick={() => dialogRef.current?.close()}
-        >
+        <IconButton label="Close" onClick={() => dialogRef.current?.close()}>
           <CloseIcon />
-        </button>
+        </IconButton>
       </div>
 
       {confirmingDelete ? (
@@ -361,14 +357,9 @@ export function SettingsSheet({
                 </p>
               )}
 
-              <button
-                type="button"
-                className="icon-button state-role-swap"
-                aria-label="Swap which state is default"
-                onClick={handleSwap}
-              >
+              <IconButton className="state-role-swap" label="Swap which state is default" onClick={handleSwap}>
                 <SwapIcon />
-              </button>
+              </IconButton>
 
               <div className="state-role-row">
                 <label htmlFor={markedLabelId}>Marked.</label>

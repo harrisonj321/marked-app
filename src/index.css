@@ -1,66 +1,15 @@
+/*
+ * Semantic tokens, spacing, and the object-glow/shine/halo/elevation
+ * material recipe now come from @maker428/ui/styles.css (imported in
+ * main.tsx) rather than being duplicated here -- Marked. donated the
+ * canonical values for all of them (STANDARD.md §5, reference/
+ * migration-roadmap.md §4.1), so this is source consolidation, not a
+ * redesign: every value below was already byte-identical to the shared
+ * package's. Only what's genuinely Marked.-specific stays local: the
+ * paper-grain texture, the ledger color palette, and the safe-area
+ * composites this file builds on top of the package's raw insets.
+ */
 :root {
-  color-scheme: light dark;
-  --color-bg: #f6f0e4;
-  --color-text: #332920;
-  --color-text-muted: #6d6152;
-  --color-border: #e7ddce;
-  --color-border-strong: #c9b99e;
-  --color-surface: #fbf7ee;
-  /* One step brighter than --color-surface, for dialogs/sheets that float
-     above the page -- elevation reads as a lit surface, not just a
-     different fill. */
-  --color-raised: #fffdf7;
-  --color-accent: #4a3524;
-  --color-accent-text: #f8f2e6;
-  /* The brand's one drop of gold ink, taken from the dot in the approved
-     wordmark (public/wordmark.png). Reserved for emphasis --
-     halos, selection, small lit accents -- never for the toggle/day-state
-     ink itself, which stays --color-accent so meaning never depends on this
-     color. */
-  --color-gold: #b99a68;
-  /* The one shared "this is lit" shape -- a crisp ring plus a soft bloom
-     behind it, not just a hard outline. Used sparingly: text-field focus,
-     and a couple of small "this is the current one" markers. */
-  --halo: 0 0 0 3px color-mix(in srgb, var(--color-gold) 20%, transparent),
-    0 0 16px color-mix(in srgb, var(--color-gold) 24%, transparent);
-  /* How much of itself a lit object's light carries -- see --object-glow
-     just below the reset. Kept here (and not beside the shape) because
-     these two are plain inherited values: a subtree, or a single element,
-     can turn its own light up or down without restating the shape. */
-  --glow-near-alpha: 40%;
-  --glow-far-alpha: 14%;
-  /* The other half of the luminous material: the specular catch-light
-     that visually explains an accent object's glow -- a crisp warm-white
-     hairline on the top edge plus a soft pool of light hugging the top
-     few pixels (the negative spread keeps the second layer a shallow
-     band, not a wash down the face). Small enough to read subconsciously
-     -- light catching a softly lit object, never gloss. Shared by the
-     primary Save, the toggle's ink pill, and the active count chip, so
-     every accent-filled control reads as the same material; the
-     calendar's marked days and the color swatches keep their own quieter
-     hairlines (small objects don't need the full treatment). Contains no
-     var() references, so :root is a safe home (unlike --object-glow --
-     see the reset). */
-  --shine:
-    inset 0 1px 0 rgb(255 249 240 / 28%),
-    inset 0 12px 16px -12px rgb(255 249 240 / 20%);
-  /* The inset highlight line on a raised dialog -- a plain white catch-light
-     in daylight; overridden warm below since a white sheen on a candlelit
-     dark surface would read as a plastic edge rather than light. */
-  --sheet-highlight: rgb(255 255 255 / 40%);
-  /* The fill of a recessed input well: a translucent shadow tint, so the
-     same value reads as "a step below whatever surface it sits on" whether
-     the field is on the page (sign-in) or on a raised sheet. Deeper in the
-     dark, where a recess needs more distance to register at all. */
-  --color-well: rgb(var(--color-shadow-rgb) / 0.06);
-  /* Native radios/checkboxes render in the app's own ink, not the
-     browser's default blue -- the one control color the platform lets us
-     set without rebuilding the control. */
-  accent-color: var(--color-accent);
-  /* Shared warm-umber shadow tone (space-separated for rgb(var(...) / a)).
-     Shadows read as "dark" in both themes, so this is not overridden
-     under prefers-color-scheme: dark. */
-  --color-shadow-rgb: 34 24 15;
   /* A whisper of warm light in one corner of the page -- not a visible
      gradient, just enough to keep large empty fields from reading flat.
      Composited under the grain at --grain-opacity, so its effective
@@ -76,10 +25,6 @@
      subtree-level override of that color would not reach this token. */
   --texture-vignette: radial-gradient(150% 120% at 20% -10%, var(--color-vignette) 0%, transparent 60%);
   --texture-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.35' intercept='0.33'/%3E%3CfeFuncG type='linear' slope='0.35' intercept='0.33'/%3E%3CfeFuncB type='linear' slope='0.35' intercept='0.33'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-  --space-1: 0.5rem;
-  --space-2: 1rem;
-  --space-3: 1.5rem;
-  --space-4: 2.5rem;
   /* A ledger's identifying color -- a small, fixed palette (see
      domain/ledger.ts's LEDGER_COLORS), not freeform hex, so nothing a user
      picks can clash with the app's warm, quiet palette. The set is drawn
@@ -106,37 +51,16 @@
   --ledger-color-straw: #a86e0e;
 }
 
+/* Only what's genuinely Marked.-specific: the paper texture and the ledger
+   palette. Every semantic color, --halo, --shine, --glow-near-alpha,
+   --glow-far-alpha, --sheet-highlight, --color-well, and --object-glow
+   itself now come from @maker428/ui/styles.css (glow.css, tokens.css),
+   which already carries the identical dark calibration Marked. donated --
+   see the file-header note. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #1b1611;
-    --color-text: #efe8da;
-    --color-text-muted: #ab9f8a;
-    --color-border: #332a1f;
-    --color-border-strong: #5a4c38;
-    --color-surface: #221c15;
-    --color-raised: #2b241a;
-    --color-accent: #f0e6d3;
-    --color-accent-text: #241c14;
     --color-vignette: rgb(50 40 28 / 45%);
     --grain-opacity: 0.065;
-    /* Gold reads as light in the dark rather than as a deeper ink. */
-    --color-gold: #d0b483;
-    --halo: 0 0 0 3px color-mix(in srgb, var(--color-gold) 28%, transparent),
-      0 0 18px color-mix(in srgb, var(--color-gold) 30%, transparent);
-    --sheet-highlight: color-mix(in srgb, var(--color-gold) 12%, transparent);
-    /* Same catch-light by candlelight: warmer and a step quieter, so the
-       lit accents (already luminous in dark mode) don't turn glossy. */
-    --shine:
-      inset 0 1px 0 rgb(255 243 226 / 22%),
-      inset 0 12px 16px -12px rgb(255 243 226 / 15%);
-    --color-well: rgb(var(--color-shadow-rgb) / 0.35);
-    /* Colored light registers as light against a near-black ground, so
-       dark mode must NOT simply raise the light-mode alphas -- that way
-       lies neon. The near bloom gets a small lift so the rim still reads
-       against the low-contrast ground; the far bloom stays as tight as
-       daylight's. */
-    --glow-near-alpha: 45%;
-    --glow-far-alpha: 18%;
     /* The same materials by candlelight: each hue lifts toward luminous
        rather than washing toward pastel -- deep enough to stay enamel, not
        sherbet, while keeping wide contrast against the dark accent text. */
@@ -153,33 +77,6 @@
 *::before,
 *::after {
   box-sizing: border-box;
-  /* The one shared "this object is lit" shape, and the app's whole answer
-     to glow: two coincident blooms made of the object's OWN color, both at
-     zero offset so the light reads as coming off the shape in every
-     direction rather than falling beneath it as a drop shadow. An element
-     opts in by naming its color -- --glow-color -- and, when it is much
-     smaller or larger than a standard control, its --glow-scale; with no
-     --glow-color both mixes resolve to transparent, so nothing glows by
-     accident and `box-shadow: var(--object-glow)` is safe anywhere.
-
-     Declared on every element rather than once on :root deliberately: a
-     custom property's var() references are substituted where the property
-     is DECLARED, so a :root definition would resolve --glow-color against
-     :root -- transparent -- and inherit that dead value everywhere. This
-     re-declares the shape per element, which is what lets each one supply
-     its own color and scale.
-
-     Every accent-carrying object shares it: the today toggle's glow
-     stand-in (a transformed sibling of the clipped ink card -- see
-     .today-toggle-glow for why the card can't carry it itself), the
-     calendar's marked days and today ring, a ledger's primary Save, the
-     count chips, the color swatches, and the ledger dots. Anything not
-     carrying a ledger's accent stays unlit. */
-  --object-glow:
-    0 0 calc(0.5rem * var(--glow-scale, 1))
-      color-mix(in srgb, var(--glow-color, transparent) var(--glow-near-alpha), transparent),
-    0 0 calc(1rem * var(--glow-scale, 1))
-      color-mix(in srgb, var(--glow-color, transparent) var(--glow-far-alpha), transparent);
 }
 
 html {
@@ -241,10 +138,10 @@ h1 {
   width: 100%;
   max-width: 26rem;
   margin: 0 auto;
-  padding-top: max(var(--space-4), calc(var(--space-2) + env(safe-area-inset-top, 0px)));
-  padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
-  padding-bottom: max(var(--space-2), calc(var(--space-1) + env(safe-area-inset-bottom, 0px)));
-  padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+  padding-top: max(var(--space-4), calc(var(--space-2) + var(--safe-area-top)));
+  padding-right: calc(var(--space-3) + var(--safe-area-right));
+  padding-bottom: max(var(--space-2), calc(var(--space-1) + var(--safe-area-bottom)));
+  padding-left: calc(var(--space-3) + var(--safe-area-left));
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -255,7 +152,7 @@ h1 {
    safe-area handling or any width above the breakpoint. */
 @media (max-width: 480px) {
   .screen {
-    padding-top: max(1.75rem, calc(var(--space-1) + env(safe-area-inset-top, 0px)));
+    padding-top: max(1.75rem, calc(var(--space-1) + var(--safe-area-top)));
   }
 }
 
@@ -339,6 +236,12 @@ textarea {
   border: 1px solid transparent;
   background: var(--color-well);
   color: var(--color-text);
+  /* NOT var(--shadow-well): that token varies by theme (0.06 light / 0.35
+     dark, matching --color-well's own split), but this literal has never had
+     a dark-mode override of its own, so substituting it would be a real,
+     new dark-mode intensification -- not the byte-identical swap the rest of
+     this consolidation is. Left as a discovered-but-out-of-scope inconsistency
+     rather than silently changed. */
   box-shadow: inset 0 1px 2px rgb(var(--color-shadow-rgb) / 0.06);
   transition:
     border-color 0.15s ease,
@@ -433,31 +336,11 @@ fieldset label {
   margin: 0;
 }
 
-.icon-button {
-  border: none;
-  background: none;
-  padding: 0;
-  min-height: 44px;
-  min-width: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-  border-radius: 0.625rem;
-  -webkit-tap-highlight-color: transparent;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
-}
-
-/* Translucent rather than a fixed surface tone, so the same hover reads
-   correctly whether the button sits on the page or on a raised dialog. */
-@media (hover: hover) {
-  .icon-button:hover {
-    color: var(--color-text);
-    background: color-mix(in srgb, var(--color-text) 6%, transparent);
-  }
-}
+/* The former .icon-button is now @maker428/ui's IconButton (imported in
+   every component that used to define it locally) -- same 44px target,
+   transparent ground, hover-capable-only tint, focus-visible ring, and
+   canonical press scale, from one shared implementation instead of six
+   copies of this rule. */
 
 /* Sign-in */
 
@@ -913,11 +796,8 @@ fieldset label {
   font-size: 0.875rem;
 }
 
-.maker-mark {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
-}
+/* .maker-mark is now @maker428/ui's own .m428-maker-mark (see the
+   <MakerMark> import in Home.tsx). */
 
 .visually-hidden {
   position: absolute;
@@ -1120,10 +1000,9 @@ fieldset label {
   /* A close, tight shadow for grounding, a wide soft one for lift, and a
      faint inset line catching the card's own top edge -- reads as resting
      gently above the page and lit from the front, not a hard drop. */
-  box-shadow:
-    0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
-    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12),
-    inset 0 1px 0 var(--sheet-highlight);
+  /* @maker428/ui's shared elevation recipe (STANDARD.md §7) -- this file's
+     own three-layer shadow was already identical to it. */
+  box-shadow: var(--shadow-raised);
 }
 
 .day-detail,
@@ -1141,12 +1020,12 @@ fieldset label {
   width: min(100%, 26rem);
   margin: auto;
   max-height: calc(
-    100dvh - 2 * var(--space-3) - env(safe-area-inset-top, 0px) -
-      env(safe-area-inset-bottom, 0px)
+    100dvh - 2 * var(--space-3) - var(--safe-area-top) -
+      var(--safe-area-bottom)
   );
   overflow-y: auto;
   padding: var(--space-3);
-  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--space-3) + var(--safe-area-bottom));
 }
 
 /* A phone's dialogs sit closer to full-width already (see the width
@@ -1163,7 +1042,7 @@ fieldset label {
 
   .calendar-sheet {
     padding: var(--space-2);
-    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--space-2) + var(--safe-area-bottom));
   }
 
   .day-detail-header,
@@ -1233,6 +1112,16 @@ fieldset label {
 .state-role-swap {
   align-self: center;
   margin: -0.125rem 0;
+}
+
+/* IconButton's glyph slot floors at the family default (1.25rem/20px, see
+   @maker428/ui's icon-button.css) -- overridden here with an unlayered rule
+   (which wins regardless of import order) to keep this glyph at its existing
+   18px, SwapIcon's own default and the size this control has always
+   rendered at. */
+.state-role-swap .m428-icon-button__content > svg {
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .day-detail-actions,
@@ -1315,6 +1204,14 @@ fieldset label {
 
 .ledger-row-manage {
   flex-shrink: 0;
+}
+
+/* Same override as .state-role-swap above, preserving this row affordance's
+   existing 16px (EditIcon's explicit size={16}) against IconButton's 20px
+   glyph-slot default. */
+.ledger-row-manage .m428-icon-button__content > svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* "New ledger" as a continuation of the list itself, not a footer link: a
@@ -1507,7 +1404,7 @@ fieldset label {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--space-2) + var(--safe-area-bottom));
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -1580,10 +1477,10 @@ fieldset label {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: max(var(--space-2), calc(var(--space-1) + env(safe-area-inset-top, 0px)));
-  padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+  padding-top: max(var(--space-2), calc(var(--space-1) + var(--safe-area-top)));
+  padding-right: calc(var(--space-3) + var(--safe-area-right));
   padding-bottom: var(--space-1);
-  padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+  padding-left: calc(var(--space-3) + var(--safe-area-left));
 }
 
 .onboarding-dots {
@@ -1605,7 +1502,15 @@ fieldset label {
 .onboarding-dot-active {
   width: 14px;
   background: var(--color-accent);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--color-gold) 45%, transparent);
+  /* Routed through the canonical --object-glow recipe (@maker428/ui) instead
+     of a one-off box-shadow -- this was the family's one remaining direct
+     glow bypass (reference/migration-roadmap.md §4.1). A small --glow-scale
+     for a dot this size, matching the app's other small-marker glows; this
+     also means the dot now correctly picks up the recipe's own dark-mode
+     alpha lift instead of a fixed 45% that never varied by theme. */
+  --glow-color: var(--color-gold);
+  --glow-scale: 0.4;
+  box-shadow: var(--object-glow);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1710,10 +1615,10 @@ fieldset label {
      phones, large text scaling) the intro must scroll itself or its
      bottom-anchored primary action becomes unreachable. */
   overflow-y: auto;
-  padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
-  padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
-  padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+  padding-top: calc(4.5rem + var(--safe-area-top));
+  padding-bottom: calc(var(--space-2) + var(--safe-area-bottom));
+  padding-right: calc(var(--space-3) + var(--safe-area-right));
+  padding-left: calc(var(--space-3) + var(--safe-area-left));
 }
 
 /* The intro's opaque background sits above the body's grain (z-index 1000
@@ -1852,10 +1757,9 @@ fieldset label {
   background: var(--color-raised);
   border-radius: 1rem;
   padding: var(--space-2);
-  box-shadow:
-    0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
-    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12),
-    inset 0 1px 0 var(--sheet-highlight);
+  /* @maker428/ui's shared elevation recipe (STANDARD.md §7) -- this file's
+     own three-layer shadow was already identical to it. */
+  box-shadow: var(--shadow-raised);
   display: flex;
   flex-direction: column;
   /* Tighter than a modal card's rhythm (space-2): this is a brief
@@ -1999,8 +1903,8 @@ fieldset label {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) calc(var(--space-3) + env(safe-area-inset-right, 0px))
-    calc(var(--space-3) + env(safe-area-inset-bottom, 0px)) calc(var(--space-3) + env(safe-area-inset-left, 0px));
+  padding: calc(var(--space-3) + var(--safe-area-top)) calc(var(--space-3) + var(--safe-area-right))
+    calc(var(--space-3) + var(--safe-area-bottom)) calc(var(--space-3) + var(--safe-area-left));
 }
 
 .onboarding-card {
@@ -2009,10 +1913,9 @@ fieldset label {
   padding: var(--space-3);
   width: min(24rem, 100%);
   box-sizing: border-box;
-  box-shadow:
-    0 0.25rem 0.75rem rgb(var(--color-shadow-rgb) / 0.1),
-    0 1.25rem 3rem rgb(var(--color-shadow-rgb) / 0.12),
-    inset 0 1px 0 var(--sheet-highlight);
+  /* @maker428/ui's shared elevation recipe (STANDARD.md §7) -- this file's
+     own three-layer shadow was already identical to it. */
+  box-shadow: var(--shadow-raised);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

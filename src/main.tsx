@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { UpdatePrompt } from './components/UpdatePrompt'
+import '@maker428/ui/styles.css'
 import './index.css'
 
 const rootElement = document.getElementById('root')

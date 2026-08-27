@@ -492,9 +492,30 @@ describe('Home', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  it('shows the maker mark with the app version', () => {
+  it('shows the maker mark with the app version, rendered by the shared MakerMark primitive', () => {
     renderSettledHome()
-    expect(screen.getByText(`Made with ❤️ by Maker 428 · v${__APP_VERSION__}`)).toBeInTheDocument()
+    const mark = screen.getByText(`Made with ❤️ by Maker 428 · v${__APP_VERSION__}`)
+    expect(mark).toBeInTheDocument()
+    // Not merely a coincidentally-matching local string: @maker428/ui's own
+    // class, proving this renders through MakerMark rather than a
+    // hand-typed <p> that happens to read the same.
+    expect(mark).toHaveClass('m428-maker-mark')
+  })
+
+  it('renders the calendar control through the shared IconButton primitive, resolved from @maker428/ui', () => {
+    renderSettledHome()
+    const button = screen.getByRole('button', { name: 'Open calendar' })
+    // @maker428/ui's own class -- proves the package actually resolved and
+    // rendered, not just that a same-named local button still exists.
+    expect(button).toHaveClass('m428-icon-button')
+    // Defaults to type="button" so an icon button inside a form can never
+    // silently submit it.
+    expect(button).toHaveAttribute('type', 'button')
+    // The label prop is what IconButton turns into the accessible name --
+    // getByRole('button', { name: … }) above already depends on this, but
+    // asserting the underlying attribute directly is what pins it to the
+    // shared component's contract rather than to RTL's query behavior.
+    expect(button).toHaveAttribute('aria-label', 'Open calendar')
   })
 
   describe('ledger switcher', () => {
@@ -740,7 +761,15 @@ describe('Home', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
       fireEvent.click(screen.getByRole('button', { name: 'Tour Marked.' }))
 
-      expect(container.querySelector('main')).toHaveAttribute('inert')
+      // The tour is portalled to document.body (see OnboardingTour), so the
+      // shared useOverlay background isolation marks the whole React-root
+      // branch inert -- not just <main> specifically, which is what lets it
+      // also reach a sibling like UpdatePrompt that sits outside Home's own
+      // markup entirely (see the dedicated coverage for that in
+      // OnboardingTour.test.tsx). `container` here is that whole branch.
+      expect(container).toHaveAttribute('inert')
+      expect(container).toHaveAttribute('aria-hidden', 'true')
+      expect(container.querySelector('main')).toBeInTheDocument()
     })
 
     it('closes on Skip and leaves the main content interactive again, without writing or touching any onboarding record', () => {
@@ -752,7 +781,8 @@ describe('Home', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
-      expect(container.querySelector('main')).not.toHaveAttribute('inert')
+      expect(container).not.toHaveAttribute('inert')
+      expect(container).not.toHaveAttribute('aria-hidden')
       expect(storageWrites).not.toHaveBeenCalled()
 
       storageWrites.mockRestore()

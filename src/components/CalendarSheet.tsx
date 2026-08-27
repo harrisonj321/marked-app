@@ -1,4 +1,5 @@
 import { useEffect, useRef, type MouseEvent } from 'react'
+import { IconButton } from '@maker428/ui'
 import type { Ledger } from '../domain/ledger'
 import { Calendar } from './Calendar'
 import { CloseIcon } from './icons'
@@ -32,14 +33,9 @@ export function CalendarSheet({ uid, ledger, todayKey, onDismiss }: CalendarShee
       onClick={handleBackdropClick}
     >
       <div className="calendar-sheet-header">
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Close calendar"
-          onClick={() => dialogRef.current?.close()}
-        >
+        <IconButton label="Close calendar" onClick={() => dialogRef.current?.close()}>
           <CloseIcon />
-        </button>
+        </IconButton>
       </div>
       <Calendar uid={uid} ledger={ledger} todayKey={todayKey} />
     </dialog>

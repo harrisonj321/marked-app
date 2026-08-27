@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from 'react'
+import { IconButton, MakerMark } from '@maker428/ui'
 import { deleteAllUserData } from '../data/account'
 import {
   createLedger,
@@ -185,20 +186,18 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
 
   return (
     <>
-      <main className="screen home home-enter" inert={tourActive || undefined}>
+      <main className="screen home home-enter">
         <header className="home-header">
           <Wordmark className="brand" />
           {activeLedger && todayKey && (
             <div className="home-header-actions">
-              <button
-                type="button"
-                className="icon-button"
-                aria-label="Open calendar"
+              <IconButton
+                label="Open calendar"
                 data-tour-id="open-calendar"
                 onClick={() => setCalendarOpen(true)}
               >
                 <CalendarIcon />
-              </button>
+              </IconButton>
             </div>
           )}
         </header>
@@ -291,7 +290,7 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
               </button>
             )}
           </div>
-          <p className="maker-mark">{`Made with ❤️ by Maker 428 · v${__APP_VERSION__}`}</p>
+          <MakerMark version={__APP_VERSION__} />
         </footer>
 
         {calendarOpen && todayKey && activeLedger && user && (
