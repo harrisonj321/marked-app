@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useOverlay } from '@maker428/ui'
 import type { OnboardingStatus } from '../domain/onboarding'
 import { useInstallPrompt, type InstallPromptOutcome } from '../hooks/useInstallPrompt'
 import { useTourTargetRect } from '../hooks/useTourTargetRect'
@@ -174,6 +175,17 @@ interface OnboardingTourProps {
  * targeting.
  */
 export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageChange }: OnboardingTourProps) {
+  // Captured during the FIRST RENDER, via a lazy initializer -- which runs
+  // before any effect anywhere in this commit, layout or passive. Handed to
+  // useOverlay as returnFocusTo below rather than trusting its own internal
+  // capture (document.activeElement read inside its registration *effect*),
+  // because IntroStep's own mount effect (a descendant, so it fires first
+  // under React's children-before-parents effect ordering) moves focus onto
+  // the tour's own container/primary before that registration effect ever
+  // runs -- silently capturing the tour's own element as "opener" instead of
+  // whatever really opened it, and returning focus nowhere on close (that
+  // element is gone by then too).
+  const [opener] = useState<Element | null>(() => (typeof document === 'undefined' ? null : document.activeElement))
   const { canPromptInstall, promptInstall } = useInstallPrompt()
   // Display mode and device class cannot meaningfully change while the tour
   // is open, so these are read once rather than re-derived every render.
@@ -212,25 +224,57 @@ export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageCh
     }
   }, [staged, onStageChange, step, closing])
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !closing) {
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  useOverlay(overlayRef, {
+    onDismiss: () => {
+      if (!closing) {
         onFinish('skipped')
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onFinish, closing])
-
-  // Background scroll would otherwise fight the fixed-position overlay on
-  // long-content phones; restored on unmount regardless of how the tour ends.
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previousOverflow
-    }
-  }, [])
+    },
+    // Full Tab/Shift+Tab trapping is the actual named gap this closes
+    // (MAKER428.md's outstanding compliance issue, reference/migration-
+    // roadmap.md §4.1): nothing previously stopped Tab from leaving the tour
+    // into the inert screen underneath.
+    trapFocus: true,
+    // Escape now goes through the stack's topmost-only, descendant-claim-
+    // first model instead of an unconditional window listener -- an inner
+    // control could claim Escape for itself first, though nothing in the
+    // tour currently does. dismissOnEscape stays true; the callback's own
+    // !closing guard is unchanged from the previous handler.
+    dismissOnEscape: true,
+    // Replaces the previous manual `document.body.style.overflow = 'hidden'`
+    // effect with the shared, reference-counted lock (exact prior inline
+    // style restored on close rather than a hardcoded '').
+    lockScroll: true,
+    // NOT the mechanism that marks the background inert -- Home.tsx and
+    // OnboardingOrientation.tsx already do that by hand (`inert={tourActive}`
+    // / `inert`) on the *specific* sibling `<main>` that needs it, and
+    // correctly so: this overlay is not portalled to document.body, so the
+    // package's own isolation (which marks body-level branches inert) would
+    // operate one level too high to reach that sibling. Background isolation
+    // is therefore genuinely present here, just not through this flag.
+    isolateBackground: false,
+    // Mirrors IntroStep's own initial-focus choice (the only step mounted
+    // when this fires, since this registration effect runs once on mount):
+    // reduced motion starts IntroStep already "revealed", so its own effect
+    // focuses the primary button immediately; otherwise it focuses the
+    // dialog itself pending the entrance animation. Because a child
+    // component's effects run before an ancestor's on mount, IntroStep's own
+    // focus call happens first and this one would otherwise clobber it a
+    // moment later -- matching its decision here makes the two idempotent
+    // instead of racing.
+    initialFocus: () => {
+      const dialog = overlayRef.current?.querySelector<HTMLElement>('[role="dialog"]')
+      if (!dialog) return null
+      return prefersReducedMotion()
+        ? (dialog.querySelector<HTMLElement>('.onboarding-primary') ?? dialog)
+        : dialog
+    },
+    // See the `opener` comment above: the render-time capture, not
+    // useOverlay's own effect-time one.
+    returnFocusTo: () => (opener instanceof HTMLElement ? opener : null),
+  })
 
   function goNext() {
     if (closing) {
@@ -287,7 +331,20 @@ export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageCh
   }
 
   return (
-    <>
+    // The useOverlay boundary for the whole tour: Tab/Shift+Tab trapping,
+    // topmost Escape ownership, focus return, and scroll locking all apply
+    // across whichever single step is current, plus the always-present
+    // topbar, rather than needing a trap of their own per step. Unstyled and
+    // uninvolved in layout -- every child below keeps its own fixed
+    // positioning exactly as before (a non-positioned ancestor doesn't
+    // affect a `position: fixed` descendant's containing block) -- and
+    // carries no role/aria-modal of its own: each step's own dialog div
+    // (IntroStep's, CoachCallout's, InstallStep's) already supplies the real
+    // accessible name and semantics, so this wrapper's only job is to be a
+    // stable node for the trap/focus-return boundary. tabIndex={-1} is the
+    // container-fallback focus target if a step ever renders nothing
+    // focusable.
+    <div ref={overlayRef} tabIndex={-1}>
       {step === 'welcome' && (
         <IntroStep onPrimary={handleIntroPrimary} leaving={introLeaving} onLeft={handleIntroLeft} />
       )}
@@ -320,7 +377,7 @@ export function OnboardingTour({ onFinish, presentation = 'spotlight', onStageCh
         closing={closing}
         onSkip={step === 'install' || closing ? undefined : skip}
       />
-    </>
+    </div>
   )
 }
 

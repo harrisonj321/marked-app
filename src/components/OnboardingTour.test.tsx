@@ -85,6 +85,18 @@ function mockDistinctTourRects() {
   })
 }
 
+/**
+ * Presses a key the way a browser does -- on whatever element actually holds
+ * focus, bubbling so it can reach the useOverlay boundary on
+ * document.documentElement. `fireEvent.keyDown(window, …)` does NOT bubble
+ * into `document`/`documentElement` at all (window has no DOM parent to
+ * traverse through), so it would silently never reach that listener --
+ * exercising nothing rather than the real Escape path.
+ */
+function pressEscape() {
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape', bubbles: true })
+}
+
 afterEach(() => {
   vi.restoreAllMocks()
 })
@@ -165,9 +177,73 @@ describe('OnboardingTour', () => {
     const { onFinish } = renderTour()
 
     clickNext() // welcome -> coach-today
-    fireEvent.keyDown(window, { key: 'Escape' })
+    pressEscape()
 
     expect(onFinish).toHaveBeenCalledWith('skipped')
+  })
+
+  it('traps Tab within the tour, wrapping from the last focusable back to the first', () => {
+    // useOverlay's own gap-close: previously nothing stopped Tab from
+    // leaving the tour into the inert screen underneath (MAKER428.md's
+    // named accessibility gap).
+    mockPlatform({ reducedMotion: true })
+    renderTour()
+
+    clickNext() // welcome -> coach-today; entrance settles immediately under reduced motion
+    // DOM/tab order is the coach card's Next, then the topbar's Skip -- Next
+    // is first, Skip is last.
+    const next = screen.getByRole('button', { name: 'Next' })
+    const skip = screen.getByRole('button', { name: 'Skip' })
+    expect(next).toHaveFocus()
+
+    skip.focus()
+    fireEvent.keyDown(skip, { key: 'Tab', bubbles: true })
+    expect(next).toHaveFocus()
+  })
+
+  it('traps Shift+Tab the same way, wrapping from the first focusable back to the last', () => {
+    mockPlatform({ reducedMotion: true })
+    renderTour()
+
+    clickNext() // welcome -> coach-today
+    const next = screen.getByRole('button', { name: 'Next' })
+    const skip = screen.getByRole('button', { name: 'Skip' })
+    expect(next).toHaveFocus()
+
+    fireEvent.keyDown(next, { key: 'Tab', shiftKey: true, bubbles: true })
+    expect(skip).toHaveFocus()
+  })
+
+  it('returns focus to what had it before the tour opened, once the tour closes', () => {
+    // The tour previously returned focus nowhere on close; this is a new
+    // correctness win from useOverlay, not a preserved behavior.
+    mockPlatform()
+    const opener = document.createElement('button')
+    opener.textContent = 'Tour Marked.'
+    document.body.appendChild(opener)
+    opener.focus()
+    expect(opener).toHaveFocus()
+
+    const onFinish = vi.fn()
+    const view = render(
+      <>
+        <div data-tour-id="open-settings" />
+        <div data-tour-id="today-toggle" />
+        <div data-tour-id="open-calendar" />
+        <div data-tour-id="ledger-title" />
+        <OnboardingTour onFinish={onFinish} />
+      </>,
+    )
+    expect(opener).not.toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    expect(onFinish).toHaveBeenCalledWith('skipped')
+
+    // Home reacts to onFinish by unmounting the tour (tourActive -> false).
+    view.unmount()
+
+    expect(opener).toHaveFocus()
+    opener.remove()
   })
 
   it('leads from the intro straight to the primary daily control, not another intro slide or a settings detour', () => {
@@ -658,7 +734,7 @@ describe('OnboardingTour', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Done' }))
 
       expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
-      fireEvent.keyDown(window, { key: 'Escape' })
+      pressEscape()
       expect(onFinish).not.toHaveBeenCalled()
 
       fireAnimationEnd(document.querySelector('.onboarding-coach')!, 'onboarding-close')

@@ -8,6 +8,7 @@ import {
   type MouseEvent,
   type SyntheticEvent,
 } from 'react'
+import { IconButton } from '@maker428/ui'
 import { LEDGER_NAME_SUGGESTIONS } from '../domain/ledgerSuggestions'
 import {
   TRACKER_NAME_MAX_LENGTH,
@@ -189,14 +190,9 @@ export function LedgerSwitcherSheet({
       <div className="settings-sheet-header">
         <h2 id={titleId}>Ledgers</h2>
         {!isFirstLedger && (
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Close"
-            onClick={() => dialogRef.current?.close()}
-          >
+          <IconButton label="Close" onClick={() => dialogRef.current?.close()}>
             <CloseIcon />
-          </button>
+          </IconButton>
         )}
       </div>
 
@@ -224,14 +220,13 @@ export function LedgerSwitcherSheet({
               />
               <span className="ledger-row-name">{ledger.name}</span>
             </button>
-            <button
-              type="button"
-              className="icon-button ledger-row-manage"
-              aria-label={`Manage ${ledger.name}`}
+            <IconButton
+              className="ledger-row-manage"
+              label={`Manage ${ledger.name}`}
               onClick={() => handleManage(ledger.id)}
             >
               <EditIcon size={16} />
-            </button>
+            </IconButton>
           </li>
         ))}
       </ul>

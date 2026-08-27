@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { IconButton } from '@maker428/ui'
 import { formatDisplayDate, getTodayKey, resolveDeviceTimezone } from '../domain/date'
 import type { OnboardingStatus } from '../domain/onboarding'
 import { prefersReducedMotion } from '../lib/platform'
@@ -114,15 +115,9 @@ function DemoShell({ stage }: DemoShellProps) {
       <header className="home-header">
         <Wordmark className="brand" data-demo="brand" />
         <div className="home-header-actions">
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Open calendar"
-            data-demo="calendar"
-            data-tour-id="open-calendar"
-          >
+          <IconButton label="Open calendar" data-demo="calendar" data-tour-id="open-calendar">
             <CalendarIcon />
-          </button>
+          </IconButton>
         </div>
       </header>
 

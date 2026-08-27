@@ -4,11 +4,11 @@ This app inherits from the Maker 428 App Standard.
 
 **Canonical source:** https://github.com/harrisonj321/maker-428-app-standard
 **Inherited version:** v1.0.1
-**Last reviewed against standard:** 2026-08-26
+**Last reviewed against standard:** 2026-08-27
 
 ## SHOULD overrides (locally documented)
 
-None currently documented.
+- `STANDARD.md` §6 — this app's general-purpose icons (`src/components/icons.tsx`) are inlined SVG rather than imported from the `lucide-react` package. They are not a foreign icon language: the file's own header states they are Lucide's own path data, embedded directly to avoid the dependency, and spot-checking several against the current `lucide-react@1.34.0` release confirms this -- `X`, `ChevronDown`, and `Plus` are byte-for-byte identical, and `Calendar` differs by a 1px revision Lucide itself made upstream after this copy was taken. This app therefore already satisfies the MUST-level "use Lucide as the default general-purpose icon language" in substance (`reference/audit-matrix.md`'s note that this convergence is "already true in practice in all three apps" predates and describes exactly this). Phase 4.1 adopted the shared `IconButton` primitive at every icon-only control (see below) but deliberately did not additionally swap these SVGs for live `lucide-react` imports: three of the seven (the edit/swap/share glyphs) have no confirmed current-version match, and forcing a match risked exactly the kind of small, unintended pixel drift `STANDARD.md`'s own restraint principle warns against, for a change with no user-visible benefit. Revisit if a future icon is added that Lucide provides and this file doesn't already have inlined.
 
 ## Centrally-documented exceptions relied on (MUST exceptions, or protected-identity SHOULD exceptions)
 
@@ -16,7 +16,26 @@ None currently documented.
 
 ## Outstanding compliance issues
 
-- `STANDARD.md` §13 (accessibility) — the hand-rolled onboarding-tour overlay does not implement a full Tab-cycle focus trap. The app's four native `<dialog>` sheets get focus-trapping for free from the platform; the tour overlay, built separately to support its spotlight-cutout visual, does not yet have an equivalent hand-built trap. Tracked in `reference/audit-matrix.md` row 29 and `reference/migration-roadmap.md` Phase 4 (§4.1) in the canonical standard repository. Remediation: adopt the shared overlay-accessibility helper once it's built (Phase 3), or add an equivalent hand-built focus trap in the meantime. This is tracked as an open gap, not a settled design decision.
+None currently open. The one previously tracked here -- `STANDARD.md` §13's onboarding-tour focus-trap gap -- is closed; see below.
+
+## Phase 4.1: shared-package adoption status
+
+Adopted `@maker428/ui@0.1.0` (pinned exact) per `reference/migration-roadmap.md` §4.1:
+
+- **Theme tokens, glow/shine/halo, elevation, safe-area raw insets** -- `src/index.css`'s duplicated `:root` declarations for these were removed in favor of `@maker428/ui/styles.css` (imported once, in `main.tsx`); the values were already byte-identical, so this was source consolidation, not a redesign. What's left locally is genuinely Marked.-specific: the paper-grain texture and the ledger color palette, plus the safe-area *composite* formulas this app builds on top of the package's raw `--safe-area-*` tokens (those composites don't match the package's own `--mobile-*-gap` shortcuts, so they stay local rather than being force-fit).
+- **The one remaining direct glow bypass** named in `reference/audit-matrix.md` -- `.onboarding-dot-active`'s hand-written `box-shadow` -- now goes through the canonical `--object-glow` recipe instead.
+- **`IconButton`** -- adopted at all eight icon-only controls in the app (calendar open, all four sheet close buttons, the ledger-row manage/edit button, the settings default-state swap, and the orientation demo's calendar button). The app's own icon glyphs are passed through unchanged as `children` (see the SHOULD override above for why they aren't `lucide-react` imports); two controls whose glyph has always rendered smaller than the primitive's 20px default (the manage icon at 16px, the swap icon at 18px) get a small unlayered CSS override preserving that exact size.
+- **`MakerMark`** -- the footer attribution is now `<MakerMark version={__APP_VERSION__} />` rather than a hand-typed string carrying the same canonical wording.
+- **The shared overlay-accessibility helper (`useOverlay`)** -- closes the tour focus-trap gap; see below.
+- **`Sheet`** -- deliberately not adopted. This app's four native `<dialog>` sheets remain valid per `STANDARD.md` §10.1 for content this simple, exactly as the roadmap anticipated; nothing about this migration required touching them.
+
+Also closed in this same phase, independent of the package (`STANDARD.md` §15, `patterns/pwa-and-installation.md` §2.2): the PWA manifest's missing maskable icon pair. `icon-512.png` previously carried both `purpose: 'any'` and `purpose: 'maskable'` at once -- the exact anti-pattern §2.2 names, since an `any` icon is authored trusting nothing will crop it. The manifest now declares a genuinely separate, generously-padded `icon-192-maskable.png` / `icon-512-maskable.png` pair (same mark and background, rescaled inward so it survives an arbitrary adaptive-icon crop), matching Tacos' canonical four-icon reference.
+
+### Onboarding-tour accessibility gap: closed
+
+The hand-rolled onboarding-tour overlay (`src/components/OnboardingTour.tsx`) now wraps its rendered content in one container and calls the shared `useOverlay` on it, providing the full contract: focus entry, full Tab/Shift+Tab trapping (the actual named gap -- previously nothing stopped Tab from leaving the tour into the screen underneath), topmost Escape ownership (replacing a manual `window` keydown listener), scroll locking (replacing a manual `document.body.style.overflow` toggle), and focus return to whatever opened the tour on close (previously absent entirely -- a genuine new correctness win, not a preserved behavior). Background isolation is real but is *not* provided by `useOverlay`'s own `isolateBackground` flag: the tour isn't portalled to `document.body`, so the package's document-body-branch isolation would operate one level too high to reach the specific sibling `<main>` that needs to go inert. `Home.tsx`'s and `OnboardingOrientation.tsx`'s existing hand-built `inert` toggle already does this correctly at the right granularity and is left in place; `isolateBackground: false` with an explanatory comment documents why.
+
+Verified with new tests (`OnboardingTour.test.tsx`): Tab wraps last-to-first and Shift+Tab wraps first-to-last within the tour; focus returns to a real external opener once the tour closes; Escape (fixed to dispatch from the actually-focused element, matching real browser event bubbling -- `fireEvent.keyDown(window, …)` never reached `document.documentElement` at all) still exits the tour as skipped, and is still ignored during the staged finale's closing beat.
 
 ## Notes
 

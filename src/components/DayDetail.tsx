@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react'
+import { IconButton } from '@maker428/ui'
 import { formatDisplayDate } from '../domain/date'
 import {
   NOTE_MAX_LENGTH,
@@ -120,14 +121,9 @@ export function DayDetail({
     >
       <div className="day-detail-header">
         <h2 id={titleId}>{formatDisplayDate(dateKey)}</h2>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Close"
-          onClick={() => dialogRef.current?.close()}
-        >
+        <IconButton label="Close" onClick={() => dialogRef.current?.close()}>
           <CloseIcon />
-        </button>
+        </IconButton>
       </div>
 
       <form onSubmit={(event) => void handleSubmit(event)} noValidate>

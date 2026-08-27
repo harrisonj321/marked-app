@@ -17,6 +17,7 @@
     "deploy:rules": "firebase deploy --only firestore:rules --project marked-app-733c0"
   },
   "dependencies": {
+    "@maker428/ui": "0.1.0",
     "firebase": "^12.17.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
