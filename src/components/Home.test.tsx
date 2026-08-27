@@ -761,7 +761,15 @@ describe('Home', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
       fireEvent.click(screen.getByRole('button', { name: 'Tour Marked.' }))
 
-      expect(container.querySelector('main')).toHaveAttribute('inert')
+      // The tour is portalled to document.body (see OnboardingTour), so the
+      // shared useOverlay background isolation marks the whole React-root
+      // branch inert -- not just <main> specifically, which is what lets it
+      // also reach a sibling like UpdatePrompt that sits outside Home's own
+      // markup entirely (see the dedicated coverage for that in
+      // OnboardingTour.test.tsx). `container` here is that whole branch.
+      expect(container).toHaveAttribute('inert')
+      expect(container).toHaveAttribute('aria-hidden', 'true')
+      expect(container.querySelector('main')).toBeInTheDocument()
     })
 
     it('closes on Skip and leaves the main content interactive again, without writing or touching any onboarding record', () => {
@@ -773,7 +781,8 @@ describe('Home', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
 
       expect(screen.queryByText(WELCOME_TEXT)).not.toBeInTheDocument()
-      expect(container.querySelector('main')).not.toHaveAttribute('inert')
+      expect(container).not.toHaveAttribute('inert')
+      expect(container).not.toHaveAttribute('aria-hidden')
       expect(storageWrites).not.toHaveBeenCalled()
 
       storageWrites.mockRestore()

@@ -96,11 +96,17 @@ describe('OnboardingOrientation', () => {
     mockPlatform()
     render(<OnboardingOrientation onFinish={vi.fn()} />)
 
-    // jsdom does not enforce `inert`'s interaction-blocking behavior, which
-    // is exactly what lets this prove the control is the genuine, wired
-    // TodayToggle component (see TodayToggle.test.tsx for its own dedicated
-    // interaction coverage) rather than a disabled picture of one.
-    const options = screen.getAllByRole('radio')
+    // The demo shell is genuinely inert/aria-hidden now (the shared
+    // useOverlay background isolation, not the previous hand-rolled
+    // stand-in, actually enforces this -- see the "makes the demo shell
+    // inert" test above), so reaching into it here needs `hidden: true` to
+    // bypass that accessibility filtering. That is exactly what lets this
+    // prove the control is the genuine, wired TodayToggle component (see
+    // TodayToggle.test.tsx for its own dedicated interaction coverage)
+    // rather than a disabled picture of one -- jsdom itself still doesn't
+    // enforce `inert`'s interaction-blocking behavior, so the click below
+    // still reaches it.
+    const options = screen.getAllByRole('radio', { hidden: true })
     expect(options).toHaveLength(2)
     fireEvent.click(options[1])
     expect(options[1]).toBeChecked()
@@ -131,7 +137,7 @@ describe('OnboardingOrientation', () => {
     render(<OnboardingOrientation onFinish={vi.fn()} />)
     leaveIntro()
 
-    const [didnt, did] = screen.getAllByRole('radio')
+    const [didnt, did] = screen.getAllByRole('radio', { hidden: true })
     expect(didnt).toBeChecked()
 
     act(() => {
@@ -170,7 +176,7 @@ describe('OnboardingOrientation', () => {
     act(() => {
       vi.advanceTimersByTime(3100)
     })
-    const [didnt, did] = screen.getAllByRole('radio')
+    const [didnt, did] = screen.getAllByRole('radio', { hidden: true })
     expect(did).toBeChecked()
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // today -> calendar
@@ -192,7 +198,7 @@ describe('OnboardingOrientation', () => {
       vi.advanceTimersByTime(7000)
     })
 
-    const [didnt] = screen.getAllByRole('radio')
+    const [didnt] = screen.getAllByRole('radio', { hidden: true })
     expect(didnt).toBeChecked()
     expect(container.querySelector('.demo-touch')).not.toBeInTheDocument()
   })

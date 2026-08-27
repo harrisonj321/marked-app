@@ -186,7 +186,7 @@ export function Home({ user, authError, ledgers, activeLedger, ledgersLoading, o
 
   return (
     <>
-      <main className="screen home home-enter" inert={tourActive || undefined}>
+      <main className="screen home home-enter">
         <header className="home-header">
           <Wordmark className="brand" />
           {activeLedger && todayKey && (
