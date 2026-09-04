@@ -22,8 +22,8 @@ vi.mock('./hooks/useTodayState', () => ({
     setState: vi.fn(),
   }),
 }))
-vi.mock('./hooks/useMonthRecords', () => ({
-  useMonthRecords: () => ({ records: new Map(), loading: false, error: null }),
+vi.mock('./hooks/useRangeRecords', () => ({
+  useRangeRecords: () => ({ records: new Map(), loading: false, error: null }),
 }))
 vi.mock('./data/ledger', () => ({
   createLedger: createLedgerMock,

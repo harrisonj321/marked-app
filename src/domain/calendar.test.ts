@@ -3,6 +3,7 @@ import {
   addMonths,
   compareYearMonth,
   formatMonthLabel,
+  generateRollingMonths,
   getCalendarMonth,
   monthKeyRange,
   resolveCalendarDayView,
@@ -76,6 +77,32 @@ describe('addMonths', () => {
 
   it('handles multi-month deltas across a year boundary', () => {
     expect(addMonths({ year: 2026, month: 11 }, 3)).toEqual({ year: 2027, month: 2 })
+  })
+})
+
+describe('generateRollingMonths', () => {
+  it('returns count consecutive months, oldest first, ending at latest', () => {
+    expect(generateRollingMonths({ year: 2026, month: 8 }, 3)).toEqual([
+      { year: 2026, month: 6 },
+      { year: 2026, month: 7 },
+      { year: 2026, month: 8 },
+    ])
+  })
+
+  it('crosses a year boundary correctly', () => {
+    expect(generateRollingMonths({ year: 2026, month: 1 }, 3)).toEqual([
+      { year: 2025, month: 11 },
+      { year: 2025, month: 12 },
+      { year: 2026, month: 1 },
+    ])
+  })
+
+  it('returns just latest when count is 1', () => {
+    expect(generateRollingMonths({ year: 2026, month: 8 }, 1)).toEqual([{ year: 2026, month: 8 }])
+  })
+
+  it('clamps a non-positive count to still include latest', () => {
+    expect(generateRollingMonths({ year: 2026, month: 8 }, 0)).toEqual([{ year: 2026, month: 8 }])
   })
 })
 

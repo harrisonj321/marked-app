@@ -817,34 +817,10 @@ fieldset label {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-
-.calendar-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.calendar-nav button {
-  min-height: 40px;
-  min-width: 40px;
-  padding: 0.5rem;
-  border-color: transparent;
-  background: none;
-  transition: background-color 0.15s ease;
-}
-
-@media (hover: hover) {
-  .calendar-nav button:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-text) 6%, transparent);
-    border-color: transparent;
-  }
-}
-
-.calendar-month-label {
-  margin: 0;
-  font-weight: 600;
-  font-size: 0.9375rem;
+  /* The weekday header stays put; .calendar-scroll below is the one
+     scrolling region, so the sheet never has two nested scroll areas. */
+  flex: 1;
+  min-height: 0;
 }
 
 .calendar-weekdays {
@@ -853,6 +829,37 @@ fieldset label {
   text-align: center;
   color: var(--color-text-muted);
   font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+/* The continuous roll of months. Native scrolling, contained so an
+   overscroll at either end can't leak into the page behind the dialog. */
+.calendar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.calendar-history-sentinel {
+  height: 1px;
+}
+
+.calendar-month-section + .calendar-month-section {
+  /* Enough separation to read each month as its own stretch of the same
+     ledger, not a wall of undifferentiated weeks -- without going as far
+     as a bordered/shadowed card, which would read as a separate object. */
+  margin-top: var(--space-4);
+}
+
+/* Subordinate to the ledger itself: quieter weight and color than the day
+   numbers it introduces, so the eye lands on the marks, not the label. */
+.calendar-month-heading {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
 }
 
 .calendar-grid {
@@ -978,6 +985,7 @@ fieldset label {
 .calendar-sheet-header {
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 /* Day detail, settings, and calendar dialogs share one small card
@@ -1023,7 +1031,11 @@ fieldset label {
     100dvh - 2 * var(--space-3) - var(--safe-area-top) -
       var(--safe-area-bottom)
   );
-  overflow-y: auto;
+  /* The sheet itself no longer scrolls -- .calendar-scroll inside it does,
+     so the close button stays put while the months roll underneath it. */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   padding: var(--space-3);
   padding-bottom: calc(var(--space-3) + var(--safe-area-bottom));
 }

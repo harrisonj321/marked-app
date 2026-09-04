@@ -7,7 +7,7 @@ vi.mock('../data/day', () => ({
   subscribeMonth: (...args: unknown[]) => subscribeMonthMock(...args),
 }))
 
-const { useMonthRecords } = await import('./useMonthRecords')
+const { useRangeRecords } = await import('./useRangeRecords')
 
 const UID = 'user-1'
 const LEDGER_ID = 'ledger-1'
@@ -19,13 +19,13 @@ function emitLatestRecords(records: Map<string, unknown>) {
   call?.[4](records)
 }
 
-describe('useMonthRecords', () => {
+describe('useRangeRecords', () => {
   beforeEach(() => {
     subscribeMonthMock.mockReset().mockReturnValue(() => {})
   })
 
-  it('queries the exact first/last date-key range for the visible month, scoped to the ledger', () => {
-    renderHook(() => useMonthRecords(UID, LEDGER_ID, { year: 2026, month: 2 }))
+  it('queries the exact given start/end date-key range, scoped to the ledger', () => {
+    renderHook(() => useRangeRecords(UID, LEDGER_ID, '2026-02-01', '2026-02-28'))
     expect(subscribeMonthMock).toHaveBeenCalledWith(
       UID,
       LEDGER_ID,
@@ -37,7 +37,7 @@ describe('useMonthRecords', () => {
   })
 
   it('starts in a loading state and resolves once data arrives', () => {
-    const { result } = renderHook(() => useMonthRecords(UID, LEDGER_ID, { year: 2026, month: 8 }))
+    const { result } = renderHook(() => useRangeRecords(UID, LEDGER_ID, '2026-08-01', '2026-08-31'))
     expect(result.current.loading).toBe(true)
 
     act(() => emitLatestRecords(new Map([['2026-08-10', { state: 'didnt' }]])))
@@ -46,22 +46,24 @@ describe('useMonthRecords', () => {
     expect(result.current.records.get('2026-08-10')).toEqual({ state: 'didnt' })
   })
 
-  it('re-subscribes with a new range when the visible month changes', () => {
+  it('re-subscribes with a new range when the range widens', () => {
     const { rerender } = renderHook(
-      ({ month }: { month: number }) => useMonthRecords(UID, LEDGER_ID, { year: 2026, month }),
-      { initialProps: { month: 8 } },
+      ({ startKey }: { startKey: string }) =>
+        useRangeRecords(UID, LEDGER_ID, startKey, '2026-08-31'),
+      { initialProps: { startKey: '2026-08-01' } },
     )
     expect(subscribeMonthMock).toHaveBeenCalledTimes(1)
 
-    rerender({ month: 9 })
+    rerender({ startKey: '2026-06-01' })
 
     expect(subscribeMonthMock).toHaveBeenCalledTimes(2)
-    expect(subscribeMonthMock.mock.calls[1][2]).toBe('2026-09-01')
+    expect(subscribeMonthMock.mock.calls[1][2]).toBe('2026-06-01')
   })
 
   it('re-subscribes when the ledger changes', () => {
     const { rerender } = renderHook(
-      ({ ledgerId }: { ledgerId: string }) => useMonthRecords(UID, ledgerId, { year: 2026, month: 8 }),
+      ({ ledgerId }: { ledgerId: string }) =>
+        useRangeRecords(UID, ledgerId, '2026-08-01', '2026-08-31'),
       { initialProps: { ledgerId: LEDGER_ID } },
     )
     expect(subscribeMonthMock).toHaveBeenCalledTimes(1)
@@ -73,12 +75,12 @@ describe('useMonthRecords', () => {
   })
 
   it('does not query when there is no signed-in user', () => {
-    renderHook(() => useMonthRecords(null, LEDGER_ID, { year: 2026, month: 8 }))
+    renderHook(() => useRangeRecords(null, LEDGER_ID, '2026-08-01', '2026-08-31'))
     expect(subscribeMonthMock).not.toHaveBeenCalled()
   })
 
   it('does not query when there is no ledger', () => {
-    renderHook(() => useMonthRecords(UID, null, { year: 2026, month: 8 }))
+    renderHook(() => useRangeRecords(UID, null, '2026-08-01', '2026-08-31'))
     expect(subscribeMonthMock).not.toHaveBeenCalled()
   })
 })

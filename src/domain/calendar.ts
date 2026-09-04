@@ -55,6 +55,17 @@ export function addMonths({ year, month }: YearMonth, delta: number): YearMonth 
   return { year: Math.floor(total / 12), month: normalizedMonth + 1 }
 }
 
+/**
+ * `count` consecutive months ending at (and including) `latest`, oldest
+ * first -- the sequence a continuously-scrolling calendar renders, read
+ * top-to-bottom. `count` is clamped to at least 1 so `latest`'s own month
+ * always renders even if a caller derives a non-positive count.
+ */
+export function generateRollingMonths(latest: YearMonth, count: number): YearMonth[] {
+  const clampedCount = Math.max(1, count)
+  return Array.from({ length: clampedCount }, (_, index) => addMonths(latest, index - (clampedCount - 1)))
+}
+
 export function yearMonthFromDateKey(dateKey: string): YearMonth {
   const [year, month] = dateKey.split('-').map(Number)
   return { year, month }
