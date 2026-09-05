@@ -4,8 +4,20 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 let mockRecords = new Map<string, { state?: 'did' | 'didnt'; note?: string; count?: number }>()
 let mockError: string | null = null
 
+const useRangeRecordsMock = vi.fn<
+  (uid: string | null, ledgerId: string | null, startKey: string, endKey: string) => {
+    records: typeof mockRecords
+    loading: boolean
+    error: string | null
+  }
+>(() => ({ records: mockRecords, loading: false, error: mockError }))
 vi.mock('../hooks/useRangeRecords', () => ({
-  useRangeRecords: () => ({ records: mockRecords, loading: false, error: mockError }),
+  useRangeRecords: (
+    uid: string | null,
+    ledgerId: string | null,
+    startKey: string,
+    endKey: string,
+  ) => useRangeRecordsMock(uid, ledgerId, startKey, endKey),
 }))
 
 const saveDailyRecordMock = vi.fn().mockResolvedValue(undefined)
@@ -24,6 +36,7 @@ beforeEach(() => {
   mockRecords = new Map()
   mockError = null
   saveDailyRecordMock.mockClear()
+  useRangeRecordsMock.mockClear()
 })
 
 const { Calendar } = await import('./Calendar')
@@ -249,6 +262,93 @@ describe('Calendar', () => {
 
       // ...and with no more history to load, the sentinel is gone.
       expect(document.querySelector('.calendar-history-sentinel')).not.toBeInTheDocument()
+    } finally {
+      globalThis.IntersectionObserver = OriginalIntersectionObserver
+    }
+  })
+
+  it('rolls back through 12+ months of real history, across a year boundary, without an artificial stop', () => {
+    let observerCallback: IntersectionObserverCallback | null = null
+    const OriginalIntersectionObserver = globalThis.IntersectionObserver
+
+    class CapturingObserver {
+      constructor(callback: IntersectionObserverCallback) {
+        observerCallback = callback
+      }
+      observe = vi.fn()
+      unobserve = vi.fn()
+      disconnect = vi.fn()
+      takeRecords = () => []
+    }
+    globalThis.IntersectionObserver = CapturingObserver as unknown as typeof IntersectionObserver
+
+    function loadMore() {
+      act(() => {
+        observerCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {
+          disconnect: vi.fn(),
+        } as unknown as IntersectionObserver)
+      })
+    }
+
+    try {
+      // A ledger old enough to span more than two years of real history.
+      render(
+        <Calendar
+          uid="u1"
+          ledger={{ ...ledger, startDate: '2024-01-15' }}
+          todayKey="2026-08-15"
+        />,
+      )
+
+      // Initial window: June-August 2026 only.
+      expect(screen.getByText('June 2026')).toBeInTheDocument()
+      expect(screen.queryByText('December 2025')).not.toBeInTheDocument()
+
+      const scrollContainer = document.querySelector('.calendar-scroll') as HTMLDivElement
+      // scrollHeight tracks rendered content, the way a real browser's would
+      // once more months are added to the DOM below.
+      Object.defineProperty(scrollContainer, 'scrollHeight', {
+        configurable: true,
+        get(this: HTMLDivElement) {
+          return this.querySelectorAll('.calendar-month-section').length * 300
+        },
+      })
+
+      // Widen a few times -- well beyond the initial 3-month window, but
+      // not yet at the ledger's actual start.
+      loadMore()
+      loadMore()
+
+      expect(screen.getByText('December 2025')).toBeInTheDocument()
+      expect(screen.queryByText('January 2024')).not.toBeInTheDocument()
+
+      // The range query keeps widening to match -- never re-querying a
+      // fixed/short window, and never fetching more than what's rendered.
+      const callsSoFar = useRangeRecordsMock.mock.calls.length
+      const [, , earliestStartKeySoFar] = useRangeRecordsMock.mock.calls[callsSoFar - 1]
+      expect(earliestStartKeySoFar).toBe('2025-12-01')
+
+      // Keep going until the actual ledger start is reached -- proving
+      // there's no artificial stop well short of the real boundary, and
+      // that it correctly crosses two year boundaries (2026->2025->2024)
+      // along the way.
+      for (let i = 0; i < 8; i++) loadMore()
+
+      expect(screen.getByText('January 2025')).toBeInTheDocument()
+      expect(screen.getByText('December 2024')).toBeInTheDocument()
+      expect(screen.getByText('January 2024')).toBeInTheDocument()
+      expect(screen.queryByText('December 2023')).not.toBeInTheDocument()
+
+      // Reaching the real boundary stops loading -- no sentinel left to
+      // trigger further (and no less-bounded) queries.
+      expect(document.querySelector('.calendar-history-sentinel')).not.toBeInTheDocument()
+      const lastCall = useRangeRecordsMock.mock.calls.at(-1)
+      expect(lastCall?.[2]).toBe('2024-01-01')
+      expect(lastCall?.[3]).toBe('2026-08-31')
+
+      // Every one of those repeated loads held the scroll position steady
+      // (the compensation effect ran on each, never resetting to 0).
+      expect(scrollContainer.scrollTop).toBeGreaterThan(0)
     } finally {
       globalThis.IntersectionObserver = OriginalIntersectionObserver
     }
