@@ -537,6 +537,16 @@ const CALLOUT_GAP_PX = 16
 // and CALLOUT_GAP_PX already shadow their rem-based CSS counterparts.
 const CALLOUT_MAX_WIDTH_PX = 352
 const CALLOUT_VIEWPORT_MARGIN_PX = 16
+// A generous ceiling on the callout's own rendered height (label + up to a
+// few lines of body + the action row + .tour-callout's padding) -- the
+// longest of the four coach steps' bodies measures ~190px in practice.
+// Used only to keep the vertical placement below from ever landing the
+// callout off the top or bottom edge on a short viewport (a landscape
+// phone, a foldable's cover screen); unlike CALLOUT_MAX_WIDTH_PX this
+// doesn't correspond to a real CSS max-height -- the callout's actual
+// height is whatever its content needs, this is just an upper estimate of
+// it for clamping purposes.
+const CALLOUT_MAX_HEIGHT_PX = 220
 
 interface CoachOverlayProps {
   step: CoachStepId
@@ -602,6 +612,36 @@ function CoachOverlay({
       )
     : null
 
+  // The vertical counterpart of the clamp above -- needed for the same
+  // reason, on a viewport short enough that neither useTourTargetRect's
+  // own scroll-to-center (which only guarantees the TARGET is visible, not
+  // that there's room enough beside it for the callout too) nor a target
+  // that happens to sit comfortably mid-screen can be assumed. Expressed as
+  // the actual `top`/`bottom` CSS value each placement branch below already
+  // computes, clamped against CALLOUT_MAX_HEIGHT_PX so the callout's OWN
+  // far edge can't cross the opposite safe margin -- the mirror image of
+  // clamping calloutCenterX against the callout's known half-width.
+  const calloutTopPx =
+    rect && placeBelow
+      ? Math.max(
+          CALLOUT_VIEWPORT_MARGIN_PX,
+          Math.min(
+            rect.bottom + SPOTLIGHT_PADDING_PX + CALLOUT_GAP_PX,
+            window.innerHeight - CALLOUT_VIEWPORT_MARGIN_PX - CALLOUT_MAX_HEIGHT_PX,
+          ),
+        )
+      : null
+  const calloutBottomPx =
+    rect && !placeBelow
+      ? Math.max(
+          CALLOUT_VIEWPORT_MARGIN_PX,
+          Math.min(
+            window.innerHeight - rect.top + SPOTLIGHT_PADDING_PX + CALLOUT_GAP_PX,
+            window.innerHeight - CALLOUT_VIEWPORT_MARGIN_PX - CALLOUT_MAX_HEIGHT_PX,
+          ),
+        )
+      : null
+
   useEffect(() => {
     if (!closing || !onClosed) {
       return
@@ -659,9 +699,7 @@ function CoachOverlay({
           rect
             ? {
                 left: calloutCenterX ?? undefined,
-                ...(placeBelow
-                  ? { top: rect.bottom + SPOTLIGHT_PADDING_PX + CALLOUT_GAP_PX }
-                  : { bottom: window.innerHeight - rect.top + SPOTLIGHT_PADDING_PX + CALLOUT_GAP_PX }),
+                ...(placeBelow ? { top: calloutTopPx ?? undefined } : { bottom: calloutBottomPx ?? undefined }),
               }
             : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
         }

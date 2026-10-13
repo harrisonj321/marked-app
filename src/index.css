@@ -131,10 +131,29 @@ h1 {
   margin: 0;
 }
 
+/*
+ * `height` (not `min-height`) plus its own `overflow-y` is what makes a
+ * screen scrollable IN ITSELF rather than relying on the document to grow
+ * past the viewport and scroll instead (Maker 428 Standard §24.6). That
+ * distinction only matters on a short viewport where a screen's header +
+ * content + footer genuinely exceed the available height -- landscape
+ * phones and the pre-auth orientation's demo shell (which renders the full
+ * header/toggle/footer at once, unlike the shorter guest/sign-in state) are
+ * where this is actually reached; on any viewport tall enough for the
+ * content to fit, the two are visually identical.
+ *
+ * It is also what makes the footer still reachable while a modal overlay
+ * (the onboarding tour) has locked `body`'s own scroll: `document.body`
+ * being non-scrollable does not stop a DESCENDANT element with its own
+ * `overflow-y: auto` from scrolling -- see useTourTargetRect's
+ * scrollIntoView call, which depends on this being a real, independent
+ * scroll container to have anything to scroll at all.
+ */
 .screen {
   box-sizing: border-box;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
   width: 100%;
   max-width: 26rem;
   margin: 0 auto;
@@ -782,6 +801,80 @@ fieldset label {
   display: flex;
   justify-content: center;
   gap: var(--space-2);
+}
+
+/*
+ * Wide/short landscape (Maker 428 Standard §24.2): a landscape phone, an
+ * open foldable, and a landscape tablet all share the same shape -- width
+ * comfortably beyond the portrait column's own 26rem, height short enough
+ * that the portrait stack's generous vertical rhythm reads as dead air
+ * instead of calm. Below 640px this never matches (there's no width to
+ * recompose into), and a query written as `orientation: landscape` would
+ * both miss a short desktop window and wrongly fire on a tall, narrow one
+ * (`patterns/responsive-and-viewport.md` §6.2) -- `min-aspect-ratio: 1/1`
+ * is what actually says "wider than tall," live, regardless of whether a
+ * rotation, a resize, or a fold produced it. A foldable opening from its
+ * portrait cover screen into this wide state crosses both thresholds at
+ * once and the layout below simply starts applying; folding it back
+ * un-applies the same way. No JS: this is a styling-only decision
+ * (patterns/responsive-and-viewport.md §4.2), so a live media query is
+ * the whole mechanism.
+ *
+ * The recomposition itself is scoped to `:has(.tracker-title)` -- the
+ * shape `.home-main` only takes once a ledger exists and is showing its
+ * real content (today's date, the ledger title, the toggle). The guest
+ * sign-in state and the empty-account state stay in the portrait column's
+ * plain centered stack; a heading and a couple of buttons don't need a
+ * second composition to read as intentional at any width. Degrades
+ * gracefully with no `@supports` needed, the same way `.ledger-row:has(…)`
+ * already does elsewhere in this file: a browser without `:has()` simply
+ * keeps the portrait-style stack in landscape too, which is a real, valid,
+ * already-shipped layout, not a broken one.
+ */
+@media (min-width: 640px) and (min-aspect-ratio: 1/1) {
+  .screen {
+    max-width: 42rem;
+    gap: var(--space-1);
+    padding-top: max(var(--space-2), calc(var(--space-1) + var(--safe-area-top)));
+    padding-bottom: max(var(--space-1), var(--safe-area-bottom));
+  }
+
+  .home-main {
+    padding: var(--space-1) 0;
+  }
+
+  /*
+   * One identity column (today's date over the ledger title) beside one
+   * control column (the toggle, its status line, the note affordance) --
+   * still one ledger's single control, read left-to-right instead of
+   * top-to-bottom, not a dashboard of independent panels. Named rows
+   * (rather than wrapping either element) are what let this reach
+   * .today-date and .tracker-title without touching Home.tsx's markup --
+   * both stay exactly where they already are in the DOM.
+   */
+  .home-main:has(.tracker-title) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-content: center;
+    align-items: center;
+    column-gap: var(--space-4);
+    text-align: center;
+  }
+
+  .home-main:has(.tracker-title) .today-date {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .home-main:has(.tracker-title) .tracker-title {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .home-main:has(.tracker-title) .today {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
 }
 
 .footer-link {

@@ -5,6 +5,17 @@ function measureTourTarget(tourId: string): DOMRect | null {
 }
 
 /**
+ * Instant (not smooth) on purpose: a step's target is scrolled into place
+ * as part of establishing where the spotlight belongs, not as a visible
+ * flourish of its own -- and an instant jump means the very next
+ * `getBoundingClientRect()` call already reflects the final position,
+ * with no animation frame to wait out first.
+ */
+function scrollTargetIntoView(element: Element): void {
+  element.scrollIntoView({ block: 'center', inline: 'nearest' })
+}
+
+/**
  * Measures the real, currently-rendered element carrying the given
  * `data-tour-id`, so a coach mark can anchor to the actual control instead
  * of a recreated screenshot. Re-measures on resize/orientation/scroll;
@@ -42,6 +53,7 @@ export function useTourTargetRect(tourId: string): DOMRect | null {
         const mounted = document.querySelector(`[data-tour-id="${tourId}"]`)
         if (mounted) {
           mutationObserver.disconnect()
+          scrollTargetIntoView(mounted)
           setRect(mounted.getBoundingClientRect())
         }
       })
@@ -50,6 +62,30 @@ export function useTourTargetRect(tourId: string): DOMRect | null {
     }
 
     const remeasure = () => setRect(element.getBoundingClientRect())
+
+    // A short viewport (a landscape phone, a foldable's cover screen) can
+    // leave a step's real target below the fold of its own screen -- and
+    // the screen underneath a modal tour is both scroll-locked (see
+    // useOverlay) and `inert`, so nothing short of a script can bring it
+    // back into view; a real person has no gesture left that would do it.
+    // `.screen`'s own `overflow-y: auto` (index.css) is what gives this
+    // something to scroll: `document.body` being locked doesn't stop a
+    // descendant scroll container from moving. `block: 'center'` rather
+    // than the usual `'nearest'` is deliberate here, not just "scroll it
+    // into view" -- centering the target leaves roughly equal headroom on
+    // whichever side CoachOverlay ends up placing the callout, which is
+    // the room the callout's own viewport clamp (OnboardingTour.tsx) needs
+    // to have something to clamp within. A target already fully visible is
+    // a no-op either way -- and, deliberately, this reads `rect` no
+    // further than that: an actual scroll fires a real `scroll` event,
+    // which the capture-phase listener below already turns into a
+    // `remeasure()`. Calling `remeasure()` here directly, unconditionally,
+    // would reintroduce exactly the race `skippedInitialReport` below
+    // exists to avoid -- a second, immediate getBoundingClientRect() that
+    // can observe a sibling effect's mid-transform element instead of its
+    // settled position (see that comment), except with no way to tell the
+    // two cases apart the way the ResizeObserver report's *timing* does.
+    scrollTargetIntoView(element)
 
     // ResizeObserver's spec-mandated first callback fires asynchronously
     // right after observe(), reporting the size as of whenever that
