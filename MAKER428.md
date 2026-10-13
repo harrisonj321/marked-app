@@ -3,12 +3,15 @@
 This app inherits from the Maker 428 App Standard.
 
 **Canonical source:** https://github.com/harrisonj321/maker-428-app-standard
-**Inherited version:** v1.1.0
-**Last reviewed against standard:** 2026-09-13
+**Inherited version:** v1.3.0
+**Last reviewed against standard:** 2026-10-12
+**Application class:** Consumer
 
 ## SHOULD overrides (locally documented)
 
 None currently documented.
+
+Marked.'s warm paper palette, grain texture, and gold focal light are deliberately **not** listed here. A product's palette is identity, not a departure from a rule (`STANDARD.md` §5.1, §5.4, §20.1), and needs no override and no exception. They are recorded as protected product expression under "Protected product expression" below.
 
 **Icon convention note (not an override):** this app's general-purpose icons (`src/components/icons.tsx`) are inlined SVG rather than imported from the `lucide-react` package. A previous revision of this file recorded that as a SHOULD override; it wasn't one, and the entry is removed rather than carried forward. `STANDARD.md` §6's MUST is "use Lucide as the default general-purpose icon language," not "depend on the `lucide-react` npm package specifically," and `reference/audit-matrix.md`'s own canonical row names Marked.'s approach directly: "vendored as hand-copied inline SVGs (no npm dependency) matching Lucide's default style exactly" is listed alongside Noted.'s and Tacos' `lucide-react` imports as part of the same "cleanest convergence in the entire audit." The file's own header states these are Lucide's own path data, embedded directly to avoid the dependency, and spot-checking several against the current `lucide-react@1.34.0` release confirms this -- `X`, `ChevronDown`, and `Plus` are byte-for-byte identical, and `Calendar` differs by a 1px revision Lucide itself made upstream after this copy was taken. Nothing here needs revisiting unless a future icon is added that Lucide provides and this file doesn't already have inlined -- at which point the new glyph is added the same way, not a reason to switch the existing ones to a live import.
 
@@ -18,13 +21,15 @@ None currently documented.
 
 ## Outstanding compliance issues
 
-None currently open. The one previously tracked here -- `STANDARD.md` §13's onboarding-tour focus-trap gap -- is closed; see below.
+None currently open. Two items have been tracked here and are closed: `STANDARD.md` §13's onboarding-tour focus-trap gap (see "Onboarding-tour accessibility gap: closed"), and the visible-focus and contrast findings of the v1.3.0 review (light-mode text-field focus, which the canonical roadmap predicted and this app's own measurement confirmed; swatch focus; placeholder text; Saffron's text contrast), found and closed in the same pass (see "Phase 7"). One MUST-level implementation observation that is not a user-protection invariant, press feedback on glow-bearing buttons, is recorded in Phase 7 as unfinished work.
 
 ## Phase 4.1: shared-package adoption status
 
 Adopted `@maker428/ui@0.1.1` (pinned exact) per `reference/migration-roadmap.md` §4.1:
 
 - **Theme tokens, glow/shine/halo, elevation, safe-area raw insets** -- `src/index.css`'s duplicated `:root` declarations for these were removed in favor of `@maker428/ui/styles.css` (imported once, in `main.tsx`); the values were already byte-identical, so this was source consolidation, not a redesign. What's left locally is genuinely Marked.-specific: the paper-grain texture and the ledger color palette, plus the safe-area *composite* formulas this app builds on top of the package's raw `--safe-area-*` tokens (those composites don't match the package's own `--mobile-*-gap` shortcuts, so they stay local rather than being force-fit).
+
+*Annotated 2026-10-12 (v1.3.0). This record was written when the standard treated those token values as the family's shared base palette. Under v1.3.0 they are not: they are Marked.'s own palette, which `@maker428/ui` ships as its replaceable default calibration (`STANDARD.md` §5.1). The consolidation described here is unchanged and still correct as a source-level fact; only the framing is withdrawn. See "Protected product expression" in Phase 7.*
 - **The one remaining direct glow bypass** named in `reference/audit-matrix.md` -- `.onboarding-dot-active`'s hand-written `box-shadow` -- now goes through the canonical `--object-glow` recipe instead.
 - **`IconButton`** -- adopted at all eight icon-only controls in the app (calendar open, all four sheet close buttons, the ledger-row manage/edit button, the settings default-state swap, and the orientation demo's calendar button). The app's own icon glyphs are passed through unchanged as `children` (see the icon-convention note above for why they're inlined SVG rather than `lucide-react` imports -- both are compliant); two controls whose glyph has always rendered smaller than the primitive's 20px default (the manage icon at 16px, the swap icon at 18px) get a small unlayered CSS override preserving that exact size.
 - **`MakerMark`** -- the footer attribution is now `<MakerMark version={__APP_VERSION__} />` rather than a hand-typed string carrying the same canonical wording.
@@ -62,6 +67,8 @@ Also confirmed correct, not changed: native `<dialog>`'s own `:modal` UA stylesh
 
 **Ready to adopt, not yet possible:** `@maker428/ui@0.3.0` adds `useMediaQuery`/`useIsCompactViewport` and a `--mobile-left-gap`/`--mobile-right-gap` safe-area pair (`STANDARD.md` §24.4, §24.6). The left/right pair is a direct generalization of this app's own `calc(var(--space-3) + var(--safe-area-{left,right}))`, cited as the evidence for adding it centrally -- unlike the existing top/bottom `--mobile-*-gap` pair (Phase 4.1, above), which didn't match this app's own composite formula closely enough to adopt, the left/right pair is modeled on this app's exact arithmetic and would be a clean, direct swap at its four call sites (`.screen`, `.onboarding-topbar`, `.onboarding-intro`, `.onboarding-install`) once available. Not done now: `0.3.0` is prepared but not yet published to the public npm registry (only `0.2.1` currently is), and installing it via a local-path/tarball reference would leave a dependency a clean `npm install` in Vercel's deploy environment can't resolve (the same npm-registry reasoning `reference/shared-package-architecture.md` §7 already gives for this family). This app has no live-breakpoint JS to migrate onto `useMediaQuery`/`useIsCompactViewport` today, since its one layout breakpoint (`max-width: 480px`) is CSS-only.
 
+*Annotated 2026-10-12: the "not yet published" claim above is stale. `npm view @maker428/ui` reports `0.3.0` as `latest`, published 2026-09-12, alongside `0.1.0`-`0.2.2`. That removes the blocker but not the decision, and `0.3.0` is still not adopted; see "`@maker428/ui` status" in Phase 7.*
+
 ## Phase 6.2: wide/short landscape composition
 
 Follow-up to Phase 6.1 after visual review: the previous pass made the wide/short shape (a landscape phone, an open foldable, a landscape tablet) *functionally* correct -- nothing clipped, nothing unreachable -- but left it visually unrecomposed, a portrait single-column stack simply re-centered in a wider box. That's a real, distinct finding from the "leave `.screen`'s 26rem cap alone at tablet/desktop widths" conclusion Phase 6.1 already recorded above: that conclusion covers the *portrait-shaped* wide case (a tall tablet, an ordinary desktop window), where the existing centered column is genuinely the right call per `STANDARD.md` §12. It says nothing about the *landscape-shaped* wide case, which is what this phase addresses -- the two are not in tension.
@@ -73,6 +80,81 @@ Follow-up to Phase 6.1 after visual review: the previous pass made the wide/shor
 **Verified visually** at every landscape-shaped matrix row (740×360, 930×430, 850×380, 880×720, 1200×800) against portrait counterparts (360×740, 430×930, 720×880 foldable-open-portrait, 800×1200 tablet-portrait) to confirm portrait is byte-for-byte unchanged; live rotation in both directions (with a dialog open, and mid-onboarding-tour) re-composes instantly with no reload and no lost state, since the whole mechanism is a live media query with no JS driving it (`patterns/responsive-and-viewport.md` §4.2's "prefer plain CSS wherever a viewport condition only changes styling"). The onboarding tour's coach spotlight/callout (Phase 6.1's fix) needed no further change -- `useTourTargetRect` measures the real, current position of whichever element the current step targets, so it followed the toggle and title to their new grid cells correctly without modification.
 
 **The standard-level lesson applied here, learned from `reference/viewport-test-matrix.md` §2.1's own account of a defect in a sibling app:** a wide landscape row is not evidence of zero safe-area, and this phase's own new two-column composition is exactly the shape §2.1 warns about (a layout that starts using extra width once a breakpoint-like condition is crossed). Verified with `--safe-area-left`/`--safe-area-right` forced non-zero (44px), independently on each side and then both together, at 930×430: `.screen`'s own existing `padding-left`/`padding-right` formula (unchanged by this phase -- only `max-width`, `gap`, and vertical padding were touched) already keeps both the identity column and the control column clear of the simulated inset on whichever edge it's forced to, with no horizontal overflow (`scrollWidth === clientWidth`) when both are forced at once. This app didn't repeat Noted.'s gap because the new layout was built *inside* `.screen`'s existing safe-padded box rather than introducing a second edge-owning surface of its own -- worth stating plainly since that was a matter of how this composition happened to be built, not a check that would have caught a different structural choice.
+
+## Phase 7: adoption of v1.3.0 (and the v1.2.0 step before it)
+
+Adopted 2026-10-12. v1.3.0 corrects the standard's visual foundation: "Maker 428 products share a language of light, not a color palette" (`STANDARD.md` §5). Marked.'s warm palette had been over-generalized into a family requirement; that is withdrawn, and Marked.'s palette is Marked.'s own. This was therefore a review-and-verify pass, not a redesign. Everything below was measured on the real app (see "How this was verified, and what it doesn't cover"), not inferred from the standard's own computed figures.
+
+### Version gap reviewed
+
+This file declared v1.0.1 at the last commit before this pass. An earlier session had adopted v1.1.0 (Phases 6.1 and 6.2 above) but left it uncommitted; it was committed as its own change first, so the gap reviewed here was v1.1.0 (already recorded above), v1.2.0, and v1.3.0.
+
+- **v1.2.0: reviewed, no change.** Marked. is a consumer application, declared at the top of this file. The organization-owned class (§25) does not apply and alters no product behavior. The operational-density allowance (§5.7) is not used: Marked. has no surface for scanning, comparing, or acting on many records, and its one dense grid, the calendar's day cells, already rests on §9's documented dense-grid exception. The system-font rule is a SHOULD, and Marked. already uses the system stack. The remaining v1.2.0 changes were wording clarifications and documentation corrections that bind Marked. no differently than before.
+- **v1.3.0: adopted.** Palette independence, the language of light (§5.5), and the measurable visible-focus floor (§8.2). Details below.
+
+### Protected product expression
+
+Marked.'s **warm paper palette** (the cream-and-umber ladder and its ink accent), its **grain-and-vignette texture**, its **gold focal light**, and its **seven-swatch ledger colors** are protected product expression (`STANDARD.md` §23.1; `brand/marked.md` §3.1, §4.3). They are Marked.'s to keep and are not a family default. Nothing in this pass changed the canvas, the surfaces, the grain, the gold, or the ledger hues, with one exception recorded under "Findings and changes": Saffron's light-mode value, nudged for text contrast.
+
+**Marked. is a primary donor of the language of light** (§5.5, §23.1): the parameterized `--object-glow`/`--shine`/`--halo` technique, the recessed-well input, the no-ambient-wash rule, and the reference reduced-motion implementation. It is evidence for those principles, not a template for another product to copy.
+
+**Where the palette physically lives.** Marked.'s own values are the default calibration of `@maker428/ui`, which this app consumes pinned at exactly `0.1.1` (the package ships the ladder Marked. originated as a replaceable default, per `STANDARD.md` §5.1). Only the grain, the ledger colors, and the focus edge are declared locally. So a package upgrade could change Marked.'s look without touching this repository. Before ever bumping the pin, diff the package's `tokens.css` and `glow.css` against `0.1.1`, or pin the values locally.
+
+### The language of light, mapped to §5.5
+
+Quiet by default, luminous when meaningful. Every lit object in Marked. maps to a §5.5 source, and nothing else glows:
+
+| Object | Role | Why it is lit |
+|---|---|---|
+| Today toggle's pill | accent, with subtle shine | the one primary control in view |
+| `.button-primary` (a sheet's Save) | accent, with subtle shine | the one confirming action of its surface |
+| Marked calendar days | accent | set allowance: the light is the state each day shows |
+| Ledger swatches and ledger dots | accent | set allowance: the light is the identity each one offers |
+| Selected swatch, active count chip | accent, stronger | meaningful selected state |
+| Today's calendar cell | accent, weaker | a location cue; "a ring is a location cue and a mark is content" |
+| Active onboarding step dot | focal | active state |
+| A focused text field | focal (gold) | the one deliberate moment of light on a form |
+
+Not lit: ordinary buttons, inputs at rest, cards, rows, links, banners, and the page itself. The page carries only `body::before`'s neutral grain and vignette, with no accent-derived wash (`STANDARD.md` §5.1).
+
+Checked against the §5.5 definition, on the real source and render:
+
+- **Localized, soft, dimensional, source-attached.** Every glow is a layered `box-shadow` on the object itself: a crisp near bloom plus a softer, wider far bloom, never a flat outline. Each blur is a fraction of a rem scaled by `--glow-scale`, so it falls off within the object's own neighborhood.
+- **Product-colored.** Each object names its own `--glow-color` (its ledger's hue, or gold for focal moments), never a fixed family color.
+- **Restrained, with the focal object brightest.** Measured near-bloom intensity against the ground in light: unselected swatches 1.6:1, toggle pill 2.15:1, Save 2.17:1, selected swatch 3.09:1. The selected swatch is the most lit thing in its view, as the allowance requires. In dark, with the espresso ledger (whose accent becomes cream): toggle 3.83:1, marked days 3.41:1, today 2.14:1, selected swatch 4.76:1, with far blooms between 1.3:1 and 2.4:1. Light-mode marked days and today's cell were reviewed visually, not measured numerically.
+- **Visually quiet in both themes.** Reviewed in a browser on the calendar, the swatch pickers, Home, and the tour, with the espresso and Saffron ledgers. Adjacent marked days stay distinct and do not smear; dark reads warm and dim, not neon.
+- **No banned technique in the glow itself.** No CSS `filter` is used anywhere (the stylesheet's only `filter:` mentions are comments forbidding it; the grain texture's SVG `<filter>` is a texture, not glow), and the toggle's light follower is positioned with `left`, carrying no transform.
+
+Two honest notes, neither changed:
+
+- **Dark tuning is partly the package's, partly the hues'.** The glows the package drives (toggle, Save, ledger dots, onboarding dot) get its small dark-only lift (near bloom 40% to 45%, far 14% to 18%). The per-object alphas this file sets (marked days, today's cell, swatches, the active count chip) are the same in light and dark, so dark's difference there comes from the lifted ledger hues rather than a separate alpha calibration. Reviewed and judged quiet; it is the first place to look if a future ledger color ever reads as neon in dark.
+- **Press feedback lands on glow-bearing buttons (unfinished, not a design decision).** The global `button:active` press-scale (`transform: scale(0.97)`, with a transitioned `transform`) also applies to the four glow-bearing buttons: `.button-primary`, `.count-chip-active`, `.ledger-color-chip`, and `.calendar-cell-today`. `STANDARD.md` §5.5 asks that glow not share an element with an animated transform, which is why the package's `IconButton` puts its press scale on an inner wrapper. This pre-dates v1.3.0 (the rule is unchanged since v1.0.0), no defect was observed in the Chromium browser used here, and the real risk is WebKit, which this pass could not test. It was not changed: the fix is structural (move the press feedback inward on those controls) and should be made and verified on a real iOS device, not blind. It is not a user-protection invariant (§20.3), so it is not listed under "Outstanding compliance issues".
+
+### Findings and changes
+
+Focus is a user-protection invariant (§20.3) and a separate thing from glow (§5.5, §8.2): the crisp indicator must hold 3:1 against adjacent colors, and glow can never be the sole indicator. Measured with a real browser's keyboard focus (`:focus-visible` driven by genuine Tab presses), in both presentations:
+
+- **Already compliant, unchanged.** The app-wide ring (2px ink at 2px offset) measured 12.51:1 on the page and 13.96:1 on a raised sheet in light, and 12.57:1 on a raised sheet to 14.73:1 on the page in dark: icon buttons, the ledger title, Add note, the footer links, Settings, dialog controls, calendar day cells, and the onboarding controls. The today toggle's ring, which is drawn on its container because its radios are visually hidden, measured 12.51:1 in light. Onboarding-tour controls were measured in dark (12.57-14.73:1) and share the same generic rule.
+- **Found: light-mode text-field focus was below the floor.** The halo's crisp ring measured 1.16:1 and the gold-tinted border 2.02:1 against the page, 2.26:1 against a raised sheet. That is what the v1.3.0 roadmap predicted from the package's default values; here it is measured on the render. The soft bloom was doing most of the visible work, which §8.2 rules out. **Fixed** with a Marked.-local `--color-focus-edge` (gold pulled toward ink in light, `color-mix(in srgb, var(--color-gold) 55%, var(--color-text))`), used as the border plus a 1px spread, so the crisp edge is 2px. It measures 4.74:1 on the page and 5.29:1 on a raised sheet, and 4.21:1 and 4.69:1 against the well inside. The package's halo stays, as bloom only. Dark already passed (4.32:1 against a raised sheet, 4.55:1 against the well; 5.07:1 against the page is computed). Its color is unchanged, and its edge thickens from 1px to 2px so the two presentations match.
+- **Found: swatch focus collided with selection.** Both were the same ink ring at the same distance, so keyboard focus was invisible on the selected swatch and read as a second selection on any other, in both themes. **Fixed**: selection keeps its tight ring; focus is a wider, separate ring on `::after` (13.96:1 light, 12.57:1 dark) that never touches the swatch's own light. Verified for selected, focused, and both together at desktop width, and for selected and focused at 375px, with no clipping or horizontal overflow.
+- **Found: placeholder text was under 4.5:1.** `opacity: 0.75` left it at 2.97-3.18:1 in light (computed) and measured 4.11:1 in dark. Now full muted color: 5.26:1 in light and 6.19:1 in dark, measured.
+- **Found: Saffron, in light, was short of 4.5:1 for small text.** Text on that ledger's fill was 3.84:1, which is fine for the 20px toggle word but not for the 13-16px marked-day numerals, the count chip, or the Save label. **Fixed** by darkening only Saffron's light-mode value, `#a86e0e` to `#98630d` (same hue and saturation, lightness down about 4 points), to 4.57:1 measured. This is the one place a palette value moved, and it moved because it failed contrast, not to converge on any other app. Its ledger-tinted "Add note" link, derived from the same hue, improves with it. The other six colors already passed in both themes (light: lowest 4.81:1; dark: lowest 5.55:1).
+- **Checked, compliant, unchanged.** Body, muted, link, and engraving text (lowest 5.31:1 light, 5.88:1 dark), text on the toggle and Save fills, the "Add note" link and today ring across all seven colors in both themes, and the ink selected-swatch ring. Future days are deliberately dimmed to 0.35 opacity as disabled controls (§8.1) and are exempt.
+- **Guard.** `src/themeContrast.test.ts` reads the real stylesheets and fails if any ledger color falls under 4.5:1 beneath its text, or the focus edge under 3:1 against the page, a raised sheet, or the well. Both halves were confirmed to fail against the old values.
+
+### `@maker428/ui` status
+
+Unchanged: pinned exactly at `0.1.1`, with no upgrade. v1.3.0 changed no package value, selector, export, or behavior, and the two package follow-ups it proposes (a recalibrated default halo, and a neutrally named focal-hue token) are not released, so nothing in this pass needed a newer package. `0.3.0` is published and would also bring `useMediaQuery`, `useIsCompactViewport`, and the left/right safe-area gap pair (Phase 6.1 above); adopting it is a separate, optional change that would need its own light/dark review, because this pass's measurements are against `0.1.1`. When the package's halo is recalibrated, this app's `--color-focus-edge` can be dropped in favor of it.
+
+### How this was verified, and what it doesn't cover
+
+The real application was run against local Firebase Emulator Suite instances (Auth and Firestore only; no production project was touched), with seeded ledgers, marked days, notes, and counts. It was reviewed in light and dark (via `prefers-color-scheme` emulation), at desktop width and 375px, across Home, the calendar, the day sheet, Settings, the ledger switcher and its swatch picker, the sign-in screen, the first-ledger empty state, and the onboarding tour. Contrast figures are computed from the browser's resolved styles and composited over the real effective backgrounds, not sampled from pixels. For the focus indicator, "adjacent colors" means the page or sheet outside the field and the recessed well inside it, the same measure the standard's own figures use. The soft bloom is not counted. Against the translucent halo band the edge measures 4.07-4.47:1 in light and 2.36:1 in dark; that is recorded for transparency and is not treated as the floor.
+
+Not covered: WebKit and real iOS rendering (the new swatch ring uses a plain border and border-radius, no filter or transform, but it is unconfirmed there), assistive-technology behavior beyond keyboard, the update-available banner (not triggered), real Google sign-in (the emulator's email path was used), and viewport widths between the two reviewed.
+
+### Deliberately unchanged
+
+The warm canvas and surfaces, the paper grain and vignette, the gold focal light, the six other ledger hues, the glow recipes and every glow value, the calendar's marked, today, count, and note semantics, the information architecture, the responsive and landscape behavior, the PWA configuration, authentication and persistence, the Firestore rules, and the `@maker428/ui` integration.
 
 ## Notes
 
