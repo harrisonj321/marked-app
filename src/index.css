@@ -1,12 +1,14 @@
 /*
  * Semantic tokens, spacing, and the object-glow/shine/halo/elevation
- * material recipe now come from @maker428/ui/styles.css (imported in
- * main.tsx) rather than being duplicated here -- Marked. donated the
- * canonical values for all of them (STANDARD.md §5, reference/
- * migration-roadmap.md §4.1), so this is source consolidation, not a
- * redesign: every value below was already byte-identical to the shared
- * package's. Only what's genuinely Marked.-specific stays local: the
- * paper-grain texture, the ledger color palette, and the safe-area
+ * material recipe come from @maker428/ui/styles.css (imported in
+ * main.tsx) rather than being duplicated here. The values are Marked.'s
+ * own: the package ships the warm paper, umber, and gold ladder Marked.
+ * originated as its replaceable default calibration -- not a family
+ * palette (STANDARD.md §5.1, §5.4). Marked. keeps it as protected product
+ * expression (§23.1), which is why the package stays pinned exactly: a
+ * different default would have to be overridden here, not accepted.
+ * Only what's genuinely Marked.-specific stays local: the paper-grain
+ * texture, the ledger color palette, the focus edge, and the safe-area
  * composites this file builds on top of the package's raw insets.
  */
 :root {
@@ -48,7 +50,20 @@
   --ledger-color-dust: #1f6673;
   --ledger-color-plum: #3a4da6;
   --ledger-color-rose: #a63a5c;
-  --ledger-color-straw: #a86e0e;
+  /* Saffron sits a few points darker than it first shipped (#a86e0e), same
+     hue and saturation: that value held only 3.84:1 against
+     --color-accent-text, short of the 4.5:1 the 13-16px numerals, count
+     chip, and Save label drawn on this fill need (STANDARD.md §13). */
+  --ledger-color-straw: #98630d;
+
+  /* The crisp edge of a text field's focus halo (STANDARD.md §8.2): gold
+     pulled toward ink until it holds 3:1 on its own against everything it
+     touches -- the page, a raised sheet, and the recessed well inside --
+     so the soft --halo bloom is atmosphere, never the only thing marking
+     focus. Light: 4.74:1 on the page and 5.29:1 on a raised sheet, 4.21:1
+     and 4.69:1 against the well on each. (The package's own halo ring is
+     20% gold, 1.16:1; it stays, as bloom.) */
+  --color-focus-edge: color-mix(in srgb, var(--color-gold) 55%, var(--color-text));
 }
 
 /* Only what's genuinely Marked.-specific: the paper texture and the ledger
@@ -70,6 +85,10 @@
     --ledger-color-plum: #7d92e6;
     --ledger-color-rose: #dd7392;
     --ledger-color-straw: #dfa63e;
+    /* Dark's edge already cleared the floor (5.07:1 on the page, 4.33:1 on
+       a raised sheet, 4.54:1 against the well). Mixing toward dark's own
+       light ink, as light does, would only brighten it for no gain. */
+    --color-focus-edge: color-mix(in srgb, var(--color-gold) 55%, var(--color-border-strong));
   }
 }
 
@@ -270,7 +289,11 @@ textarea {
 input::placeholder,
 textarea::placeholder {
   color: var(--color-text-muted);
-  opacity: 0.75;
+  /* Full muted, not dimmed: placeholder text is text, so it owes the same
+     4.5:1 as every other muted label (STANDARD.md §13). At the 0.75 it used
+     to carry it measured 2.97-3.18:1 in light and 4.10-4.39:1 in dark. A
+     typed value stays full ink, so the two still read as different. */
+  opacity: 1;
 }
 
 textarea {
@@ -279,15 +302,22 @@ textarea {
 }
 
 /* The one deliberate moment of light on a form: a text field takes the
-   halo on focus instead of the generic hard outline above. */
+   halo on focus instead of the generic hard outline above. The light is
+   the halo's bloom; the focus indicator itself is the crisp 2px edge --
+   the border plus a 1px spread, both --color-focus-edge -- which meets the
+   3:1 floor on its own (STANDARD.md §8.2). The halo's translucent ring and
+   bloom sit outside that edge and are atmosphere only: remove them and
+   focus is still strong and obvious. */
 input[type='text']:focus-visible,
 input[type='number']:focus-visible,
 input[type='email']:focus-visible,
 input[type='password']:focus-visible,
 textarea:focus-visible {
   outline: none;
-  border-color: color-mix(in srgb, var(--color-gold) 55%, var(--color-border-strong));
-  box-shadow: var(--halo);
+  border-color: var(--color-focus-edge);
+  box-shadow:
+    0 0 0 1px var(--color-focus-edge),
+    var(--halo);
 }
 
 /* Interface labels recede to muted so the user's own words own the full
@@ -1425,6 +1455,8 @@ fieldset label {
    --ledger-accent is the draft color, and deriving the light from that
    would give all seven swatches the same halo. */
 .ledger-color-chip {
+  /* Anchors the focus ring's ::after (below). */
+  position: relative;
   width: 2rem;
   height: 2rem;
   min-height: 0;
@@ -1437,6 +1469,31 @@ fieldset label {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 25%),
     var(--object-glow);
+}
+
+/* Keyboard focus and selection can land on the same swatch, and both used
+   to be the same ink ring at the same distance: focus was invisible on the
+   selected swatch, and on any other it read as a second selection. They
+   are now two different rings. Selection keeps the tight one (below);
+   focus is a wider ring on ::after, so it never touches the swatch's own
+   light. The generic button ring is switched off here because it would
+   draw at selection's distance. Keep this above the [aria-pressed] rule:
+   at equal specificity the later one wins, and a selected swatch must
+   keep its selection ring while it holds focus. */
+.ledger-color-chip:focus-visible {
+  outline: none;
+}
+
+/* 2px ink, 6px clear of the swatch -- a 2px gap outside the selection
+   ring's own 2px at a 2px offset. Ink on the sheet is 13.96:1 in light and
+   12.57:1 in dark. */
+.ledger-color-chip:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: -0.5625rem;
+  border: 2px solid var(--color-text);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 /* Selection is one precise ink ring offset from the swatch -- the color
