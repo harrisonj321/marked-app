@@ -246,9 +246,37 @@ button:disabled {
    rather than just clicked -- restrained enough that it reads as material,
    not as an animation. */
 @media (prefers-reduced-motion: no-preference) {
-  button:not(:disabled):active {
+  /* Not on glow-bearing buttons: STANDARD.md §5.5 keeps an animated
+     transform off any element that carries glow (a layer promoted by the
+     transform is what WebKit mispaints; the same bug class as v0.10.4's
+     toggle ghost). Those four get the non-transform press below instead:
+     .button-primary, .count-chip-active, .ledger-color-chip, and every
+     .calendar-cell (today's cell glows itself, and a marked day's glowing
+     numeral sits inside its cell, so the whole cell is excluded). */
+  button:not(:disabled):not(.button-primary):not(.count-chip-active):not(.ledger-color-chip):not(.calendar-cell):active {
     transform: scale(0.97);
   }
+}
+
+/* The pressed response for glow-bearing buttons, with no transform: the
+   control sits down into its surface (a soft inset shadow replaces the
+   catch-light shine) while its own light stays exactly where it was. It is
+   a state, not motion, so it applies under reduced motion too. */
+.button-primary:active:not(:disabled),
+.count-chip-active:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 5px rgb(var(--color-shadow-rgb) / 0.32),
+    var(--object-glow);
+}
+
+.ledger-color-chip:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 4px rgb(var(--color-shadow-rgb) / 0.35),
+    var(--object-glow);
+}
+
+.calendar-cell:active:not(:disabled):not(.calendar-cell-inactive) {
+  background: color-mix(in srgb, var(--color-text) 9%, transparent);
 }
 
 button:focus-visible,
