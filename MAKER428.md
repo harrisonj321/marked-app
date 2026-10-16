@@ -3,8 +3,8 @@
 This app inherits from the Maker 428 App Standard.
 
 **Canonical source:** https://github.com/harrisonj321/maker-428-app-standard
-**Inherited version:** v1.3.0
-**Last reviewed against standard:** 2026-10-12
+**Inherited version:** v1.3.1
+**Last reviewed against standard:** 2026-10-15
 **Application class:** Consumer
 
 ## SHOULD overrides (locally documented)
@@ -157,6 +157,25 @@ Not covered: WebKit and real iOS rendering (the repository has no WebKit test ta
 ### Deliberately unchanged
 
 The warm canvas and surfaces, the paper grain and vignette, the gold focal light, the six other ledger hues, the glow recipes and every glow value, the calendar's marked, today, count, and note semantics, the information architecture, the responsive and landscape behavior, the PWA configuration, authentication and persistence, the Firestore rules, and the `@maker428/ui` integration.
+
+## Phase 8: adoption of v1.3.1
+
+Adopted 2026-10-15. v1.3.1 is a patch-level clarification: `STANDARD.md` §5.5 gains "Where the light comes from" (a crisp, saturated source on the object; a bloom of the same hue easing outward from near to far; the surrounding surface left clean; luminous depth, not neon). It adds no requirement, token, or package surface, and widens nothing about which objects may glow, so no change was required to remain compliant. `@maker428/ui` stays pinned at `0.1.1`; nothing in this pass needed a newer one.
+
+**§5.5 was reviewed visually**, not by values alone: before/after captures in light and dark, at phone width (375px) and desktop, of Home (the Today toggle and the ledger dot), the calendar (marked days, today, a note dot, a count), the ledger switcher (ledger dots) and new-ledger form (the seven swatches, the selected swatch, Save). The count chip and the onboarding step dot were reviewed in an isolated page built from the app's real stylesheet and class markup, not in their live screens. The set of lit objects is the table in Phase 7, unchanged: no object was added to the glow set, and ordinary chrome (buttons, links, rows, inputs at rest, the page) stays unlit.
+
+**What the review found.** The package's recipe draws its far bloom only twice as wide as its near bloom, so on a small lit object such as a marked day the far layer read as a thin tinted rim around the object rather than light falling away from it, and the Today toggle's pill (the one focal object in view) carried less visible light than the calendar's marked days.
+
+**What changed** (all in `src/index.css`, one calibration block near the top; the recipe is still `--object-glow`, and every call site still reads `box-shadow: var(--object-glow)`):
+
+- The far bloom's reach is now a local token, `--glow-far-reach: 2.4rem` (the package's fixed `1rem`), still scaled by each object's `--glow-scale`. `--object-glow` is restated locally, unlayered, only so its far radius can read that token; the near layer, both hues, and the per-element `--glow-color` / `--glow-scale` contract are the package's.
+- Shared defaults: light `--glow-near-alpha` 40% to 44% and `--glow-far-alpha` 14% to 16%; dark 45% to 48% and 18% to 15%. Dark keeps its own pair, with the far bloom no wider or stronger than daylight's.
+- The Today toggle's pill reads its own pair through `--toggle-glow-near-alpha` / `--toggle-glow-far-alpha`: 58% / 26% in light, and in dark the shared 48% / 15%.
+- Per-object alphas at the other call sites (marked days, today's cell, swatches, the selected swatch, the count chip) are unchanged; they now spread over the wider far bloom.
+
+**Result.** The source object reads before its halo; the near bloom stays attached; the far bloom is visibly softer and wider; adjacent marked days on a 375px calendar stay distinct and do not merge; the surface beyond the bloom stays clean; and neither theme reads neon.
+
+**Unchanged and re-confirmed:** no `filter` and no animated `transform` on any glow-bearing element (the diff adds neither); the focus halo, the focus edge, and every contrast value (the bloom sits outside each object, never behind text); reduced-motion behavior; and the warm paper, grain, gold focal light, ledger colors, and no-red destructive treatment. Not covered: WebKit and real iOS rendering, as in Phase 7.
 
 ## Notes
 
