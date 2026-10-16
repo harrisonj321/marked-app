@@ -7,7 +7,6 @@ export interface DailyRecord {
 }
 
 export const NOTE_MAX_LENGTH = 120
-export const COUNT_MIN = 1
 export const COUNT_MAX = 99
 export const COUNT_OTHER_MIN = 4
 
@@ -73,24 +72,6 @@ export function validateNote(input: string): NoteValidation {
 export type CountValidation =
   | { valid: true; count: number | undefined }
   | { valid: false; error: string }
-
-export function validateCount(input: string): CountValidation {
-  const trimmed = input.trim()
-  if (trimmed.length === 0) {
-    return { valid: true, count: undefined }
-  }
-  const parsed = Number(trimmed)
-  if (!Number.isInteger(parsed)) {
-    return { valid: false, error: 'Enter a whole number.' }
-  }
-  if (parsed < COUNT_MIN || parsed > COUNT_MAX) {
-    return { valid: false, error: `Enter a number from ${COUNT_MIN} to ${COUNT_MAX}.` }
-  }
-  if (parsed <= 1) {
-    return { valid: true, count: undefined }
-  }
-  return { valid: true, count: parsed }
-}
 
 export function formatCount(count: number): string {
   return `${count}×`
