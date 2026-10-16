@@ -351,7 +351,7 @@ Use:
 - Firebase Authentication
 - Cloud Firestore
 - Vercel (primary production frontend hosting)
-- Firebase Hosting (secondary mirror; not the normal deploy target -- see Deployment Safety)
+- Firebase Hosting (disabled; not a deploy target -- see Deployment Safety)
 - Progressive Web App support
 
 The application is mobile-first but must remain responsive on desktop.
@@ -637,7 +637,7 @@ Never claim success if validation failed.
 - The primary public production frontend is **Vercel**, project `marked-app`, served at `https://marked-ledger.vercel.app`.
 - Production deploys happen automatically when commits are pushed to `main`, through the existing Vercel GitHub integration. Pushing `main` *is* the deploy -- do not run a manual Vercel deploy as part of a routine release.
 - Firebase remains the backend platform: Authentication, Cloud Firestore, and Firestore Rules.
-- Firebase Hosting currently holds a working mirror of the frontend but is **not** the normal production deployment target. Do not run `firebase deploy --only hosting` (or a full `firebase deploy`) as part of a routine release unless the user explicitly requests it.
+- Firebase Hosting for `marked-app-733c0` has been disabled since 08/22/2026: `https://marked-app-733c0.web.app` returns "Site Not Found" and does **not** serve the frontend. It is not a production deployment target. Firebase Authentication's reserved `/__/auth/*` endpoints on `marked-app-733c0.firebaseapp.com` still work independently of Hosting, and Vercel's `/__/auth/*` proxy (see `vercel.json`) depends on them. Do not run `firebase deploy --only hosting` (or a full `firebase deploy`), or otherwise re-enable Firebase Hosting, unless the user explicitly requests it.
 
 ### Normal Frontend Release Workflow
 

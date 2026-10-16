@@ -26,3 +26,14 @@ ui-debug.log
 
 # Vitest / coverage
 coverage
+
+# Claude Code: per-machine files only -- shared project config such as
+# .claude/launch.json stays tracked
+/.claude/settings.local.json
+/.claude/worktrees/
+
+# Noted -> Marked migration manifests, deliberately kept on disk as local
+# historical evidence of the completed migration (see 6a9d6e8). They are
+# not used by deployment, rollback, or any migration tooling, and their
+# document paths contain user UIDs, so they must never be committed.
+/.migration/

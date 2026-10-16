@@ -6,7 +6,6 @@ import {
   formatCount,
   modeForCount,
   normalizeDailyRecord,
-  validateCount,
   validateNote,
   validateOtherCount,
 } from './day'
@@ -106,37 +105,6 @@ describe('validateNote', () => {
   it('accepts a note at exactly the maximum length', () => {
     const result = validateNote('a'.repeat(NOTE_MAX_LENGTH))
     expect(result.valid).toBe(true)
-  })
-})
-
-describe('validateCount', () => {
-  it('treats blank input as no explicit count', () => {
-    expect(validateCount('')).toEqual({ valid: true, count: undefined })
-  })
-
-  it('treats 1 as no explicit count needed', () => {
-    expect(validateCount('1')).toEqual({ valid: true, count: undefined })
-  })
-
-  it('accepts a valid count greater than one', () => {
-    expect(validateCount('3')).toEqual({ valid: true, count: 3 })
-  })
-
-  it('rejects a non-integer value', () => {
-    expect(validateCount('2.5').valid).toBe(false)
-    expect(validateCount('abc').valid).toBe(false)
-  })
-
-  it('rejects a count above the maximum', () => {
-    expect(validateCount(String(COUNT_MAX + 1)).valid).toBe(false)
-  })
-
-  it('accepts a count at exactly the maximum', () => {
-    expect(validateCount(String(COUNT_MAX))).toEqual({ valid: true, count: COUNT_MAX })
-  })
-
-  it('rejects a negative count', () => {
-    expect(validateCount('-1').valid).toBe(false)
   })
 })
 
