@@ -92,6 +92,62 @@
   }
 }
 
+/* Object-glow calibration (STANDARD.md §5.5, "Where the light comes from").
+   The package's recipe is a near bloom and a far bloom only twice as wide,
+   so on a small lit object the far layer reads as a thin tinted rim, not
+   light falling away. Marked.'s calibration widens the far bloom's reach
+   and sets its alphas separately per presentation; the recipe itself
+   (layered box-shadow, per-element --glow-color and --glow-scale, the same
+   hue in both layers) is the package's, restated below only so its far
+   radius can read --glow-far-reach. Not a second glow system: every
+   call site still says `box-shadow: var(--object-glow)`.
+
+   Marked. is the restrained calibration of the family: the source object
+   stays the brightest thing and the far bloom is a faint, wide exhale of
+   its own hue, gone before it can tint a row, a card, or the page. The
+   per-object alphas set at each call site (marked days, today, swatches,
+   the count chip) still apply; only the shared defaults below moved.
+   Dark gets its own pair, as §5.5 requires: a small near-bloom lift for
+   the low-contrast ground, and the far bloom no wider or stronger than
+   daylight's, since colored light against near-black tips into neon
+   long before it does against paper. Like the palette overrides above,
+   dark follows prefers-color-scheme only; this app never sets the
+   package's explicit data-theme hook. */
+:root {
+  --glow-far-reach: 2.4rem;
+  --glow-near-alpha: 44%;
+  --glow-far-alpha: 16%;
+  /* The Today toggle's pill is the one primary object in view, so it is lit
+     a step beyond the shared defaults (see .today-toggle-glow). */
+  --toggle-glow-near-alpha: 58%;
+  --toggle-glow-far-alpha: 26%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glow-near-alpha: 48%;
+    --glow-far-alpha: 15%;
+    /* Dark's pill is already a light fill on a dark track; the shared dark
+       pair is enough, and a lift on top of it reads hot. */
+    --toggle-glow-near-alpha: 48%;
+    --toggle-glow-far-alpha: 15%;
+  }
+}
+
+/* Declared per element, like the package's own, so each element resolves
+   its own --glow-color (see @maker428/ui's glow.css for why a :root-only
+   definition would silently glow nothing). Unlayered, so it follows the
+   package's layered declaration. */
+*,
+*::before,
+*::after {
+  --object-glow:
+    0 0 calc(0.5rem * var(--glow-scale, 1))
+      color-mix(in srgb, var(--glow-color, transparent) var(--glow-near-alpha), transparent),
+    0 0 calc(var(--glow-far-reach) * var(--glow-scale, 1))
+      color-mix(in srgb, var(--glow-color, transparent) var(--glow-far-alpha), transparent);
+}
+
 *,
 *::before,
 *::after {
@@ -705,6 +761,8 @@ fieldset label {
   border-radius: 0.9375rem;
   pointer-events: none;
   --glow-color: var(--today-toggle-accent, var(--color-accent));
+  --glow-near-alpha: var(--toggle-glow-near-alpha);
+  --glow-far-alpha: var(--toggle-glow-far-alpha);
   box-shadow:
     var(--shine),
     var(--object-glow),
